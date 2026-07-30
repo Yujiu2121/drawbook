@@ -49,3 +49,8 @@ next-env.d.ts
 
 # Vercel
 .vercel
+
+# Personal working documents. Not source; they live beside the project, not inside its history.
+*.docx
+*.doc
+*.pdf
