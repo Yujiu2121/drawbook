@@ -7,8 +7,9 @@ import Link from "next/link";
  * and the chain it runs on. External links say where they go, because a link that leaves the site
  * without warning is a small betrayal of the reader.
  *
- * The disclosure line is not marketing. It states exactly which parts are live and which are sample
- * data, and it stays until the raffle program is actually deployed.
+ * The disclosure about which parts are live and which are sample data is not here. It lives in the
+ * Status section of /docs, where someone looking for it will actually be, rather than as a
+ * paragraph of small print under every page.
  */
 
 const COLUMNS = [
@@ -79,15 +80,6 @@ export function SiteFooter() {
               </ul>
             </nav>
           ))}
-        </div>
-
-        <div className="mt-12 flex flex-wrap items-baseline justify-between gap-4 border-t border-line pt-6">
-          <p className="max-w-[74ch] text-sm text-text-3">
-            The wallet, balance and chain figures are live on Rialo testnet. The raffles are sample
-            data held in your browser: the commitments are real SHA-256 digests and the settled draw
-            genuinely audits, but no raffle program is deployed on chain yet.
-          </p>
-          <p className="tnum shrink-0 text-sm text-text-3">testnet.rialo.io</p>
         </div>
       </div>
     </footer>
