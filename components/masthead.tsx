@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Wordmark } from "./logo";
 import { WalletBar } from "./wallet-bar";
 
 /**
@@ -55,9 +56,7 @@ export function Masthead({ variant = "app" }: { variant?: "app" | "landing" }) {
     >
       {landing ? (
         <div className="mx-auto grid h-14 max-w-[1180px] grid-cols-[1fr_auto_1fr] items-center gap-5 px-5">
-          <Link href="/" className="justify-self-start text-base font-medium tracking-tight">
-            Drawbook
-          </Link>
+          <Wordmark className="justify-self-start" />
 
           <Nav className="hidden justify-self-center sm:block" />
 
@@ -67,9 +66,7 @@ export function Masthead({ variant = "app" }: { variant?: "app" | "landing" }) {
         </div>
       ) : (
         <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-5 px-5">
-          <Link href="/" className="shrink-0 text-base font-medium tracking-tight">
-            Drawbook
-          </Link>
+          <Wordmark className="shrink-0" />
           <span aria-hidden="true" className="hidden h-4 w-px bg-line sm:block" />
           <Nav className="hidden sm:block" />
           <div className="ml-auto">

@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Wordmark } from "./logo";
+
 /**
  * One footer for every route.
  *
@@ -43,9 +45,7 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1180px] px-5 py-14">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,0.6fr)]">
           <div>
-            <Link href="/" className="text-base font-medium tracking-tight">
-              Drawbook
-            </Link>
+            <Wordmark />
             <p className="mt-3 max-w-[38ch] text-sm text-text-2">
               On-chain raffles settled by a commit-reveal draw, so nobody picks the winner.
             </p>
