@@ -25,10 +25,43 @@ const mono = Geist_Mono({
   subsets: ["latin"],
 });
 
+/**
+ * Absolute URLs for the social card.
+ *
+ * Scrapers do not resolve relative image paths, so without a metadataBase Next emits a bare
+ * `/opengraph-image.png` and every unfurl silently fails. The production host is read from Vercel's
+ * own system variable rather than hardcoded, which keeps preview deployments pointing at themselves
+ * instead of at production, and falls back to the dev port so the tags are testable locally.
+ */
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : `http://localhost:${process.env.PORT ?? 5522}`;
+
+const description =
+  "On-chain raffles on Rialo testnet, settled by a commit-reveal draw. Every ticket buyer feeds the seed, so anyone can recompute the winner.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Drawbook",
-  description:
-    "On-chain raffles on Rialo testnet, settled by a commit-reveal draw. Every ticket buyer feeds the seed, so anyone can recompute the winner.",
+  description,
+  /*
+    og:title and og:description are not inferred from `title` and `description` above; without this
+    block a share would carry the image and nothing else. The image itself comes from the
+    app/opengraph-image.png file convention, with its alt text alongside it.
+  */
+  openGraph: {
+    type: "website",
+    siteName: "Drawbook",
+    title: "Drawbook",
+    description,
+    url: siteUrl,
+  },
+  // X reuses og:image when no twitter:image is set, so the card only needs its type declaring.
+  twitter: {
+    card: "summary_large_image",
+    title: "Drawbook",
+    description,
+  },
 };
 
 export default function RootLayout({
