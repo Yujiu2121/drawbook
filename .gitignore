@@ -51,6 +51,9 @@ next-env.d.ts
 .vercel
 
 # Personal working documents. Not source; they live beside the project, not inside its history.
+# Matched by name as well as extension: the same notes reappeared as .txt after the extension list
+# alone proved too narrow, and *.txt is too broad to blanket-ignore in a codebase.
+Drawbook-Persiapan-Interview.*
 *.docx
 *.doc
 *.pdf

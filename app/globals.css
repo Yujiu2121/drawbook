@@ -156,6 +156,17 @@ body::after {
     0 12px 32px -12px rgb(0 0 0 / 0.55);
 }
 
+/*
+  Native smooth anchor scrolling, for the case where Lenis is not running: JavaScript disabled, or
+  the component not yet mounted. Gated on the motion preference, because `scroll-behavior: smooth`
+  applied unconditionally overrides someone's explicit request for instant jumps.
+*/
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* Every quantity is monospaced and tabular, so columns of figures align. */
 .tnum {
   font-family: var(--font-mono), ui-monospace, monospace;

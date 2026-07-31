@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { SmoothScroll } from "@/components/smooth-scroll";
 import { Instrument_Sans, Geist_Mono } from "next/font/google";
+import "lenis/dist/lenis.css";
 import "./globals.css";
 
 /**
@@ -36,7 +38,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${display.variable} ${mono.variable} h-full antialiased`}>
-      <body className="min-h-[100dvh]">{children}</body>
+      <body className="min-h-[100dvh]">
+        <SmoothScroll />
+        {children}
+      </body>
     </html>
   );
 }
