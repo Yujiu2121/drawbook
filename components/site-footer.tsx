@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DiscordLogo, TelegramLogo, XLogo } from "@phosphor-icons/react/dist/ssr";
+import { DiscordLogo, XLogo } from "@phosphor-icons/react/dist/ssr";
 
 import { Wordmark } from "./logo";
 
@@ -52,7 +52,6 @@ const COLUMNS = [
     social: [
       { label: "Rialo on X", href: "https://x.com/RialoHQ", Icon: XLogo },
       { label: "Rialo on Discord", href: "https://discord.gg/RialoProtocol", Icon: DiscordLogo },
-      { label: "Rialo on Telegram", href: "https://t.me/rialoprotocol", Icon: TelegramLogo },
     ],
   },
 ];
@@ -115,10 +114,10 @@ export function SiteFooter() {
                       >
                         {/*
                           Filled rather than the outline weight used elsewhere. XLogo is a solid
-                          letterform at every weight, so at `regular` it sits next to an outlined
-                          Discord and Telegram and reads a full step heavier than both. Filling all
-                          three evens them out and matches how the brands actually draw their marks,
-                          which is also simply more legible at 18px than a hairline glyph.
+                          letterform at every weight, so at `regular` it sits beside an outlined
+                          Discord and reads a full step heavier than it. Filling both evens them out
+                          and matches how the brands actually draw their marks, which is also simply
+                          more legible at 18px than a hairline glyph.
                         */}
                         <Icon size={18} weight="fill" aria-hidden="true" />
                         <span className="sr-only">{label} (opens in a new tab)</span>
