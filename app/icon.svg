@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" fill="#17171b"/>
-  <rect width="32" height="1" fill="#ffffff" opacity=".07"/>
-  <rect x="6" y="3" width="13" height="6" fill="#8a8780"/>
-  <rect x="12" y="13" width="20" height="6" fill="#e4d7b0"/>
-  <rect x="6" y="23" width="13" height="6" fill="#8a8780"/>
+  <!-- The Drawbook mark on the Sweep ground: a revealed ticket, which is a sold cell
+       with the reveal band across its foot. Drawn on the 32 grid in whole units so the
+       band never lands on a half pixel. See components/logo.tsx for the mark itself. -->
+  <rect width="32" height="32" fill="#e9eaf6"/>
+  <rect x="4" y="4" width="24" height="24" fill="#16142c"/>
+  <rect x="4" y="19" width="24" height="9" fill="#9fa6ff"/>
 </svg>

@@ -1,269 +1,493 @@
 @import "tailwindcss";
+@import "./cell.css";
+@import "./motion.css";
 
 /*
-  Drawbook design tokens.
+  Drawbook design tokens: SWEEP / CELL.
 
-  This is the third system on this surface. First was ruled paper, which suited a savings ledger and
-  was wrong for a raffle. Second was a hard scoreboard: correct hierarchy, but the register was a
-  developer tool, because a loud amber on cold blue-black is the palette of a warning light.
+  THE MATERIAL MODEL IS THE SYSTEM
+  --------------------------------
+  The ground is the light source and ink is where light is blocked. A lightbox seen square-on casts
+  no shadow, so there are none: zero shadows of any kind, zero blur filters, zero backdrop filters,
+  zero decorative gradients, anywhere in this product. Depth comes from what a surface is made of,
+  not from a fake light that does not exist in the room. The one film over the whole page is a
+  diffusion grain at the bottom of this file, and it is a material, not a glow.
 
-  Premium is not achieved by adding gloss. Glassmorphism, gradients, a glow behind the figure and a
-  gold serif headline are the default reach and they read as cheap. The three levers that actually
-  move it are typography, space, and material:
+  (The one occurrence of the string `box` plus `shadow` in the COMPILED stylesheet comes from
+  Tailwind's own preflight, which resets Firefox's built-in invalid-field shadow to none. It removes
+  a shadow rather than drawing one. Nothing in this product authors one.)
 
-    TYPOGRAPHY  A display face with presence rather than a neutral UI grotesque, set tight and
-                large. Figures stay monospaced, because tabular figures are this product's identity.
-    SPACE       Fewer things, further apart. Panel padding is close to double what it was, and the
-                detail page lost a panel rather than gaining decoration.
-    MATERIAL    One hairline of light along the top of each surface, as though lit from above, plus a
-                wide soft ambient shadow. That is the honest cue for a raised physical object. A
-                glow is not; a glow is a light source that does not exist.
+  A ticket is a CELL. The same cell is drawn at four scales: a 6px sliver in a board row, a 22px
+  sliver when that row opens, an 88px square in the ticket bed, and the whole viewport during the
+  draw. Nothing about it changes but its size, which is why a row and a page can be the same object
+  and a navigation can be a growth rather than a replacement.
 
-  Colour does the least work here, and deliberately. The base is a deep neutral with a whisper of
-  warmth rather than blue-black, text is a warm off-white, and the accent moved from a saturated
-  amber to a pale champagne. Low chroma at high lightness reads as light falling on a surface;
-  mid-chroma warm gold reads as paint, which is the tell in every AI-generated "premium" page. It is
-  still exactly ONE accent, still reserved for live countdowns, tickets that are yours, and winners.
-  A void raffle is drained to --text-3, never given a second colour.
+  THE STRUCTURE OF THIS FILE, and why it is in this order
+  -------------------------------------------------------
+  1. RESET     Tailwind's palette, radius scale, type scale and font stacks are cleared.
+  2. PALETTE   Raw hexes. Named for the material. NEVER exposed as a utility class.
+  3. ROLES     What a component may name, and the single `.inv` block that flips all of it.
+  4. THEME     `@theme inline`, mapping roles to utilities. `inline` is load-bearing, see below.
+  5. BASE      Four rules, then the diffusion film.
+  6. TYPE      The nine Martian Mono width instances, as classes, so no component writes
+               `font-variation-settings` inline and quietly invents a tenth.
 
-  The surface was lifted out of near-black on 2026-07-30: #0b0b0c read as oppressive rather than
-  premium, and a flat void gives the eye no sense of a lit room. Everything moved up together, and
-  --text-3 had to move up with it: at the old #7b7871 it fell to 4.06:1 against the lighter ground,
-  below AA. Lightening a background silently breaks the dimmest text on the page, which is why these
-  ratios are recomputed rather than assumed each time.
+  RADIUS IS ZERO AND THAT IS ENFORCED, NOT REMEMBERED
+  ---------------------------------------------------
+  There is no radius token in this file. Block 1 clears the `--radius-*` namespace, so every named
+  radius step and the bare `rounded` class compile to nothing at all. The cell is a cell.
+  `rounded-full` survives the reset as a static keyword and would turn a cell into a lozenge: do not
+  write it.
 
-  Contrast against --page, computed rather than eyeballed:
-    --text    16.0:1  (AAA)
-    --text-2   7.0:1  (AAA large, AA body)
-    --text-3   5.0:1  (AA)
-    --accent  12.5:1  (AAA)
+  CONTRAST, COMPUTED
+  ------------------
+  Every pair below was recomputed from the hexes with the WCAG formula (0.03928 knee,
+  L = 0.2126R + 0.7152G + 0.0722B, ratio = (L1 + 0.05) / (L2 + 0.05)), formula sanity-checked at
+  #ffffff on #000000 = 21.00. Each text token is checked against the surface it actually sits on,
+  not against the page. Read as `light | inverted`.
 
-  The background token is named `page` rather than `base`, because `--color-base` would generate a
-  `text-base` colour utility that collides with Tailwind's `text-base` font size.
+                   on panel      on panel-2    on phase      on recess
+    --fg           15.01 | 15.01 13.82 | 15.01 12.55 | 15.01 11.86 | 11.15
+    --fg-2          7.60 |  7.49  7.00 |  7.49  6.35 |  7.49  6.01 |  5.57
+    --fg-3          5.73 |  5.65  5.27 |  5.65  4.79 |  5.65  4.53 |  4.20 *
+    --event         7.05 |  8.01  6.49 |  8.01  5.90 |  8.01  5.57 |  5.95
+    --bound         5.18 |  5.65  4.77 |  5.65  4.33 |  5.65  4.10 |  4.20
+    --rule          1.71 |  1.35  1.58 |  1.35  1.43 |  1.35  1.36 |  1.00
 
-  Radius: 0 on surfaces, 2px on controls. Sharp edges plus air reads editorial; softened edges plus
-  air reads like a consumer app, and this is closer to a broker's terminal than to a phone game.
+    * The only failing pair the palette can produce, and block 3 removes it by construction rather
+      than by discipline: `.inv .recess { --fg-3: var(--paper-2) }` makes it 5.57. Inside an
+      inverted well there is no third text weight, because the material cannot carry one.
+
+    cells   --on-cell on --cell       15.01 | 7.49
+            --on-sold on --cell-sold   7.49 | 7.49
+            --on-won  on --cell-won    7.05 | 8.01
+            An unsold cell is separated from a sold one by a 1px --bound gap: 5.18 light, 5.65
+            inverted, both clear of the 3:1 that SC 1.4.11 asks of a non-text state indicator.
+
+    blade   --sweep-record (--ink) on --card 13.82. A --paper blade over --card would be 1.09,
+            which is a 620ms nothing, which is why the blade sits outside the role system.
+
+    Tightest passing text pair in the whole system: --fg-3 on --recess on light, 4.53.
+    Do not lighten --ink-3 and do not darken --well. Every --bound pair clears 3:1, worst case 4.10.
+    --rule is decorative only. It is never text and never a control boundary; that is --bound.
+
+  THE THREE PAIRS THAT FAIL AND CANNOT BE REACHED
+  -----------------------------------------------
+  --iris on --ink is 2.13, --edge on --ink is 2.90, --paper-3 on --line-inv is 4.20. All three are
+  real and all three are unreachable, because inside `.inv` the roles that would produce them are
+  redefined: --event becomes --iris-lift (8.01), --bound becomes --paper-3 (5.65), and --fg-3 inside
+  a recess becomes --paper-2 (5.57). A component that writes the role name gets the right value on
+  both sides. That is the entire argument for having a role layer.
 */
 
+/* ------------------------------------------------------------------------ 1. RESET
+   Four namespaces cleared, and clearing a namespace is all-or-nothing: Tailwind emits nothing
+   rather than an error, so a utility that used to work simply stops producing CSS. Verified by
+   compiling against the installed tailwindcss 4.3.3. After this reset:
+
+     GONE      every default colour utility: the whole shipped palette, in every namespace
+               every radius step, bare and named alike
+               every default type step, including the numbered display sizes
+               the default font stacks (font-sans, font-mono, font-serif as Tailwind shipped them)
+
+     KEPT      rounded-full, rounded-none, border-transparent, bg-transparent, text-current,
+               text-inherit, the whole --spacing scale (p-4, gap-2), --leading-*, --tracking-*,
+               every layout, flex, grid, transition and transform utility.
+
+   Everything named below is re-declared in block 4, so the only classes that stop working are the
+   ones this system has no answer for. Reaching for a stock palette utility is the tell that you
+   have left the system, and here it is a build fact rather than a review note. */
+@theme {
+  --color-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+}
+
+/* ------------------------------------------------------------------- 2. THE PALETTE
+   One hue at five densities, plus motion and rhythm constants.
+
+   These raw names are deliberately NOT exposed as utilities. `text-ink` inside an inverted block is
+   1.00:1, and the way to make that unwritable is for the class not to exist. Name a role instead. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --page: #17171b;
-  --raised: #1f1f24;
-  --sunken: #121215;
+  /* the lit side: four surfaces, from the page down into a well */
+  --ground: #e9eaf6;
+  --card: #dfe1f1;
+  --wash: #d5d5f7;
+  --well: #ced1e6;
 
-  --line: #2e2e34;
-  --line-2: #43434c;
+  /* boundaries. --line is a separator you should barely see; --edge is a boundary that carries
+     meaning and has to clear 3:1. --line-inv is the well on the dark side. */
+  --line: #b0b4cc;
+  --edge: #5c6076;
+  --line-inv: #2e2c4a;
 
-  --text: #f4f2ee;
-  --text-2: #a5a29b;
-  --text-3: #8a8780;
+  /* ink, at three weights */
+  --ink: #16142c;
+  --ink-2: #434761;
+  --ink-3: #555974;
 
-  --accent: #e4d7b0;
-  /* The accent at low alpha over the page, for a header band that must not shout. */
-  --accent-wash: #35301f;
+  /* paper, at three weights. --paper and --ground are the same hex on purpose: same light, two
+     roles. Both names stay so they can diverge later without a rename across two dozen files. */
+  --paper: #e9eaf6;
+  --paper-2: #a2a6c2;
+  --paper-3: #8a8fad;
+
+  /* the signal, prepared twice: one for ink on light, one for light on ink */
+  --iris: #4a22d6;
+  --iris-lift: #9fa6ff;
+
+  /* MOTION. Two curves and six durations, and that is the whole vocabulary.
+     --ease-blade cuts: fast out, decisive stop. Sweeps, punches, cursor steps.
+     --ease-settle lands: quick then eased, no overshoot. Flight, reorder, the row opening.
+     Tailwind 4.3.3 has no --duration-* namespace (verified by compiling), so the six durations
+     stay plain custom properties. Read them as duration-[var(--t-blade)] in a class, or straight
+     from getComputedStyle in an imperative animate(). */
+  --ease-blade: cubic-bezier(0.7, 0, 0.2, 1);
+  --ease-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-punch: 180ms;   /* one cell changed state                      */
+  --t-open: 200ms;    /* a row opens under the pointer               */
+  --t-blade: 260ms;   /* a scoped blade crosses a block              */
+  --t-settle: 320ms;  /* rows reorder, the unit changes              */
+  --t-grow: 460ms;    /* a cell grows into a page                    */
+  --t-invert: 620ms;  /* a raffle leaves the floor and the block flips */
+
+  /* RHYTHM. One gutter for the whole product, and the masthead's height, which several routes
+     need as a scroll offset as well as a padding. */
+  --pad: clamp(20px, 4.4vw, 56px);
+  --mast: 56px;
 }
 
+/* --------------------------------------------------------------------- 3. THE ROLES
+   Everything a component is allowed to name. There are seventeen, and adding an eighteenth should
+   feel like a decision.
+
+   The whole inversion is the single `.inv` block below. One class on one parent repaints a block, a
+   route or the archive slab, and every descendant follows, because block 4 uses `@theme inline` and
+   so each utility emits `var(--fg)` rather than an indirection already resolved at :root. Measured
+   both ways in Chromium: with `inline`, `.inv` flips a `text-fg` child to rgb(233,234,246); without
+   it, the same child stays rgb(22,20,44) and the inversion silently does nothing. */
+:root {
+  --panel: var(--ground);   /* the page: a lit panel                                  */
+  --panel-2: var(--card);   /* a live raffle row, a panel raised off the page         */
+  --phase: var(--wash);     /* a raffle inside its reveal window: a surface, not a tint */
+  --recess: var(--well);    /* ticket bed, code block, payload block                  */
+
+  --fg: var(--ink);         /* primary text, and the fill of an inverted surface      */
+  --fg-2: var(--ink-2);     /* secondary text, the 19px lead                          */
+  --fg-3: var(--ink-3);     /* labels, captions, timestamps                           */
+
+  --rule: var(--line);      /* separator. Never a control, never text.                */
+  --bound: var(--edge);     /* control boundary and data-cell boundary                */
+  --event: var(--iris);     /* the signal: motion, focus, a winner fill               */
+
+  --cell: var(--ground);    /* an unsold ticket, at every scale                       */
+  --cell-sold: var(--ink);
+  --cell-won: var(--iris);
+  --on-cell: var(--ink);
+  --on-sold: var(--paper-2);
+  --on-won: var(--paper);   /* the serial AND the yours-marker printed on a winner    */
+}
+
+.inv {
+  --panel: var(--ink);
+  --panel-2: var(--ink);
+  --phase: var(--ink);
+  --recess: var(--line-inv);
+
+  --fg: var(--paper);
+  --fg-2: var(--paper-2);
+  --fg-3: var(--paper-3);
+
+  --rule: var(--line-inv);
+  --bound: var(--paper-3);   /* --edge is 2.90 on --ink: a stated hard rule, now unreachable */
+  --event: var(--iris-lift); /* --iris is 2.13 on --ink: the same                            */
+
+  --cell: var(--paper-2);
+  --cell-won: var(--iris-lift);
+  --on-won: var(--ink);
+}
+
+/* The one remaining computed failure in the palette, made structurally impossible.
+   --paper-3 on --line-inv is 4.20. Inside an inverted well, fg-3 IS fg-2: 5.57. */
+.inv .recess {
+  --fg-3: var(--paper-2);
+}
+
+/* ------------------------------------------------------------------ 4. THEME INLINE
+   `inline` is not decoration, see the note in block 3. Only roles are mapped here. No raw palette
+   name reaches a utility. */
 @theme inline {
-  --color-page: var(--page);
-  --color-raised: var(--raised);
-  --color-sunken: var(--sunken);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-phase: var(--phase);
+  --color-recess: var(--recess);
 
-  --color-line: var(--line);
-  --color-line-2: var(--line-2);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
 
-  --color-text: var(--text);
-  --color-text-2: var(--text-2);
-  --color-text-3: var(--text-3);
+  --color-rule: var(--rule);
+  --color-bound: var(--bound);
+  --color-event: var(--event);
 
-  --color-accent: var(--accent);
-  --color-accent-wash: var(--accent-wash);
+  --color-cell: var(--cell);
+  --color-cell-sold: var(--cell-sold);
+  --color-cell-won: var(--cell-won);
+  --color-on-cell: var(--on-cell);
+  --color-on-sold: var(--on-sold);
+  --color-on-won: var(--on-won);
 
-  --font-sans: var(--font-display);
-  --font-mono: var(--font-geist-mono);
+  /* The blade sits OUTSIDE the role system on purpose: it is a fixed rectangle drawn above a route
+     rather than a surface inside one, and which colour it is IS the message. --iris means you
+     moved. --ink means this raffle has left the floor, and the blade is depositing the darker
+     surface it leaves behind. */
+  --color-sweep: var(--iris);
+  --color-sweep-record: var(--ink);
 
-  /*
-    Five steps, with a wider gap between them than before. Compressed scales read as timid; a
-    decisive jump from body to display is most of what makes a page feel confident.
-  */
-  --text-display: 3.5rem;
-  --text-display--line-height: 0.94;
-  --text-display--letter-spacing: -0.035em;
-  --text-lg: 1.1875rem;
-  --text-lg--line-height: 1.35;
-  --text-base: 0.9375rem;
-  --text-base--line-height: 1.6;
-  --text-sm: 0.8125rem;
+  /* ---- TYPE.
+     Four UI steps, in rem rather than px so a raised browser font size is honoured. Nothing in the
+     running interface is larger than 19px: the display steps are for figures and argument, and the
+     chrome stays quiet under them.
+
+     The six display steps are all Martian Mono at width 112 except --manifesto, --display and
+     --title. Their character budgets are not advisory. Measured with fontTools on the subset latin
+     woff2 (upm 1000, HVAR and avar present, advance invariant across wght 400-700): width 75 is
+     0.600em per glyph, 87 is 0.648em, 100 is 0.700em, 112 is 0.748em. With the -0.045em tracking
+     below, a monument glyph costs 0.703em. Exceed the budget and the figure runs out of the
+     measure on a 320px phone, where --pad leaves 280px. */
+  --text-monument: clamp(3rem, 15vw, 12.5rem); /* MAX 8 GLYPHS. countdown, ceremony figure.
+        The 3rem floor is deliberate and lower than the spec's 3.25rem: at 3.25rem an 8-glyph
+        countdown is 8 x 0.703 x 52 = 292.4px inside a 320px phone's 280px measure. 3rem gives
+        270px and fits. */
+  --text-monument--line-height: 0.82;
+  --text-monument--letter-spacing: -0.045em;
+
+  --text-alarm: clamp(4rem, 22vw, 17.5rem); /* MAX 5 GLYPHS. the final hour, in seconds. */
+  --text-alarm--line-height: 0.82;
+  --text-alarm--letter-spacing: -0.045em;
+
+  --text-pool: clamp(3.5rem, 12vw, 9.5rem); /* MAX 6 GLYPHS. the pool. */
+  --text-pool--line-height: 0.82;
+  --text-pool--letter-spacing: -0.045em;
+
+  --text-manifesto: clamp(2.75rem, 8.4vw, 7rem); /* the landing sentence, and nothing else. */
+  --text-manifesto--line-height: 1.02;
+  --text-manifesto--letter-spacing: -0.005em;
+
+  --text-display: clamp(2.25rem, 5.6vw, 4.5rem); /* route titles. */
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.005em;
+
+  --text-title: clamp(1.5rem, 2.6vw, 2.125rem); /* section heads. */
+  --text-title--line-height: 1.06;
+
+  --text-lg: 1.1875rem;    /* 19px lead. The largest running text in the product. */
+  --text-lg--line-height: 1.5;
+  --text-base: 0.9375rem;  /* 15px body */
+  --text-base--line-height: 1.5;
+  --text-sm: 0.8125rem;    /* 13px table row */
   --text-sm--line-height: 1.5;
-  --text-xs: 0.6875rem;
-  --text-xs--line-height: 1.35;
+  --text-label: 0.6875rem; /* 11px label */
+  --text-label--line-height: 1.4;
+  --text-label--letter-spacing: 0.14em;
 
-  --radius-control: 2px;
+  /* ---- FAMILIES.
+     The three faces are self-hosted from app/fonts and loaded through next/font/local in
+     app/layout.tsx. Consume the variable names it publishes: --font-display is Archivo,
+     --font-geist-mono is Martian Mono, --font-serif is Young Serif. Do not rename them and do not
+     reintroduce next/font/google: fonts.gstatic.com is unreachable from this machine and the build
+     fails outright.
+
+     Declaring --font-sans also sets Tailwind's --default-font-family, and --font-mono sets
+     --default-mono-font-family, so every <pre> in every payload block gets Martian Mono from the
+     preflight with no class on it. Verified by compiling.
+
+     Young Serif is reached through the `font-serif` utility defined in block 6, not through a
+     --font-serif theme key, because the theme key would collide with next/font's own variable of
+     that exact name on the same :root element. */
+  --font-sans: var(--font-display), "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* ---- MOTION, as utilities. `ease-blade` and `ease-settle` compile; durations do not have a
+     namespace in 4.3.3 and are read as duration-[var(--t-blade)]. */
+  --ease-blade: var(--ease-blade);
+  --ease-settle: var(--ease-settle);
+
+  /* ---- RHYTHM. --spacing-* is the padding, margin and gap namespace, so px-pad, py-pad, gap-pad,
+     pt-mast and scroll-mt-mast all compile. */
+  --spacing-pad: var(--pad);
+  --spacing-mast: var(--mast);
 }
 
-/*
-  Default every border to the hairline, inside @layer base so Tailwind's border utilities can still
-  override it. Unlayered CSS outranks anything in @layer, so writing this bare would silently defeat
-  every border-accent on the page.
-*/
+/* ------------------------------------------------------------------------- 5. BASE
+   Four rules. Anything more structural belongs in cell.css, where it can be read next to the thing
+   it describes. These live inside @layer base so Tailwind's own utilities still outrank them:
+   unlayered CSS beats every layer, so writing the border default bare would silently defeat every
+   border-bound on the page. */
 @layer base {
   * {
-    border-color: var(--line);
+    border-color: var(--rule);
+  }
+
+  body {
+    background: var(--panel);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+
+    /* The stacking context the diffusion film below hangs from. See the note there. */
+    position: relative;
+    z-index: 0;
+
+    /* There is deliberately no -webkit-font-smoothing here, and the `antialiased` class is gone
+       from <html>. Greyscale smoothing is right for pale text on a dark page and wrong for this
+       one: on dark ink over a lit panel it thins the stems and under-inks 15px Archivo. */
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--event);
+    outline-offset: 2px;
+  }
+
+  /* --event follows the block, so an inverted section gets --iris-lift here with no second rule.
+     Selection has to be written twice because the pair is a fill and its own foreground. */
+  ::selection {
+    background: var(--iris);
+    color: var(--paper);
+  }
+  .inv ::selection {
+    background: var(--iris-lift);
+    color: var(--ink);
   }
 }
 
-body {
-  background: var(--page);
-  color: var(--text);
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-size: var(--text-base);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
 /*
-  A single film of grain over everything, fixed and pointer-events-none.
+  THE DIFFUSION FILM.
 
-  The technique is borrowed from ui-layouts' `noise` demo, but not the implementation: that one
-  loads a /noise.gif and drives its opacity from a slider. Here it is an inline SVG feTurbulence
-  data URI, so there is no network request, no asset to ship, and nothing to keep in sync.
+  One fixed feTurbulence tile, normal blend, no filter on any live element. It is the material of
+  the light itself: a lightbox is diffused, otherwise it is a screen. 140px tile at 5.5% keeps it
+  under the threshold where it reads as texture rather than as noise, and it is fixed so it does not
+  travel with the scroll, which is what makes it read as the panel rather than as a layer on the
+  content.
 
-  It has to be `fixed`, and it has to not scroll. Grain applied to a scrolling container repaints
-  the whole texture every frame and destroys mobile frame rate; pinned to the viewport it composites
-  once. Kept at 3.5% because grain's job is to stop a large dark field reading as a void, and any
-  more starts reading as a dirty screen.
+  It sits BELOW the content. `body` is made a stacking context above, and the film is given z-index
+  -1 inside it, which puts the film over the page background and under every child. This is done
+  here rather than by wrapping the app in a z-indexed div, so no layout file has to know about it.
+
+  The consequence, and it is easy to trip over: anything that paints an opaque --panel background
+  over the full width hides the film beneath it. The root layout wrapper must not carry a
+  background. A panel that genuinely is a different surface (--panel-2, --phase, --recess) is
+  supposed to cover it, because that is a different material.
 */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: -1;
   pointer-events: none;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='140' height='140' filter='url(%23f)'/></svg>");
+  background-size: 140px 140px;
 }
 
 /*
-  A raised surface. One hairline of light along the top edge and a wide, low-opacity ambient shadow
-  tinted to the background rather than pure black. Two lines of CSS, and the only depth cue on the
-  page.
+  ------------------------------------------------------------------------- 6. THE TYPE INSTANCES
+
+  Nine Martian Mono width instances and one serif, as classes, because there are nine and a
+  component that writes `font-variation-settings` inline invents a tenth within a week.
+
+  Width comes from font-variation-settings; weight comes from real `font-weight`. That split is not
+  cosmetic: encoding wght inside font-variation-settings means <b> and <strong> synthesise on top of
+  it and every emphasised run needs a `font-weight: 400` to undo the browser before the axis takes
+  effect. Real font-weight also inherits and animates. The rendering is identical.
+
+  Size is NOT baked in, except on `label`, where 11px uppercase is the whole definition of the
+  thing. Pair these with a `text-*` step.
 */
-.surface {
-  background: var(--raised);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.045),
-    0 1px 2px rgb(0 0 0 / 0.4),
-    0 12px 32px -12px rgb(0 0 0 / 0.55);
+@utility monument {
+  /* the countdown, the ceremony figure. 0.703em per glyph including the tracking. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 112;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.82;
 }
 
-/*
-  Native smooth anchor scrolling, for the case where Lenis is not running: JavaScript disabled, or
-  the component not yet mounted. Gated on the motion preference, because `scroll-behavior: smooth`
-  applied unconditionally overrides someone's explicit request for instant jumps.
-*/
-@media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
+@utility figure {
+  /* facts, pool figures, ledger values: every quantity in a table or a fact row. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 100;
+  font-weight: 500;
 }
 
-/* Every quantity is monospaced and tabular, so columns of figures align. */
-.tnum {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+@utility figure-b {
+  /* the emphasised figure inside a sentence, where a rule states its own unit. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 100;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-/* A figure large enough to read across a room, optically tightened at that size. */
-.board-figure {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
-  letter-spacing: -0.04em;
+@utility mono {
+  /* the payload <pre>: the exact bytes that would be posted. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 100;
+  font-weight: 400;
 }
 
-/* Small caps labels carry the hierarchy, so their tracking is set once here. */
-.label {
-  font-size: var(--text-xs);
+@utility serial {
+  /* the wordmark and a raffle's four-digit serial. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 87;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+@utility stream {
+  /* the ceremony's nonce rows, which scroll past and must not shout. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 87;
+  font-weight: 400;
+}
+
+@utility label {
+  /* every uppercase label in the chrome. Width 75 is what makes 11px uppercase at 0.14em fit the
+     column it names: 0.600em per glyph against 0.700em at the default width, 17% narrower. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 75;
+  font-weight: 600;
+  font-size: var(--text-label);
+  line-height: 1.4;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-3);
 }
 
-:where(a, button, [role="button"], input, select, summary):focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 3px;
+@utility label-b {
+  /* a nonce index: a label that is also a number you may need to find. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 75;
+  font-weight: 700;
 }
 
-::selection {
-  background: var(--accent);
-  color: var(--page);
+@utility digest {
+  /* a preimage or a commitment: long, unreadable on purpose, and narrow so it fits. */
+  font-family: var(--font-mono);
+  font-variation-settings: "wdth" 75;
+  font-weight: 400;
+  word-break: break-all;
 }
 
-/*
-  Surfaces arrive rather than appearing. One 400ms fade and 8px rise, staggered by position, which
-  is enough to read as intent and short enough never to be in the way. Nothing loops.
-*/
-@media (prefers-reduced-motion: no-preference) {
-  @keyframes surface-in {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  .surface-in {
-    animation: surface-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--index, 0) * 60ms);
-  }
-
-  /*
-    A slow sweep along a ticket bar that is still filling.
-
-    This is the only looping animation in the app, and it is stateful rather than decorative: it runs
-    on a raffle that is selling and does not run on one that has closed, so movement on the bar means
-    tickets can still be bought. A pulse applied to every bar regardless of state would say nothing.
-
-    Only `transform` is animated, on a compositor layer, so the loop costs nothing per frame.
-  */
-  @keyframes bar-sweep {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(100%);
-    }
-  }
-
-  .bar-live {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .bar-live::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--accent) 70%, transparent),
-      transparent
-    );
-    animation: bar-sweep 2.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+@utility font-serif {
+  /* Young Serif, the argument. One weight, no italic, never below 28px, never in the UI, never
+     centred. Defined as a utility rather than a --font-serif theme key so it cannot collide with
+     next/font's variable of the same name on the same element. */
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.005em;
 }

@@ -1,9 +1,18 @@
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 
-import { Masthead } from "@/components/masthead";
-import { SiteFooter } from "@/components/site-footer";
-import { Article, H2, LI, Note, P, PageHead, UL } from "@/components/prose";
+import { H2, LI, Note, P, PageHead, Reading, UL } from "@/components/prose";
+
+/** The section index in the margin. Kept beside the page so it cannot drift from the H2 ids. */
+const CONTENTS: [string, string][] = [
+  ["the-problem", "The problem with picking a winner"],
+  ["the-idea", "The idea: everybody brings a piece"],
+  ["commit", "Move one: lock it in without showing it"],
+  ["reveal", "Move two: open the envelopes"],
+  ["draw", "The draw"],
+  ["honest", "What this does not promise"],
+  ["start", "Getting started"],
+];
 
 export const metadata = {
   title: "Learn: how a Drawbook raffle works",
@@ -16,11 +25,17 @@ export const metadata = {
  *
  * No formulas here; those live in /docs. The job of this page is to make the mechanism feel obvious,
  * including the part where it is honest about what it does not guarantee.
+ *
+ * QUIET BY DESIGN, like /docs. This is a reading room, lit flat: no ticket, no drum, no signal hue
+ * and no motion. Everything the page needs it gets from the prose components, and the single bright
+ * thing on it is the button at the end, because in this room the bright thing is the thing you take.
+ *
+ * There is no card stock anywhere in the body, and that is the difference from /docs rather than an
+ * oversight: this page quotes nothing from the machine, so there is nothing on it to print.
  */
 export default function LearnPage() {
   return (
     <>
-      <Masthead />
       <main className="mx-auto w-full max-w-[1180px] px-5 pb-20">
         <PageHead
           eyebrow="Learn"
@@ -28,7 +43,7 @@ export default function LearnPage() {
           lede="A raffle only works if nobody can choose who wins. Here is the whole idea, without the cryptography."
         />
 
-        <Article className="mt-16">
+        <Reading contents={CONTENTS}>
           <H2 id="the-problem">The problem with picking a winner</H2>
           <P>
             Somebody has to produce a random number. If the person running the raffle produces it,
@@ -103,6 +118,18 @@ export default function LearnPage() {
           </P>
 
           <H2 id="start">Getting started</H2>
+          {/*
+            The caveat comes before the steps, not after them. Steps three and four describe actions
+            that do not reach the chain today, and a reader who follows them and then finds out is
+            owed the sentence first. /create prints the same statement at the head of its own
+            terminal state for the same reason.
+          */}
+          <P>
+            Buying and revealing are not wired to the chain yet, because no raffle program is
+            deployed on Rialo testnet. Both stop at the exact payload that would be posted, so you
+            can read what your ticket would commit to before anything is signed. The wallet, the
+            balance and the chain figures are real.
+          </P>
           <UL>
             <LI>Connect a wallet from the header. It creates a testnet key in this browser.</LI>
             <LI>Take testnet RLO from the faucet. It is free and it is not real money.</LI>
@@ -110,10 +137,17 @@ export default function LearnPage() {
             <LI>Come back after the sale closes and reveal, or lose the bond.</LI>
           </UL>
 
+          {/*
+            The primary action is card stock, not the signal hue. The signal is ceremonial and means
+            a winner; a link to a list of raffles is not a ceremony. Ivory is the correct answer
+            anyway, because it is the only bright material in the room, so the eye lands on it
+            without any colour being spent. Plain `bg-stock` rather than the `.stock` class: a
+            control is a control, and the card object's shadow pair would float it off the page.
+          */}
           <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-3">
             <Link
               href="/raffles"
-              className="group inline-flex items-center gap-2 rounded-control bg-accent px-5 py-3 text-sm font-medium text-page transition-transform active:translate-y-px"
+              className="group inline-flex items-center gap-2 rounded-control bg-stock px-5 py-3 text-sm font-medium text-ink transition hover:bg-stock-2 active:translate-y-px"
             >
               See the open raffles
               <ArrowRight
@@ -130,9 +164,8 @@ export default function LearnPage() {
               The formulas, in Docs
             </Link>
           </div>
-        </Article>
+        </Reading>
       </main>
-      <SiteFooter />
     </>
   );
 }

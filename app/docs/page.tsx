@@ -1,8 +1,18 @@
 import Link from "next/link";
 
-import { Masthead } from "@/components/masthead";
-import { SiteFooter } from "@/components/site-footer";
-import { Article, C, Code, Facts, H2, H3, LI, Note, P, PageHead, UL } from "@/components/prose";
+import { C, Code, Facts, H2, H3, LI, Note, P, PageHead, Reading, UL } from "@/components/prose";
+
+/** The section index in the margin. Kept beside the page so it cannot drift from the H2 ids. */
+const CONTENTS: [string, string][] = [
+  ["commitment", "Commitment"],
+  ["seed", "Seed derivation"],
+  ["properties", "What holds"],
+  ["limits", "What does not hold"],
+  ["verify", "Verifying a settled draw"],
+  ["onchain", "On-chain design"],
+  ["network", "Network reference"],
+  ["status", "Status"],
+];
 
 export const metadata = {
   title: "Docs: the Drawbook draw scheme",
@@ -16,11 +26,18 @@ export const metadata = {
  * Every figure and claim on this page came out of the project's own verification scripts or a direct
  * probe of the Rialo node, not from documentation. Where something is unverified it says so, because
  * a reference that overstates is worse than one that is thin.
+ *
+ * QUIET BY DESIGN, like /learn. This is a reading room, lit flat: no ticket, no drum, no signal hue
+ * and no motion. The only ivory on the page is where the page quotes the machine rather than
+ * arguing with it: the two formulas, the selection keystream, the two tables of measured and probed
+ * values, and every inline identifier. Everything the author says stays dark in the room.
+ *
+ * The section index in the margin is the reason the head rule runs the full width. It is also the
+ * reason the anchors on these headings exist at all, since nothing else on the site links to them.
  */
 export default function DocsPage() {
   return (
     <>
-      <Masthead />
       <main className="mx-auto w-full max-w-[1180px] px-5 pb-20">
         <PageHead
           eyebrow="Docs"
@@ -28,7 +45,7 @@ export default function DocsPage() {
           lede="Commitment and seed derivation, what the construction guarantees and what it does not, and how to recompute a settled draw yourself."
         />
 
-        <Article className="mt-16">
+        <Reading contents={CONTENTS}>
           <H2 id="commitment">Commitment</H2>
           <P>
             Buying ticket <C>i</C> publishes a digest, never the nonce. The preimage binds the nonce
@@ -61,7 +78,7 @@ export default function DocsPage() {
             <C>rialo_s_random_seed::get_random_seed()</C>. It is mixed in, never relied on alone. See{" "}
             <Link
               href="#limits"
-              className="underline decoration-line-2 underline-offset-4 hover:text-text"
+              className="underline decoration-line-2 underline-offset-4 transition-colors hover:text-text"
             >
               the limits
             </Link>{" "}
@@ -176,11 +193,20 @@ pick      = 48 bits from stream, mod pool size`}</Code>
           </P>
 
           <H2 id="status">Status</H2>
+          {/*
+            The constraint leads. Written the other way round, with the live figures first, the
+            sentence that matters becomes a trailing disclaimer, and the wording here has to agree
+            with what /create actually prints at the end of its own flow.
+          */}
           <P>
-            The wallet, balance and chain figures are live. The raffles themselves are sample data
-            held in your browser, with genuine SHA-256 commitments and a settled draw that really
-            does audit. Buying and revealing are not yet wired to the chain, because the raffle
-            program is not deployed.
+            Buying and revealing are not wired to the chain. No raffle program is deployed on Rialo
+            testnet yet, so both flows stop at the exact payload that would be posted, printed
+            rather than signed.
+          </P>
+          <P>
+            What is live is the wallet, the balance and the chain figures on this site, all read
+            from the node. The raffles themselves are sample data held in your browser, carrying
+            genuine SHA-256 commitments and a settled draw that really does recompute and match.
           </P>
           <div className="mt-10">
             <Link
@@ -190,9 +216,8 @@ pick      = 48 bits from stream, mod pool size`}</Code>
               The same thing without the formulas, in Learn
             </Link>
           </div>
-        </Article>
+        </Reading>
       </main>
-      <SiteFooter />
     </>
   );
 }

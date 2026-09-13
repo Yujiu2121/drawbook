@@ -59,10 +59,10 @@ address really is credited by the faucet.
 
 ```bash
 pnpm install
-pnpm dev        # http://localhost:5522
+pnpm dev        # http://localhost:3333
 ```
 
-The port is 5522, not 3000, set in `package.json` as `${PORT:-5522}`.
+The port is 3333, not 3000, set in `package.json` as `${PORT:-3333}`.
 
 ## Layout
 

@@ -147,15 +147,26 @@ export function deriveSeed(
   return toHex(sha256(concat(...parts)));
 }
 
+/** One step of the draw: where the keystream landed, and which ticket was sitting there. */
+export interface DrawStep {
+  /** Position in the remaining pool, that is `sample % poolBefore`. */
+  pick: number;
+  /** How many tickets were still in the pool when this step ran. */
+  poolBefore: number;
+  /** The ticket index this step drew and removed from the pool. */
+  winner: number;
+}
+
 /**
- * Pick `count` distinct ticket indices from `eligible`, using a partial Fisher-Yates shuffle
- * driven by a SHA-256 keystream over the seed. Deterministic for a given seed, and unbiased
- * because each draw takes a fresh 6-byte sample reduced modulo a shrinking range.
+ * The draw, with its working kept rather than discarded: the same partial Fisher-Yates shuffle
+ * `deriveWinners` performs, recording each step's pool position and pool size. A ceremony that
+ * shows the draw needs those internals, and reading them back out of the real function is what
+ * keeps the shown draw and the recorded winners the same computation.
  */
-export function deriveWinners(eligible: number[], seed: string, count: number): number[] {
+export function deriveWinnerTrace(eligible: number[], seed: string, count: number): DrawStep[] {
   const pool = [...eligible];
   const take = Math.min(count, pool.length);
-  const winners: number[] = [];
+  const steps: DrawStep[] = [];
   const seedBytes = fromHex(seed);
 
   let counter = 0;
@@ -178,12 +189,23 @@ export function deriveWinners(eligible: number[], seed: string, count: number): 
   }
 
   for (let i = 0; i < take; i += 1) {
-    const pick = nextSample() % pool.length;
-    winners.push(pool[pick]);
+    const poolBefore = pool.length;
+    const pick = nextSample() % poolBefore;
+    const winner = pool[pick];
     pool.splice(pick, 1);
+    steps.push({ pick, poolBefore, winner });
   }
 
-  return winners;
+  return steps;
+}
+
+/**
+ * Pick `count` distinct ticket indices from `eligible`, using a partial Fisher-Yates shuffle
+ * driven by a SHA-256 keystream over the seed. Deterministic for a given seed, and unbiased
+ * because each draw takes a fresh 6-byte sample reduced modulo a shrinking range.
+ */
+export function deriveWinners(eligible: number[], seed: string, count: number): number[] {
+  return deriveWinnerTrace(eligible, seed, count).map((step) => step.winner);
 }
 
 /* --------------------------------------------------------------- derived */

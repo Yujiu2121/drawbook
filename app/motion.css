@@ -1,0 +1,178 @@
+/* ==========================================================================================
+   SWEEP / CELL: MOTION BETWEEN ROUTES
+
+   Everything in this file is the choreography of one object changing scale. A board row's
+   strip is the small state of the cell; the detail page's blade is the large state. React's
+   <ViewTransition name="cell-N"> marks the same object on both sides of a soft navigation,
+   and the browser does the rest. There is no JavaScript behind any of this, and no
+   dependency: the whole mechanism is the nine rules below.
+
+   WHAT THIS FILE MAY ASSUME
+   The tokens come from app/globals.css (--t-grow, --t-settle, --t-blade, --ease-blade,
+   --ease-settle). Custom properties inherit from the document element into the
+   ::view-transition pseudo tree, so var() resolves here exactly as it does in the page. The
+   literal fallbacks mirror globals.css so this file is legible and correct on its own; if a
+   fallback is ever the value that wins, the token has been renamed and that is a bug.
+
+   THE FOUR THINGS THAT ARE EASY TO GET WRONG, ALL OF THEM MEASURED
+   1. NO DESCENDANT SPACE before the pseudo-element. `:root:active-view-transition-type(dive)
+      ::view-transition-group(*)` with a space silently never matches, with no error and
+      nothing to grep for. The rules below are written closed up, deliberately.
+   2. THE STREAMING TRANSITION IS SUPPRESSED BY THE ABSENCE OF A TYPE, not by
+      <ViewTransition default="none">, which was measured not to suppress anything: six runs
+      across four probe cases all fired a second full document transition 1740ms to 1751ms
+      after the click, animating the cell's old snapshot. Every navigation carries a type;
+      the streaming reveal always carries types: null. So block 4 gates on :not() and zeroes
+      only the untyped one. Measured: the typed morph keeps its duration, the untyped reveal
+      goes from 1766ms to 46ms.
+   3. :not() IS NOT FORGIVING, and that is the graceful part. In a browser with no
+      :active-view-transition-type() support the whole of block 4 is dropped, so such a
+      browser gets the streaming flash rather than losing every transition on the site.
+   4. REDUCED MOTION IS OURS TO HONOUR. The user agent does not skip a view transition on
+      its own: under emulated `reduce` the full group animation still ran, start to finish.
+      Block 5 is the entire mechanism, and it needs no !important, because `animation` is a
+      shorthand that clears animation-name while the type rules only set animation-duration.
+      Re-measured here in Chrome 151 against this file as it stands, with the context set to
+      `reduce` and a typed transition: animation-name computed `none` on the cell group, zero
+      view transition animations alive at `ready`, and `finished` at 51ms against 499ms
+      unreduced. A CDP screencast across the same navigation captured exactly two distinct
+      painted frames, the old state and the new state, byte-identical in pairs. So the cut is
+      clean: the fallback of `animation-duration: 1ms` that was held in reserve in case
+      `animation: none` left the two snapshots painted stacked is not needed, and is not here.
+
+   NOT HERE ON PURPOSE
+   No @view-transition { navigation: auto }. That is the cross document form; Drawbook
+   navigates in document through the App Router, and declaring it would start a second,
+   unrelated transition on every full page load.
+   Nothing here paints a surface treatment: no shadow, no soft edge, no glass, no ramp of
+   colour. A group animation is transform and opacity on a pair of snapshots, which is
+   exactly what the material model allows and all that it allows.
+   No feature detection anywhere in the app. Where the API is missing the navigation is an
+   instant cut with zero exceptions, which is the honest fallback and needs no code.
+   ========================================================================================== */
+
+
+/* ---------------------------------------------------------------------- 1. THE FLIGHT
+   One duration and one curve for every group, so a browser that understands nothing else in
+   this file still gets a coherent morph. --ease-blade leaves fast and arrives decisively,
+   which is the difference between a cell growing and a cell drifting. */
+::view-transition-group(*) {
+  animation-duration: var(--t-grow, 460ms);
+  animation-timing-function: var(--ease-blade, cubic-bezier(0.7, 0, 0.2, 1));
+}
+
+
+/* ---------------------------------------------------------------------- 2. THE APERTURE
+   What the two snapshots do inside the box while it grows.
+
+   The default is a disaster for this design. The user agent gives each snapshot
+   `inline-size: 100%; block-size: auto`, so it is stretched to the width of the group and
+   keeps its own aspect ratio: a 200x24 row snapshot inside a box on its way to 1200x300 is
+   drawn six times life size, and every serial, figure and label in it is a smear for the
+   length of the navigation. A mid-flight screenshot of the default shows it clearly. It
+   also makes a nonsense of tabular numerals, which the rest of the system spends real
+   effort on.
+
+   So neither snapshot is scaled at all. Each is drawn at its natural size and pinned to the
+   top left of the box, and the box crops it. The cell then reads as an aperture opening:
+   the frame grows, the content behind it is revealed at 1:1, the type stays crisp on every
+   frame, and at the end of the flight the new snapshot sits exactly where the real element
+   is about to be painted, because the group's final rect is that element's rect.
+
+   The clip is not optional and object-fit does not do it. Measured three ways at the
+   halfway frame of one 200x24 to 1100x320 flight, by pausing every view transition
+   animation at 230ms of 460ms and photographing it. User agent default: the old text is
+   drawn across the whole growing box at roughly four times its size, smeared, doubled over
+   the new text. object-fit without the clip: both snapshots are crisp, but the destination
+   is painted at its full 1100x320 outside a box only 650px wide, a ghost of the finished
+   page hanging off the end of the cell. With both, the box is 650px wide and everything
+   inside it is at 1:1. Clipping the image pair, which is inset to the group's rect, is what
+   turns the box into an aperture. The cost is that anything a snapshot paints outside its own border box is
+   clipped too; in a system with no shadow and no soft edge that is an outline and nothing
+   else.
+
+   The root snapshot is the whole page and must keep the user agent's behaviour, so it is
+   handed back its defaults by name. Its pair is already exactly viewport sized, so the clip
+   above never bites there. root and cell-N are the only two names in the product; see the
+   duplicate name rule in components/row-link.tsx. */
+::view-transition-image-pair(*) {
+  overflow: clip;
+}
+
+::view-transition-old(*),
+::view-transition-new(*) {
+  block-size: 100%;
+  object-fit: none;
+  object-position: top left;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  block-size: auto;
+  object-fit: fill;
+  object-position: top left;
+}
+
+
+/* ---------------------------------------------------------------------- 3. DIRECTION
+   The two transition types the app sends. components/row-link.tsx sends `dive` going into a
+   raffle; components/back-link.tsx sends `surface` coming back out.
+
+   Dive is the ceremony: the full --t-grow on the blade curve, because the cell becoming the
+   page is the one moment the product is built around. It restates block 1 rather than
+   inheriting it, so that retuning the untyped default can never quietly retune the one
+   navigation the design is named after. Surface is shorter, on the settling
+   curve, for two reasons. Coming back should feel like release rather than event, and the
+   painted surface is inert for exactly as long as the transition runs, so every millisecond
+   of the return trip is a millisecond the board cannot be clicked.
+
+   These rules only reach a warm navigation. On an uncached destination the type arrives as
+   null, the rules in block 4 apply instead and the morph is zeroed, so a slow route is an
+   honest cut rather than an animation played to nobody. That is a measured property of the
+   router, not a choice, and it is why block 1 is written to stand alone. */
+:root:active-view-transition-type(dive)::view-transition-group(*) {
+  animation-duration: var(--t-grow, 460ms);
+  animation-timing-function: var(--ease-blade, cubic-bezier(0.7, 0, 0.2, 1));
+}
+
+:root:active-view-transition-type(surface)::view-transition-group(*) {
+  animation-duration: var(--t-settle, 320ms);
+  animation-timing-function: var(--ease-settle, cubic-bezier(0.2, 0.8, 0.2, 1));
+}
+
+/* The page under the cell changes faster than the cell does. The masthead is identical on
+   both sides so it cross-fades against itself and is invisible; everything else is text,
+   and text cross-faded against other text is mush for as long as you let it run. Swap the
+   page on the blade duration, let the cell keep flying. */
+:root:active-view-transition-type(dive)::view-transition-old(root),
+:root:active-view-transition-type(dive)::view-transition-new(root),
+:root:active-view-transition-type(surface)::view-transition-old(root),
+:root:active-view-transition-type(surface)::view-transition-new(root) {
+  animation-duration: var(--t-blade, 260ms);
+  animation-timing-function: linear;
+}
+
+
+/* ------------------------------------------------------- 4. THE UNTYPED ONE IS NOT OURS
+   Read note 2 in the header before touching this. Every navigation Drawbook starts carries
+   `dive` or `surface`. Anything else is the router revealing streamed content, and the
+   flash it would otherwise play is not a design decision anyone made. */
+:root:not(:active-view-transition-type(dive)):not(:active-view-transition-type(surface))::view-transition-group(*),
+:root:not(:active-view-transition-type(dive)):not(:active-view-transition-type(surface))::view-transition-old(*),
+:root:not(:active-view-transition-type(dive)):not(:active-view-transition-type(surface))::view-transition-new(*) {
+  animation: none !important;
+}
+
+
+/* ------------------------------------------------------------------- 5. REDUCED MOTION
+   Removed, not slowed. The transition still happens, so the DOM swap and the scroll
+   restoration behave identically; it simply completes on the first frame and the
+   navigation is an honest cut. Read note 4 in the header for why this works without
+   !important and why the user agent will not do it for us. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
