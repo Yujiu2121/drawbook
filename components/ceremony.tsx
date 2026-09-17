@@ -187,6 +187,11 @@ export interface CeremonyProps {
    * The cursor's stopping points and the pool sizes it walks are read from this and nowhere else.
    */
   trace: TraceStep[];
+  /**
+   * Print the audit footer under the stage. True everywhere except the landing, which hosts the
+   * same `<RecomputePanel>` in its own "Verify it" section and must not offer two of them.
+   */
+  audit?: boolean;
 }
 
 /* =========================================================== shared presentation */
@@ -477,6 +482,68 @@ function totalMs(trace: TraceStep[]): number {
   return ms + T.cursorOut + T.result;
 }
 
+/* ====================================================== the recomputation
+
+   RECOMPUTE IT. Not a demonstration of a computation, the computation: SHA-256 over the public
+   nonces and the chain value, in this tab, right now, and then a comparison against what the
+   record says. Nothing is read back out of the record except the two lines being compared.
+
+   IT IS ITS OWN COMPONENT SO THERE CAN ONLY EVER BE ONE OF IT ON A PAGE. It used to be the
+   ceremony's footer, which was correct while the ceremony was the only surface making the
+   verification argument. The landing now has a section whose entire subject is that argument, and
+   a page carrying both the stage and that section would have offered the reader two buttons that
+   run the same SHA-256 and print the same five lines. So the ceremony takes `audit={false}` there
+   and this component is mounted once, in the section that is about it.
+
+   Every value it reads is module scope in this file and derived from lib/mock-raffles.ts, so the
+   move changed where the button is and nothing about what it computes. */
+export function RecomputePanel() {
+  const [audit, setAudit] = useState<string[] | null>(null);
+
+  const recompute = useCallback(() => {
+    const nonces = RAFFLE.tickets.filter((t) => t.nonce !== null).map((t) => t.nonce as string);
+    if (nonces.length === 0 || !RAFFLE.chainSeed) {
+      setAudit([
+        "No nonce was ever revealed, so there is no seed to recompute.",
+        "That is what void means, and it is the correct answer rather than a failure.",
+      ]);
+      return;
+    }
+    const seed = deriveSeed(RAFFLE.config.id, nonces, RAFFLE.chainSeed);
+    const steps = deriveWinnerTrace(SUMMARY.eligible, seed, RAFFLE.config.winners);
+    const winners = steps.map((s) => s.winner);
+    const matches =
+      winners.length === RAFFLE.winningTickets.length &&
+      winners.every((w, i) => w === RAFFLE.winningTickets[i]);
+    setAudit([
+      `recomputed seed     ${seed}`,
+      `recorded seed       ${SEED}`,
+      `recomputed winners  ${winners.join(", ")}`,
+      `recorded winners    ${RAFFLE.winningTickets.join(", ")}`,
+      `matches             ${matches ? "yes" : "no"}`,
+    ]);
+  }, []);
+
+  return (
+    <>
+      <button type="button" className={BUTTON} onClick={recompute}>
+        Recompute it
+      </button>
+      {audit ? (
+        <pre className="mono mt-3.5 w-fit max-w-full overflow-x-auto bg-recess p-3.5 text-sm text-fg">
+          {audit.join("\n")}
+        </pre>
+      ) : null}
+      <p className={`${NOTE} mt-3`}>
+        Recompute runs SHA-256 over the {SORTED_NONCES.length} public nonces and the chain value in
+        this tab, then compares the result with the record. The draw is randomized. It is not
+        unbiasable: moving it would take a party who both produces the block the chain value comes
+        from and reveals last.
+      </p>
+    </>
+  );
+}
+
 /* ============================================================== the island */
 
 type Phase = "idle" | "playing" | "done";
@@ -491,7 +558,7 @@ const REST_FIGURE: Figure = {
   label: `RLO to each of ${SUMMARY.effectiveWinners} winners`,
 };
 
-export function Ceremony({ poster, ledger, trace }: CeremonyProps) {
+export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps) {
   const preferReduced = useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>("idle");
@@ -500,7 +567,6 @@ export function Ceremony({ poster, ledger, trace }: CeremonyProps) {
   const [seedText, setSeedText] = useState("");
   const [pickStatus, setPickStatus] = useState("");
   const [drawn, setDrawn] = useState<number[]>([]);
-  const [audit, setAudit] = useState<string[] | null>(null);
   // Set from an effect rather than at render: the preference is not knowable on the server, and a
   // control whose markup depends on it would not survive hydration.
   const [reduced, setReduced] = useState(false);
@@ -848,35 +914,6 @@ export function Ceremony({ poster, ledger, trace }: CeremonyProps) {
     // `reset` is stable and `trace` is the record; neither changes under a running sequence.
   }, [phase, trace, reset]);
 
-  /**
-   * RECOMPUTE IT. Not a demonstration of a computation, the computation: SHA-256 over the public
-   * nonces and the chain value, in this tab, right now, and then a comparison against what the
-   * record says. Nothing is read back out of the record except the two lines being compared.
-   */
-  const recompute = useCallback(() => {
-    const nonces = RAFFLE.tickets.filter((t) => t.nonce !== null).map((t) => t.nonce as string);
-    if (nonces.length === 0 || !RAFFLE.chainSeed) {
-      setAudit([
-        "No nonce was ever revealed, so there is no seed to recompute.",
-        "That is what void means, and it is the correct answer rather than a failure.",
-      ]);
-      return;
-    }
-    const seed = deriveSeed(RAFFLE.config.id, nonces, RAFFLE.chainSeed);
-    const steps = deriveWinnerTrace(SUMMARY.eligible, seed, RAFFLE.config.winners);
-    const winners = steps.map((s) => s.winner);
-    const matches =
-      winners.length === RAFFLE.winningTickets.length &&
-      winners.every((w, i) => w === RAFFLE.winningTickets[i]);
-    setAudit([
-      `recomputed seed     ${seed}`,
-      `recorded seed       ${SEED}`,
-      `recomputed winners  ${winners.join(", ")}`,
-      `recorded winners    ${RAFFLE.winningTickets.join(", ")}`,
-      `matches             ${matches ? "yes" : "no"}`,
-    ]);
-  }, []);
-
   const status =
     phase === "playing" ? ACT_NAMES[act] : phase === "done" ? "Settled. Nothing loops after this." : "The record";
 
@@ -1053,22 +1090,11 @@ export function Ceremony({ poster, ledger, trace }: CeremonyProps) {
         </aside>
       </div>
 
-      <div className="border-t border-rule px-pad py-4">
-        <button type="button" className={BUTTON} onClick={recompute}>
-          Recompute it
-        </button>
-        {audit ? (
-          <pre className="mono mt-3.5 w-fit max-w-full overflow-x-auto bg-recess p-3.5 text-sm text-fg">
-            {audit.join("\n")}
-          </pre>
-        ) : null}
-        <p className={`${NOTE} mt-3`}>
-          Recompute runs SHA-256 over the {SORTED_NONCES.length} public nonces and the chain value
-          in this tab, then compares the result with the record. The draw is randomized. It is not
-          unbiasable: moving it would take a party who both produces the block the chain value
-          comes from and reveals last.
-        </p>
-      </div>
+      {audit ? (
+        <div className="border-t border-rule px-pad py-4">
+          <RecomputePanel />
+        </div>
+      ) : null}
     </section>
   );
 }

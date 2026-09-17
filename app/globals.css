@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./cell.css";
+@import "./story.css";
 @import "./motion.css";
 
 /*
@@ -273,7 +274,15 @@
   --text-pool--line-height: 0.82;
   --text-pool--letter-spacing: -0.045em;
 
-  --text-manifesto: clamp(2.75rem, 8.4vw, 7rem); /* the landing sentence, and nothing else. */
+  --text-manifesto: clamp(2.5rem, 5.2vw, 4.5rem); /* the landing sentence, and nothing else.
+        RETUNED WITH THE LANDING, and the reason is the composition rather than taste. This was
+        clamp(2.75rem, 8.4vw, 7rem), which is right for a sentence set full bleed across the
+        viewport, which is where it used to be. It now sits in one column of a two-column hero
+        beside the ticket field, so its measure is about half what it was: at 7rem in a 553px
+        column, "Fair raffles, built on Rialo." breaks over four lines at roughly five characters
+        each and reads as a ransom note. The cap here is the largest step that keeps it to two
+        lines in that column at 1280 and one line per phrase below the breakpoint, where the
+        column is the full measure again. */
   --text-manifesto--line-height: 1.02;
   --text-manifesto--letter-spacing: -0.005em;
 

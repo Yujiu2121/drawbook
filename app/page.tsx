@@ -2,10 +2,20 @@ import Link from "next/link";
 
 import { MusterBands } from "@/components/cell";
 import { Ceremony, CeremonyLedger, CeremonyWinners } from "@/components/ceremony";
-import { Countdown } from "@/components/countdown";
-import { Muster } from "@/components/landing/fold";
-import { RaffleRowCells, rowContainerProps, rowLabel } from "@/components/row";
-import { activeDeadline, isLive } from "@/lib/cell";
+import { Hero } from "@/components/landing/hero";
+import { RaffleCard } from "@/components/landing/raffle-card";
+import {
+  DrawChain,
+  Flow,
+  SectionHead,
+  Stepper,
+  type ChainLink,
+  type FlowStep,
+  type Step,
+} from "@/components/landing/sections";
+import { VerifyPanel } from "@/components/landing/verify-panel";
+import { activeDeadline, isLive, serialOf } from "@/lib/cell";
+import { BUTTON, BUTTON_PRIMARY } from "@/lib/controls";
 import { MOCK_RAFFLES } from "@/lib/mock-raffles";
 import {
   auditSeed,
@@ -16,7 +26,7 @@ import {
 } from "@/lib/raffle";
 
 export const metadata = {
-  title: "Drawbook: nobody picks the winner",
+  title: "Drawbook: fair raffles, built on Rialo",
   description:
     "On-chain raffles on Rialo testnet. Every ticket buyer commits a secret, the winner falls out of all of them at once, and anyone can recompute it.",
 };
@@ -24,46 +34,44 @@ export const metadata = {
 /**
  * THE LANDING.
  *
- * Five surfaces and no illustration: the fold, the ceremony, three step slabs, the argument, the
- * record. The fold is the whole pitch. Every ticket in Drawbook is on the screen as a cell, the
- * cells sweep in, and then the ones that fall inside the sentence stand aside so the sentence can
- * be read out of the space they leave. The headline and the product are one object, which is the
- * claim the old seven-section landing had to make in prose.
+ * EIGHT SECTIONS, IN THE ORDER A STRANGER NEEDS THEM: what this is, why it matters, how it works,
+ * try one, watch a draw, check the working, why Rialo, go.
  *
- * EVERYTHING ON THIS PAGE IS A SERVER COMPONENT EXCEPT TWO ISLANDS. `<Muster>` arms and releases
- * the opening; `<Countdown>` is the one figure that changes under the reader. The 112 cells, the
- * five rows, every figure and the whole ceremony poster ship as HTML.
+ * WHAT CHANGED AND WHY. The page this replaces opened on the sentence "Nobody picks the winner"
+ * over a field of 112 cells, then a seven-figure statistics line, two miniboards, and then the
+ * recorded draw with its nonces and its seed, all before a single line saying what Drawbook is.
+ * Every one of those surfaces was correct and every one of them was an answer to a question the
+ * reader had not asked yet. Nothing has been deleted: the field is the hero's own visual, the
+ * figures moved to the foot of the raffle section where the record they describe actually is, the
+ * miniboards became cards, and the draw and its working are sections five and six, after the
+ * product rather than in front of it.
+ *
+ * WHAT DID NOT CHANGE, AND THAT IS THE LARGER HALF. The ceremony is the same island replaying the
+ * same settled raffle through the same five acts. The cell, the strip and the muster are the same
+ * components at the same four scales. Every route, every deadline and every digest is where it
+ * was. This file decided what is said and in what order; it invented nothing.
+ *
+ * EVERYTHING HERE IS A SERVER COMPONENT EXCEPT THREE ISLANDS: `<Hero>` arms and releases the
+ * opening, `<Countdown>` inside each card is the one figure that moves under the reader, and the
+ * ceremony is its own. The 112 cells, five cards, the chain, the whole verification panel and the
+ * entire ceremony poster ship as HTML.
  *
  * NOT ONE QUANTITY BELOW IS A LITERAL. Every figure is a reduction over MOCK_RAFFLES through
- * `summarize`, computed at render time, which is the only way the footer note gets to say every
- * figure is read out of lib/mock-raffles.ts and be telling the truth.
- *
- * THE AGGREGATE THAT WAS FIXED RATHER THAN PORTED. The design this ports prints "In the pools
- * 40.75 RLO", the sum of every raffle's pool. It is false as worded: the live raffles hold 33.05,
- * while raffle 0004 has already paid 6.10 out to its two winners and raffle 0005 has already
- * refunded 1.60. 7.70 of that 40.75 is money that has left. Worse, the line appears twice, the
- * second time directly under a note vouching that every figure comes out of the record. It is
- * split here into what is still in the pools and what has already gone, which is the more
- * interesting half anyway. The second label is "Paid and refunded" rather than the plan's
- * "Settled" because this same line already carries a "Settled" row counting drawn raffles, and
- * two rows reading SETTLED 1 and SETTLED 7.70 would be a worse defect than the one being fixed.
+ * `summarize`, `auditSeed` and `deriveWinnerTrace`, computed at render time, which is the only way
+ * the note at the foot gets to say every figure is read out of lib/mock-raffles.ts and be telling
+ * the truth.
  */
 
-/** The sentence. Sixteen characters of measure, four words, one rise each. */
-const MANIFESTO = "Nobody picks the winner.";
-
-/* ------------------------------------------------------------------- the record */
+/* --------------------------------------------------------------------- the record, counted */
 
 function sum(raffles: readonly Raffle[], of: (r: Raffle) => number): number {
   return raffles.reduce((total, r) => total + of(r), 0);
 }
 
 /**
- * Counted out of the record, once, at render time.
- *
- * Live and settled are the same split the miniboard makes, so the figure line and the two
- * miniboard headers can never give three different answers to how many raffles are finished. A
- * void raffle settled nothing, so it is counted apart from the drawn one rather than added to it.
+ * Live and settled are the same split the cards make, so the figure line and the two card rows
+ * can never give three different answers to how many raffles are finished. A void raffle settled
+ * nothing, so it is counted apart from the drawn one rather than added to it.
  */
 const LIVE = MOCK_RAFFLES.filter(isLive).sort(
   (a, b) => Date.parse(activeDeadline(a)) - Date.parse(activeDeadline(b)),
@@ -82,6 +90,16 @@ const TOTALS = {
   liveSold: sum(LIVE, (r) => summarize(r).sold),
 };
 
+/**
+ * THE AGGREGATE THAT IS SPLIT RATHER THAN SUMMED. The design this descends from printed "In the
+ * pools 40.75 RLO", the sum of every raffle's pool. It is false as worded: the live raffles hold
+ * 33.05, while raffle 0004 has already paid 6.10 out to its two winners and raffle 0005 has
+ * already refunded 1.60. 7.70 of that 40.75 is money that has left. It is split here into what is
+ * still in the pools and what has already gone, which is the more interesting half anyway. The
+ * second label is "Paid and refunded" rather than "Settled" because this same line already carries
+ * a "Settled" row counting drawn raffles, and two rows reading SETTLED 1 and SETTLED 7.70 would be
+ * a worse defect than the one being fixed.
+ */
 const FIGURES: [string, string][] = [
   ["Raffles", String(TOTALS.raffles)],
   ["Tickets", String(TOTALS.tickets)],
@@ -93,15 +111,13 @@ const FIGURES: [string, string][] = [
 ];
 
 /**
- * The figure line, twice: once under the field and once in the record block at the foot.
- *
- * A description list, because that is what it is. The label carries the 11px uppercase instance
- * and the value overrides its tracking, since `figure` sets a width axis and a weight but not a
- * letter-spacing and would otherwise inherit the label's 0.14em.
+ * The figure line. A description list, because that is what it is. The label carries the 11px
+ * uppercase instance and the value overrides its tracking, since `figure` sets a width axis and a
+ * weight but not a letter-spacing and would otherwise inherit the label's 0.14em.
  */
 function Figures() {
   return (
-    <dl className="label m-0 flex flex-wrap gap-x-[26px] gap-y-[6px]">
+    <dl className="label m-0 flex flex-wrap gap-x-[26px] gap-y-1.5">
       {FIGURES.map(([key, value]) => (
         <div key={key} className="flex items-baseline gap-2">
           <dt className="text-fg-3">{key}</dt>
@@ -112,64 +128,8 @@ function Figures() {
   );
 }
 
-/* ----------------------------------------------------------------- the miniboard */
+/* --------------------------------------------------------------------- the settled draw */
 
-/**
- * A miniboard row.
- *
- * It is built from `RaffleRowCells` inside a plain `<Link>` rather than from `RaffleRow`, for one
- * reason: the container needs `data-rid` so the field above can drive it. Moving a pointer onto a
- * band opens that raffle's row, because a band and a row are the same object at two scales, and
- * the copy on this page says so.
- *
- * It is deliberately NOT `<RowLink>`. That component writes the current scrollY into
- * lib/nav-memory so the board can be put back where it was left, and a landing row writing the
- * landing's offset into it would hand /raffles a scroll position from a different document.
- */
-function MiniRow({ raffle }: { raffle: Raffle }) {
-  const live = isLive(raffle);
-
-  return (
-    <Link
-      href={`/raffle/${raffle.config.id}`}
-      data-rid={raffle.config.id}
-      aria-label={rowLabel(raffle)}
-      {...rowContainerProps(raffle, true)}
-    >
-      <RaffleRowCells
-        raffle={raffle}
-        mini
-        countdown={
-          <Countdown deadline={live ? activeDeadline(raffle) : raffle.config.revealDeadline} live={live} />
-        }
-      />
-    </Link>
-  );
-}
-
-/** The two heads over the two halves of the miniboard. Same shape, opposite surfaces. */
-function MiniHead({ left, right }: { left: string; right: string }) {
-  return (
-    <div className="label flex flex-wrap justify-between gap-4 py-[11px] text-fg-3">
-      <span>{left}</span>
-      <span>{right}</span>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------- the ceremony host */
-
-/**
- * The settled raffle the replay walks, and the walk itself.
- *
- * `deriveWinnerTrace` is the draw loop inside `deriveWinners`, lifted out and exported so the
- * cursor's two stopping points and the pool size it steps through at each one are read out of
- * lib/raffle.ts rather than copied into the island as a constant. The design this ports carried
- * `pickIndices = [14, 8]` by hand, which is a figure that goes stale silently the first time a
- * nonce changes.
- *
- * The trace is computed here, on the server, and handed in: the island never derives anything.
- */
 /*
   components/ceremony.tsx pins raffle 0004 and exports `CEREMONY_RAFFLE_ID`, and that constant is
   deliberately NOT imported here. Every export of a module carrying the client directive reaches a
@@ -181,16 +141,70 @@ function MiniHead({ left, right }: { left: string; right: string }) {
 */
 const CEREMONY = MOCK_RAFFLES.find((r) => r.phase === "drawn") ?? null;
 const CEREMONY_SEED = CEREMONY ? auditSeed(CEREMONY) : null;
+const CEREMONY_SUMMARY = CEREMONY ? summarize(CEREMONY) : null;
+
+/**
+ * `deriveWinnerTrace` is the draw loop inside `deriveWinners`, lifted out and exported so the
+ * cursor's stopping points and the pool size it steps through at each one are read out of
+ * lib/raffle.ts rather than copied into the island as a constant. The design this descends from
+ * carried `pickIndices = [14, 8]` by hand, which is a figure that goes stale silently the first
+ * time a nonce changes.
+ */
 const TRACE =
-  CEREMONY && CEREMONY_SEED
-    ? deriveWinnerTrace(
-        summarize(CEREMONY).eligible,
-        CEREMONY_SEED,
-        CEREMONY.config.winners,
-      )
+  CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY
+    ? deriveWinnerTrace(CEREMONY_SUMMARY.eligible, CEREMONY_SEED, CEREMONY.config.winners)
     : [];
 
-/* -------------------------------------------------------------------- the steps */
+/** Every revealed nonce, in the order `deriveSeed` hashes them in, which is sorted. */
+const SORTED_NONCES = CEREMONY
+  ? CEREMONY.tickets
+      .filter((t) => t.nonce !== null)
+      .map((t) => ({ index: String(t.index).padStart(2, "0"), nonce: t.nonce as string }))
+      .sort((a, b) => (a.nonce < b.nonce ? -1 : 1))
+  : [];
+
+const PER_WINNER =
+  CEREMONY && CEREMONY_SUMMARY ? formatRLO(CEREMONY_SUMMARY.perWinner) : "0.00";
+
+/**
+ * THE DRAW AS FIVE LINKS. A summary of the section under it, and it cannot drift from it: every
+ * value here comes out of the same three modules at the same render as the ceremony's own.
+ */
+const CHAIN: ChainLink[] =
+  CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY
+    ? [
+        {
+          name: "Revealed tickets",
+          value: String(CEREMONY_SUMMARY.revealed),
+          note: `of ${CEREMONY_SUMMARY.sold} sold. ${CEREMONY_SUMMARY.outstanding} bonds forfeited.`,
+        },
+        {
+          name: "Public data",
+          value: `${SORTED_NONCES.length} nonces`,
+          wide: true,
+          note: "Sorted before hashing, so revealing last buys nothing.",
+        },
+        {
+          name: "Chain value",
+          value: CEREMONY.chainSeed ?? "",
+          hex: true,
+          note: "Arrives last, and nobody sees it coming.",
+        },
+        {
+          name: "Seed",
+          value: CEREMONY_SEED,
+          hex: true,
+          note: "One SHA-256 over all of it.",
+        },
+        {
+          name: "Winners",
+          value: CEREMONY.winningTickets.join(" · "),
+          note: `${PER_WINNER} RLO to each.`,
+        },
+      ]
+    : [];
+
+/* ------------------------------------------------------------------------------- the copy */
 
 /**
  * Commit, reveal, draw, in that order, because that is the order they happen in and each one is
@@ -198,146 +212,297 @@ const TRACE =
  *
  * Each caption is checked against the function that implements it: `commitmentFor` binds the
  * holder address, the raffle and the ticket index into the hashed string; `revealMatches`
- * recomputes that hash from the posted nonce; `deriveSeed` sorts the nonces before hashing, which
- * is the whole of the answer to "what stops the last revealer choosing the winner".
+ * recomputes that hash from the posted nonce; `deriveSeed` sorts the nonces before hashing.
+ *
+ * NOT ONE OF THE THREE SAYS "HASH", "NONCE" OR "SHA-256". That vocabulary has not been dropped
+ * from the product, it has been moved: it is in section six, under a disclosure, with the digests
+ * beside it. A reader who needs those words to follow section three is a reader who could already
+ * have skipped section three.
  */
-const STEPS: { n: string; title: string; body: string }[] = [
+const STEPS: Step[] = [
   {
     n: "01",
     title: "Commit",
     body:
-      "Every buyer publishes a hash of a secret nonce, bound to their address, this raffle and this exact ticket. Nobody, including the creator, can read the number that decides the draw.",
+      "Buy a ticket and commit a secret. It is bound to your address, this raffle and this exact ticket, and nobody, the creator included, can read it.",
   },
   {
     n: "02",
     title: "Reveal",
     body:
-      "When the sale closes, holders post the nonce itself. The chain checks it against the commitment already recorded. A holder who stays silent forfeits their reveal bond into the pool.",
+      "When the sale closes, publish your secret to become eligible. The chain checks it against what you committed. Stay silent and your bond goes into the pool.",
   },
   {
     n: "03",
     title: "Draw",
     body:
-      "The seed is the hash of the domain, the raffle id, every revealed nonce in sorted order, and one value from the chain that arrives last. Sorted, so revealing late buys nothing.",
+      "The winner is generated from every published secret at once, in sorted order, plus one value the chain adds last. Revealing late buys nothing.",
   },
 ];
 
-/* ---------------------------------------------------------------------- the page */
+const FLOW: FlowStep[] = [
+  { title: "Reveal deadline", body: "an absolute instant, written into the raffle" },
+  { title: "Condition met", body: "the chain notices, not a server" },
+  { title: "Reactive transaction", body: "the draw is its body" },
+  { title: "Draw executed", body: "winners paid, and nothing was pressed" },
+];
+
+const BENEFITS: [string, string, string][] = [
+  ["01", "Transparent", "Every step of the draw can be inspected while it is still open."],
+  ["02", "Verifiable", "Anyone can recompute the result from data the chain already holds."],
+  ["03", "Automatic", "The draw executes itself the moment the reveal period ends."],
+];
+
+/* -------------------------------------------------------------------------------- the page */
 
 export default function LandingPage() {
+  const serial = CEREMONY ? serialOf(CEREMONY) : "";
+
   return (
     <main className="pt-mast">
-      {/* ----------------------------------------------------------------- the fold */}
-      <section aria-label="Every ticket in Drawbook">
-        <Muster sentence={MANIFESTO} bands={<MusterBands raffles={MOCK_RAFFLES} />} figures={<Figures />}>
-          <div className="mt-[clamp(12px,1.8vh,20px)] border-t border-bound">
-            {/* The record is a slab here too, not only on /raffles. Inversion is how this system
-                says a raffle has left the floor, and it cannot mean that on only one screen. It
-                bleeds back out to the viewport edge, because the fold's own gutter is already
-                paid by the wrapper around it. */}
-            {RECORD.length > 0 ? (
-              <div className="inv mx-[calc(var(--pad)*-1)] bg-panel px-pad text-fg">
-                <MiniHead
-                  left="The record"
-                  right={`${TOTALS.drawn} settled · ${TOTALS.voided} void`}
-                />
-                <div className="rows [&>a:last-child]:border-b-0">
-                  {RECORD.map((r) => (
-                    <MiniRow key={r.config.id} raffle={r} />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <MiniHead
-              left={`On the floor · the same ${TOTALS.tickets} cells as the field above`}
-              right={`${LIVE.length} live · ${TOTALS.liveSold} of ${TOTALS.liveTickets} tickets gone`}
-            />
-            <div className="rows">
-              {LIVE.map((r) => (
-                <MiniRow key={r.config.id} raffle={r} />
-              ))}
-            </div>
-            <p className="label py-[11px] text-fg-3">
-              Each band above is one raffle&rsquo;s tickets, and so is the row beside it. Open
-              either and those cells become the page.
+      {/* ==================================================================== 1. THE HERO */}
+      <section aria-label="Drawbook">
+        <Hero
+          eyebrow="Built on Rialo"
+          sentence="Fair raffles, built on Rialo."
+          lead="Drawbook makes raffle results transparent, verifiable and automatic, so nobody has to pick the winner."
+          actions={
+            <>
+              <Link href="/raffles" className={BUTTON_PRIMARY}>
+                Explore raffles <span aria-hidden="true">&rarr;</span>
+              </Link>
+              <Link href="#how" className={BUTTON}>
+                How it works
+              </Link>
+            </>
+          }
+          field={<MusterBands raffles={MOCK_RAFFLES} />}
+          fieldHead={
+            <figcaption className="label mb-3.5 flex justify-between gap-3 text-fg-3">
+              <span>Every ticket in Drawbook</span>
+              <span>{TOTALS.tickets} tickets</span>
+            </figcaption>
+          }
+          fieldNote={
+            <p className="m-0 mt-3.5 max-w-[52ch] text-sm text-fg-3">
+              One block per ticket, {TOTALS.raffles} raffles deep. Filled is sold, a light foot is a
+              published secret, and the two lit blocks are raffle {serial}&rsquo;s winners. Open a
+              band and those blocks become the page.
             </p>
-          </div>
-        </Muster>
+          }
+        />
       </section>
 
-      {/*
-        THE CEREMONY. components/ceremony.tsx owns the section, the five acts and the controls;
-        this page owns what is printed inside it and still readable with no script. The landing
-        hands in the winners, because nothing else on this page prints them, and the settled
-        ledger. The replay only ever replays this history: nothing here settles a live raffle to
-        manufacture a result.
-      */}
+      {/* ============================================================ 2. WHAT IS DRAWBOOK */}
+      <section
+        className="px-pad py-[clamp(48px,8vw,112px)]"
+        aria-labelledby="what-heading"
+      >
+        <div className="max-w-[58ch]">
+          <h2 id="what-heading" className="m-0 max-w-[18ch] font-serif text-display">
+            What is Drawbook?
+          </h2>
+          <p className="m-0 mt-5 text-lg text-fg-2">
+            Drawbook is an on-chain raffle system where the winner is decided by a commit-reveal
+            process instead of by a person choosing the result.
+          </p>
+        </div>
+
+        <ol className="m-0 mt-[clamp(36px,4.6vw,64px)] grid list-none gap-[clamp(24px,3vw,44px)] p-0 min-[760px]:grid-cols-3">
+          {BENEFITS.map(([n, title, body]) => (
+            <li key={n} className="border-t border-bound pt-[18px]">
+              <span className="monument mb-4 block text-[clamp(2.5rem,4.4vw,3.75rem)] text-event">
+                {n}
+              </span>
+              <h3 className="m-0 mb-2.5 font-serif text-title">{title}</h3>
+              <p className="m-0 max-w-[42ch] text-fg-2">{body}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* =============================================================== 3. HOW IT WORKS */}
+      <section
+        id="how"
+        className="inv scroll-mt-mast bg-panel px-pad py-[clamp(48px,8vw,112px)] text-fg"
+        aria-labelledby="how-heading"
+      >
+        <h2
+          id="how-heading"
+          className="m-0 mb-[clamp(36px,4.6vw,64px)] max-w-[18ch] font-serif text-display"
+        >
+          How a Drawbook raffle works
+        </h2>
+        <Stepper steps={STEPS} />
+        <p className="m-0 mt-[clamp(26px,3vw,40px)] max-w-[62ch] text-sm text-fg-3">
+          Nothing in the sequence asks you to trust a shuffle. Each step is only safe because of the
+          one before it.
+        </p>
+      </section>
+
+      {/* ================================================================ 4. LIVE RAFFLES */}
+      <section
+        id="raffles"
+        className="scroll-mt-mast px-pad py-[clamp(48px,8vw,112px)]"
+        aria-labelledby="raffles-heading"
+      >
+        <SectionHead
+          id="raffles-heading"
+          title="Try a live raffle."
+          lead="Explore active and completed draws on Drawbook."
+          aside={
+            <p className="m-0 grid gap-1.5 text-right">
+              <span className="label text-fg-3">On the floor</span>
+              <span className="figure text-sm">
+                {TOTALS.liveSold} of {TOTALS.liveTickets} tickets gone &middot;{" "}
+                {formatRLO(TOTALS.livePool)} RLO in the live pools
+              </span>
+            </p>
+          }
+        />
+
+        <ul className="rcards m-0 list-none p-0">
+          {LIVE.map((r) => (
+            <RaffleCard key={r.config.id} raffle={r} />
+          ))}
+        </ul>
+
+        {RECORD.length > 0 ? (
+          <>
+            <h3 className="label m-0 mt-[clamp(40px,5vw,72px)] mb-[clamp(18px,2vw,26px)] flex flex-wrap justify-between gap-3 border-t border-rule pt-3.5 font-normal text-fg-3">
+              <span>The record</span>
+              <span>
+                {TOTALS.drawn} settled &middot; {TOTALS.voided} void &middot;{" "}
+                {formatRLO(TOTALS.gonePool)} RLO paid and refunded
+              </span>
+            </h3>
+            <ul className="rcards m-0 list-none p-0">
+              {RECORD.map((r) => (
+                <RaffleCard key={r.config.id} raffle={r} />
+              ))}
+            </ul>
+          </>
+        ) : null}
+
+        {/* The figure line, once, at the foot of the section whose subject it is. It used to be
+            printed twice, the second time directly under a note vouching that every figure comes
+            out of the record. */}
+        <div className="mt-[clamp(40px,5vw,72px)] border-t border-rule pt-[clamp(18px,2vw,26px)]">
+          <Figures />
+          <p className="m-0 mt-5 max-w-[60ch] text-sm text-fg-3">
+            Every figure on this page is read out of lib/mock-raffles.ts at render time, whose
+            settled raffles are settled by a real call to drawRaffle. Nothing rolls on an odometer,
+            because nothing here is connected to a node.
+          </p>
+        </div>
+      </section>
+
+      {/* =========================================================== 5. THE DRAW IN ACTION
+
+          The ceremony keeps its section, its five acts and its replay. What is new above it is the
+          chain, which says in five plates what the replay spends twenty seconds saying, for a
+          reader who is not going to press the button. `audit={false}` moves the recomputation to
+          section six, so this page offers one of it rather than two. */}
       {CEREMONY && TRACE.length > 0 ? (
-        <Ceremony poster={<CeremonyWinners />} ledger={<CeremonyLedger />} trace={TRACE} />
+        <>
+          <section
+            className="inv bg-panel px-pad py-[clamp(48px,8vw,112px)] text-fg"
+            aria-labelledby="draw-heading"
+          >
+            <SectionHead
+              id="draw-heading"
+              title="See how a winner is drawn."
+              lead={`Raffle ${serial} settled in July. This is its draw, recomputed in your browser rather than read back off a server.`}
+            />
+            <DrawChain links={CHAIN} />
+            <p className="m-0 mt-[clamp(26px,3vw,40px)] max-w-[62ch] text-sm text-fg-3">
+              No spin, no near miss, no acceleration into a result. The pool shrank from{" "}
+              {TRACE[0].poolBefore} to {TRACE[TRACE.length - 1].poolBefore} between the two picks,
+              which is why the second winner could not be the first. Replay it below.
+            </p>
+          </section>
+
+          <Ceremony
+            poster={<CeremonyWinners />}
+            ledger={<CeremonyLedger />}
+            trace={TRACE}
+            audit={false}
+          />
+        </>
       ) : null}
 
-      {/* ----------------------------------------------------------------- the steps */}
-      <section className="inv bg-panel text-fg" aria-label="How a Drawbook raffle works">
-        {STEPS.map((step, i) => (
-          <div
-            key={step.n}
-            className={`grid grid-cols-[minmax(0,1fr)] items-end gap-[14px] px-pad py-[clamp(32px,6vw,72px)] min-[900px]:grid-cols-[minmax(0,42%)_minmax(0,1fr)] min-[900px]:gap-[clamp(28px,5vw,72px)] ${
-              i < STEPS.length - 1 ? "border-b border-rule" : ""
-            }`}
-          >
-            <div className="monument text-monument text-event">{step.n}</div>
-            <div>
-              <h3 className="m-0 font-serif text-title">{step.title}</h3>
-              <p className="m-0 mt-[14px] max-w-[54ch] text-lg text-fg-2">{step.body}</p>
-            </div>
+      {/* ====================================================== 6. VERIFIABLE BY DESIGN */}
+      {CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY ? (
+        <section className="px-pad py-[clamp(48px,8vw,112px)]" aria-labelledby="verify-heading">
+          <div className="mb-[clamp(30px,4vw,52px)] max-w-[58ch]">
+            <h2 id="verify-heading" className="m-0 max-w-[18ch] font-serif text-display">
+              Don&rsquo;t trust the result. Verify it.
+            </h2>
+            <p className="m-0 mt-[18px] text-lg text-fg-2">
+              Every settled draw leaves behind the data needed to recompute the result. Nothing
+              below is summarised: it is the record.
+            </p>
           </div>
-        ))}
-      </section>
 
-      {/* -------------------------------------------------------------- the argument */}
+          <VerifyPanel
+            serial={serial}
+            nonces={SORTED_NONCES}
+            chainValue={CEREMONY.chainSeed ?? ""}
+            seed={CEREMONY_SEED}
+            eligible={CEREMONY_SUMMARY.eligible.length}
+            trace={TRACE}
+          />
+        </section>
+      ) : null}
+
+      {/* ================================================================ 7. BUILT ON RIALO */}
       <section
-        className="grid gap-[clamp(22px,3vw,56px)] px-pad py-[clamp(36px,7vw,88px)] min-[900px]:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]"
+        id="rialo"
+        className="scroll-mt-mast px-pad py-[clamp(48px,8vw,112px)]"
         aria-labelledby="rialo-heading"
       >
-        <div className="max-w-[52ch]">
-          <h2 id="rialo-heading" className="m-0 mb-[0.5em] font-serif text-display">
-            No bot fires the draw.
-          </h2>
-          <p className="m-0 text-lg text-fg-2">
-            On Rialo the draw is the body of a reactive transaction whose predicate is an absolute
-            instant. The reveal deadline passes and the program runs. There is no keeper, no cron,
-            no relayer to pay and nobody who can choose not to press it.
-          </p>
-        </div>
+        <div className="grid items-center gap-[clamp(30px,4vw,64px)] min-[900px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div>
+            <h2 id="rialo-heading" className="m-0 max-w-[18ch] font-serif text-display">
+              Built for automatic execution.
+            </h2>
+            <p className="m-0 mt-5 max-w-[52ch] text-lg text-fg-2">
+              Drawbook uses Rialo&rsquo;s reactive transactions so the draw can execute when the
+              reveal deadline passes, without relying on a keeper, a cron job or a relayer. There is
+              nobody to pay to press it, and nobody who can choose not to.
+            </p>
 
-        <div className="max-w-[52ch]">
-          <h2 className="label m-0 mb-[16px] text-fg-3">What it does not claim</h2>
-          <p className="m-0 text-lg text-fg-2">
-            This is randomized. It is not a claim that the draw cannot be biased. Rialo&rsquo;s own
-            randomness is a bare 64-bit number with no proof attached, which is why the seed is
-            built out of the participants&rsquo; nonces and the chain value is only mixed in on top.
-          </p>
-          <p className="m-0 mt-[18px] text-lg text-fg-2">
-            Withholding a reveal does move the seed. Two things blunt it: the chain value is only
-            known at the draw, so a griefer is betting blind, and the bond they forfeit is the price
-            of that bet. Biasing the draw needs a party who both produces blocks and reveals last.
-            That is a real limit and it is stated here rather than buried.
-          </p>
+            {/*
+              THE LIMIT, STATED HERE RATHER THAN BURIED. This paragraph is the reason this section
+              is not a boast, and it has survived every redesign of this product for that reason.
+              It is 13px rather than 19px because it is a qualification of the claim above it, and
+              it sits directly under that claim rather than in a footer, which is the whole of what
+              "stated rather than buried" means.
+            */}
+            <p className="m-0 mt-[22px] max-w-[58ch] text-sm text-fg-3">
+              This is randomized. It is not a claim that the draw cannot be biased. Rialo&rsquo;s own
+              randomness is a bare 64-bit number with no proof attached, which is why the seed is
+              built out of the participants&rsquo; secrets and the chain value is only mixed in on
+              top. Withholding a reveal does move the seed; biasing it needs a party who both
+              produces blocks and reveals last, and the bond they forfeit is the price of trying.
+            </p>
+          </div>
+
+          <Flow steps={FLOW} />
         </div>
       </section>
 
-      {/* ----------------------------------------------------------------- the record */}
-      <section className="inv bg-panel px-pad py-[clamp(36px,7vw,88px)] text-fg" aria-labelledby="record-heading">
-        <h2 id="record-heading" className="label m-0 mb-[14px] text-fg-3">
-          The record, right now
-        </h2>
-        <Figures />
-        <p className="m-0 mt-[22px] max-w-[60ch] text-sm text-fg-3">
-          Every figure on this page is read out of lib/mock-raffles.ts at render time, whose settled
-          raffles are settled by a real call to drawRaffle. Nothing rolls on an odometer, because
-          nothing here is connected to a node.
-        </p>
+      {/* ==================================================================== 8. THE CLOSE */}
+      <section className="inv bg-panel px-pad py-[clamp(64px,10vw,140px)] text-fg">
+        <h2 className="m-0 max-w-[16ch] font-serif text-display">Ready to see it in action?</h2>
+        <div className="mt-[clamp(28px,3.4vw,44px)] flex flex-wrap items-center gap-2.5">
+          <Link href="/raffles" className={BUTTON_PRIMARY}>
+            Explore raffles
+          </Link>
+          <Link href="/docs" className={BUTTON}>
+            Read the docs
+          </Link>
+        </div>
       </section>
     </main>
   );

@@ -1,0 +1,443 @@
+/* ==========================================================================================
+   THE STORY: the landing's eight sections.
+
+   WHY THIS FILE EXISTS. app/cell.css owns the cell at its four scales and the row that carries
+   it. Everything here is the landing's own furniture: the opening, the stepper, the raffle card,
+   the draw chain, the verification panel and the reactive-transaction diagram. None of it is a
+   cell and none of it belongs in a file whose header promises one.
+
+   IT IS THE SAME SYSTEM, WITH NO EXCEPTIONS TAKEN. Every colour below is a role token, so one
+   `.inv` on a section flips the lot. There is no radius anywhere: `--radius-*` is cleared in
+   globals.css block 1, so a `rounded` class here would compile to nothing and a hand-written
+   `border-radius` would be the one place in the product that has one. There is no shadow, no
+   blur, no backdrop filter and no gradient, because the ground is the light source and ink is
+   where light is blocked. There is no `@keyframes` and no `infinite`: the one thing on this page
+   that moves without being touched is the opening, and it runs once.
+
+   HOVER IS A SURFACE CHANGE OR A RULE, NEVER A LIFT. A card that rises off the page needs a
+   light behind it to cast the shadow that sells the rise, and there is no second light in this
+   room. A card that changes material under the pointer says the same thing and costs nothing.
+
+   CONTRAST, COMPUTED (WCAG 2.x, 0.03928 knee, L = 0.2126R + 0.7152G + 0.0722B, sanity-checked
+   at #ffffff on #000000 = 21.00), each pair against the surface it actually sits on:
+
+     card title      --fg / --panel-2      13.82 light,  15.01 inverted
+     card facts      --fg-3 / --panel-2     5.27 light,   5.65 inverted
+     card on hover   --fg-3 / --phase       4.79          (a hovered live card sits on --phase)
+     chain label     --fg-3 / --recess      4.53 light,   5.57 inverted (.inv .recess lifts fg-3)
+     chain figure    --event / --recess     5.57 light,   5.95 inverted
+     card boundary   --bound / --panel      5.18 light,   5.65 inverted   (needs 3:1)
+
+   The floor is 4.53 on an 11px label, which clears AA for small text. Nothing on this page is
+   --rule as text: --rule is decorative and --bound is the control boundary.
+   ========================================================================================== */
+
+/* ------------------------------------------------------------------------------- THE OPENING
+
+   The hero field is the muster at a smaller scale, so the cells, the sweep, the column stagger
+   and the reduced-motion path are all app/cell.css's and nothing is reimplemented here. Only the
+   height and the bed change: the landing's full-bleed field was as tall as the viewport, and this
+   one sits inside a panel beside the sentence.
+
+   --field is read by .muster in cell.css. Overriding the custom property rather than `height`
+   keeps the one declaration of how tall a field is in the file that draws it. */
+.muster[data-scale="hero"] {
+  --field: clamp(188px, 30vw, 320px);
+  background: var(--panel-2);
+  gap: 1px;
+}
+
+.muster[data-scale="hero"] .c {
+  border-width: 1px;
+}
+
+/*
+   THE DRAW LINE, AND WHY IT IS ALLOWED TO EXIST.
+
+   One rule, 2px wide, crossing the field once at the end of the opening and then gone. It is not
+   decoration and it is not a scanner: it is the moment the winner is fixed, which is the one
+   event this product is about, and the two cells it leaves lit are raffle 0004's real winners,
+   already in the HTML as `data-s="3"` before the line ever moves.
+
+   It is a transition on `left`, driven by a data attribute the island sets, rather than a
+   keyframe animation. The distinction is not stylistic: `@keyframes` is the thing this codebase
+   has none of, because a named animation invites `infinite`, and a transition cannot loop.
+*/
+.draw-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--event);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.muster-stage[data-draw="run"] .draw-line {
+  opacity: 1;
+  left: calc(100% - 2px);
+  transition:
+    left 900ms var(--ease-blade),
+    opacity var(--t-punch) linear;
+}
+
+.muster-stage[data-draw="done"] .draw-line {
+  opacity: 0;
+  left: calc(100% - 2px);
+  transition: opacity var(--t-settle) linear;
+}
+
+/* The word boxes the opening raises the headline out of. `overflow: hidden` on the box is the
+   whole of the effect: the glyphs travel from below their own line and there is nothing to see
+   until they clear it. Visible and in place with no script. */
+.riser {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+.riser > i {
+  display: inline-block;
+  font-style: normal;
+}
+
+/* ------------------------------------------------------------------------------- THE STEPPER
+
+   Commit, reveal, draw. Three columns and a connecting rule on a wide screen; a vertical
+   timeline on a narrow one, which is a different composition rather than the same one squeezed.
+
+   THE RULE IS POSITIONED OFF THE TYPE RAMP, NOT OFF A GUESS. The step numeral is
+   --text-monument's own clamp at the step's size with line-height 0.82, so the dot's centre is
+   `(size * 0.82) + margin + half the dot`. Writing that arithmetic out is what keeps the rule
+   on the dots when the clamp resolves differently at 900px and at 1600px. */
+.stepper {
+  --step-n: clamp(2.75rem, 5vw, 4.25rem);
+  --dot: 11px;
+
+  position: relative;
+  display: grid;
+  gap: clamp(30px, 3.4vw, 44px);
+}
+
+.step {
+  position: relative;
+}
+
+.step-dot {
+  display: block;
+  width: var(--dot);
+  height: var(--dot);
+  background: var(--event);
+  position: relative;
+  z-index: 1;
+  transition: width var(--t-settle) var(--ease-settle);
+}
+
+/* The one hover in this section, and it is a measurement rather than a flourish: the dot grows
+   along the rule it sits on, in the direction the sequence runs. */
+.step:hover .step-dot,
+.step:focus-within .step-dot {
+  width: calc(var(--dot) * 4);
+}
+
+@media (min-width: 900px) {
+  .stepper {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(24px, 3vw, 48px);
+  }
+
+  .stepper-rule {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(var(--step-n) * 0.82 + 22px + (var(--dot) / 2));
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .step-dot {
+    margin: 22px 0 20px;
+  }
+}
+
+/* The vertical timeline. The numeral moves off the rail and the dot takes its place on it, so
+   the eye runs down one line instead of down three stacked cards. */
+@media (max-width: 899px) {
+  .stepper-rule {
+    display: none;
+  }
+
+  .step {
+    padding-left: 34px;
+  }
+
+  .step::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 12px;
+    bottom: calc(clamp(30px, 3.4vw, 44px) * -1);
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .step:last-child::before {
+    display: none;
+  }
+
+  .step-dot {
+    position: absolute;
+    left: 0;
+    top: 7px;
+    margin: 0;
+  }
+
+  /* No pointer here to grow it with, and a dot that is 44px wide on a 1px rail reads as a
+     mistake rather than as a measurement. */
+  .step:hover .step-dot,
+  .step:focus-within .step-dot {
+    width: var(--dot);
+  }
+}
+
+/* --------------------------------------------------------------------------- THE RAFFLE CARD
+
+   A raffle as a card rather than as a row, which is the one structural departure this landing
+   makes from /raffles, and it is deliberate: the board is a list you scan, and this is an
+   invitation you accept. The row stays the object on /raffles, unchanged.
+
+   REAL GUTTERS, NOT A HAIRLINE GRID. A grid with a 1px gap over a --rule background draws the
+   separators for free and leaves a filled rectangle wherever a row is short of cards, which is
+   exactly what happens on a five-raffle book: the record row has two cards in a three-column
+   grid. Each card carries its own boundary instead. */
+.rcards {
+  display: grid;
+  gap: clamp(14px, 1.5vw, 20px);
+}
+
+@media (min-width: 720px) {
+  .rcards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .rcards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/*
+   `color` IS DECLARED HERE AND THAT IS NOT BELT AND BRACES.
+
+   `.inv` in globals.css redefines custom properties and nothing else. Every other inverted surface
+   in the product is a section written as `className="inv bg-panel text-fg"`, so the utility paints
+   the ink and the tokens do the rest. A card carries `.inv` on its own list item, and a card whose
+   ink came from a utility at the call site is a card that goes invisible the first time someone
+   renders one without it: measured, the settled and void cards printed their labels (which carry
+   `text-fg-3`) and lost the prize, the title, every fact value and the date, because inherited text
+   kept the light palette's ink on an ink background. The card paints its own foreground instead, so
+   the class on the list item is the whole of what a caller has to get right.
+*/
+.rcard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--bound);
+  background: var(--panel-2);
+  color: var(--fg);
+  padding: clamp(20px, 2.2vw, 28px);
+  transition: background var(--t-open) var(--ease-settle);
+}
+
+/* A raffle inside its reveal window sits on a different surface, exactly as it does in a board
+   row. The same fact, told the same way, at a different scale. */
+.rcard[data-phase="revealing"] {
+  background: var(--phase);
+}
+
+.rcard:hover,
+.rcard:focus-visible {
+  background: var(--phase);
+}
+
+.rcard[data-phase="revealing"]:hover,
+.rcard[data-phase="revealing"]:focus-visible {
+  background: var(--recess);
+}
+
+/* An inverted card is a raffle that has left the floor. Its hover is a well rather than a wash,
+   because --phase inside .inv is --ink, which is the surface it is already on. */
+.inv .rcard:hover,
+.inv .rcard:focus-visible {
+  background: var(--recess);
+}
+
+/* The strip on a card is a meter rather than a mark, so it takes the board's own 10px and opens
+   a little under the pointer, on the same transform and the same origin the row uses. */
+.rcard .strip {
+  --strip-h: 12px;
+}
+
+.rcard:hover .strip,
+.rcard:focus-visible .strip {
+  transform: scaleY(1.5);
+}
+
+.rcard-cta {
+  border-bottom: 1px solid var(--bound);
+  padding-bottom: 3px;
+  transition: border-color var(--t-open) var(--ease-settle);
+}
+
+.rcard:hover .rcard-cta,
+.rcard:focus-visible .rcard-cta {
+  border-color: var(--event);
+}
+
+/* ----------------------------------------------------------------------------- THE DRAW CHAIN
+
+   Five links: what was revealed, what was published, what the chain added, what came out, and
+   who won. It is a summary of the ceremony below it and it never contradicts it, because every
+   figure in it is read out of the same modules at render time.
+
+   The links are dim until the replay walks them. Dim rather than hidden: the whole chain is
+   readable at rest, and the walk adds pacing to an argument the document already makes. */
+.chain {
+  display: grid;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+
+@media (min-width: 900px) {
+  .chain {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.chain-link {
+  background: var(--panel);
+  padding: clamp(18px, 2vw, 26px);
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  transition:
+    opacity var(--t-settle) var(--ease-settle),
+    background var(--t-settle) var(--ease-settle);
+}
+
+/* Only ever dimmed by a script that is also going to undim it. With no script every link is at
+   full strength, which is the state the HTML ships in. */
+.chain[data-walk] .chain-link {
+  opacity: 0.45;
+}
+
+.chain[data-walk] .chain-link[data-on="1"] {
+  opacity: 1;
+  background: var(--recess);
+}
+
+/* ------------------------------------------------------------------------ THE VERIFY PANEL
+
+   Collapsed by default, because this is the layer under the product rather than the product.
+   A <details>, so it works with no script at all and the browser owns the state.
+
+   The marker is removed in both spellings the engines use; a stray triangle beside a hand-drawn
+   chevron is the tell that only one of them was written. */
+.vpanel > summary {
+  list-style: none;
+  cursor: pointer;
+  transition: background var(--t-open) var(--ease-settle);
+}
+
+.vpanel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.vpanel > summary::marker {
+  content: "";
+}
+
+.vpanel > summary:hover {
+  background: var(--phase);
+}
+
+.chev {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-right: 1px solid var(--fg);
+  border-bottom: 1px solid var(--fg);
+  transform: rotate(45deg);
+  transition: transform var(--t-open) var(--ease-settle);
+}
+
+.vpanel[open] .chev {
+  /* -135, not 225: the same rotation, but it unwinds through the top rather than through a
+     second full turn, which is what the eye expects of a disclosure. */
+  transform: rotate(-135deg);
+}
+
+/* ------------------------------------------------------------------------------- THE FLOW
+
+   Reveal deadline, condition met, reactive transaction, draw executed. Four plates and three
+   connectors. The last plate is bounded in --event because it is the only one of the four that
+   is an outcome rather than a state, and that is the whole claim of the section. */
+.flow-step {
+  position: relative;
+  border: 1px solid var(--bound);
+  background: var(--panel-2);
+  padding: 16px 18px;
+  display: grid;
+  gap: 5px;
+  margin-bottom: 34px;
+}
+
+.flow-step:last-child {
+  margin-bottom: 0;
+  border-color: var(--event);
+}
+
+.flow-arrow {
+  position: absolute;
+  left: 50%;
+  bottom: -34px;
+  width: 1px;
+  height: 34px;
+  background: var(--bound);
+}
+
+.flow-arrow::after {
+  content: "";
+  position: absolute;
+  left: -3px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--bound);
+  border-bottom: 1px solid var(--bound);
+  transform: rotate(45deg);
+}
+
+/* --------------------------------------------------------------------------- REDUCED MOTION
+
+   `transition-duration` only, never the `transition` shorthand: the shorthand clears
+   `transition-property` with it, and a later rule that sets only a duration would then have
+   nothing to apply it to. app/motion.css is built on the same distinction and records why. */
+@media (prefers-reduced-motion: reduce) {
+  .muster-stage[data-draw] .draw-line {
+    transition-duration: 1ms;
+  }
+
+  .step-dot,
+  .rcard,
+  .rcard .strip,
+  .rcard-cta,
+  .chain-link,
+  .vpanel > summary,
+  .chev {
+    transition-duration: 1ms;
+  }
+}

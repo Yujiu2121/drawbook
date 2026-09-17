@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { BackLink } from "./back-link";
 import { LogoMark, Wordmark } from "./logo";
-import { NavLinks } from "./nav-links";
+import { MobileNav } from "./mobile-nav";
+import { DeployLink, NavLinks } from "./nav-links";
 import { NetChip, WalletChip } from "./wallet-chip";
+import { BUTTON_PRIMARY_SM } from "@/lib/controls";
 
 /**
  * The masthead. One fixed line, `--mast` tall, identical on every route.
@@ -72,23 +74,28 @@ import { NetChip, WalletChip } from "./wallet-chip";
  * switcher, which is a demo control and does not ship. So this bar is 56px everywhere, holds one
  * line everywhere, and pays for that by dropping the two things that are said somewhere else.
  *
- * THE FOUR DESTINATIONS LEAVE THE BAR BELOW 1024. Measured in Chromium against the real subset
- * faces, the four labels set at the label width cost 274px with their tap padding, the identity
- * lockup costs 95px, and the widest chip forms I could measure cost 436px between them. Add the five
- * gaps and the whole set clears the measure that `--pad` leaves from about 995px upward. `lg` is the
- * nearest stop above that, with 27px still spare at 1024, and every pixel a narrower chip saves is a
- * pixel of slack on top of it.
+ * THE DESTINATIONS LEAVE THE BAR BELOW 1024, AND A MENU CATCHES THEM. Measured in Chromium against
+ * the real subset faces, the labels set at the label width cost 274px with their tap padding, the
+ * identity lockup costs 95px, and the widest chip forms I could measure cost 436px between them.
+ * Add the gaps and the whole set clears the measure that `--pad` leaves from about 995px upward.
+ * `lg` is the nearest stop above that.
  *
- * The routes are the right thing to drop because they are the one part of this bar that is repeated
- * elsewhere. The footer lists every destination, one scroll away. Four links behind a menu button is
- * worse than four links in a footer, and this is the same decision the previous system made for the
- * same reason. The chips do not move: which chain you are on and whether you are connected to it are
- * the two facts a testnet product must not drop, and the adversary pass on this port caught an
- * earlier build deleting the network chip to make room.
+ * THIS IS THE ONE DECISION IN THIS FILE THAT REVERSED. The previous answer was to drop the
+ * destinations below that width and let the footer carry them: four links behind a menu button is
+ * worse than four links in a footer, and that was the previous system's call for the same reason.
+ * It stopped being right when the bar gained a call to action. A phone then got a mark, two chips
+ * and a button, with no way to reach any section of the product except by scrolling to the foot of
+ * whatever page it had landed on, and "the footer has them" is a poor answer on a landing page
+ * that is eight sections tall. `components/mobile-nav.tsx` is the menu, and it is a disclosure
+ * rather than a modal; the reasoning is in its own header.
  *
- * The nav is hidden with `display: none` rather than clipped, so it leaves the accessibility tree
- * with it and a screen reader on a phone is offered the footer's copy of those four links once
- * rather than twice.
+ * The chips do not move: which chain you are on and whether you are connected to it are the two
+ * facts a testnet product must not drop, and the adversary pass on the port caught an earlier
+ * build deleting the network chip to make room.
+ *
+ * The wide nav is hidden with `display: none` rather than clipped, so it leaves the accessibility
+ * tree with it, and the menu panel is not rendered at all until it is opened, so a screen reader
+ * meets exactly one copy of the destinations at any width.
  *
  * THE NAME LEAVES THE LOCKUP BELOW 640 AND THE MARK STAYS. A 390px viewport has 350px of measure
  * after the gutter, and the back affordance plus the two chips have already spent most of it. The
@@ -130,6 +137,18 @@ export function Masthead() {
       <BackLink />
       <NetChip />
       <WalletChip />
+
+      {/* The secondary destination and the call to action, in that order, so the thing you are
+          most likely to want is the thing nearest the edge your thumb is on. Both leave the bar at
+          the same width the destinations do, and both are in the drawer below it. */}
+      <span className="hidden shrink-0 items-center gap-[clamp(10px,2vw,26px)] lg:flex">
+        <DeployLink />
+        <Link href="/raffles" className={BUTTON_PRIMARY_SM}>
+          Explore raffles
+        </Link>
+      </span>
+
+      <MobileNav />
     </header>
   );
 }
