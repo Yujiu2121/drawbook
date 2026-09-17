@@ -1,19 +1,26 @@
 import { Fragment, type CSSProperties } from "react";
 
-import { Strip } from "./cell";
+import { PHASE_WORD, Strip } from "./cell";
 import { Countdown, CountdownRules } from "./countdown";
 import { LiveRows, type LiveRow } from "./live-rows";
 import { RaffleRowCells, rowLabel, rowContainerProps } from "./row";
 import { NamedStrip, RowLink } from "./row-link";
 import { activeDeadline, isLive, serialOf } from "@/lib/cell";
-import { summarize, type Raffle } from "@/lib/raffle";
+import { summarize, type Phase, type Raffle } from "@/lib/raffle";
 
 /**
  * THE BOARD.
  *
- * Every raffle in the product, on one page, as the same object at the same scale. Three parts and
- * nothing else: the next deadline printed at monument size, the record of what has already
- * settled, and the raffles still on the floor.
+ * Every raffle in the product, on one page, as the same object at the same scale. Four parts: the
+ * next deadline printed at monument size, a key to the two things the rows never name, the raffles
+ * still on the floor, and the record of what has already settled.
+ *
+ * THE FLOOR NOW COMES BEFORE THE RECORD, AND THAT IS A CHANGE. The old order put the settled
+ * raffles directly under the countdown and the enterable ones below them, which is the order an
+ * auditor wants and the reverse of the order a visitor does: the first list on the page was the
+ * one list nothing can be done with. It also put the dark slab in the middle of a light page and
+ * sent the reader from it back into light. The record is evidence, it is still printed on the dark
+ * surface, and it now sits at the foot where the footer continues it.
  *
  * THIS FILE HAS NO CLIENT DIRECTIVE AND THAT IS THE WHOLE POINT OF THE REWRITE.
  * The board it replaces was 455 lines of Client Component, and its own header comment named the
@@ -176,6 +183,90 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
   );
 }
 
+/* ------------------------------------------------------------------------- the key
+
+   WHAT A FIRST-TIME READER IS ACTUALLY STUCK ON.
+
+   The board's densest element is also its least explained: a bar of small blocks, one per ticket,
+   carrying four states that the page never names. Someone who has used the product reads it at a
+   glance and someone who has not reads texture. The same is true of the stage word in the third
+   column: "Revealing" is precise and it is not English anybody arrives already knowing.
+
+   So the key is two lists and no prose about cryptography. It sits directly under the countdown,
+   before the first row, because a legend printed after the thing it explains has been read by
+   nobody.
+
+   THE SAMPLES ARE REAL CELLS. Each swatch below is `.c` with the same `data-s` the rows write, so
+   it takes its fill, its reveal bar and its strike from app/cell.css and cannot drift from the
+   strips it is explaining. A hand-drawn swatch would be a second definition of the one thing on
+   this page that has to be trusted.
+*/
+const TICKET_KEY: { state: 0 | 1 | 2 | 3; word: string }[] = [
+  { state: 0, word: "Not sold yet" },
+  { state: 1, word: "Bought" },
+  { state: 2, word: "Secret published" },
+  { state: 3, word: "Won" },
+];
+
+/**
+ * The four stages, in the order a raffle passes through them. The words are `PHASE_WORD`'s own, so
+ * the key and the tag in the row's third column cannot say different things.
+ */
+const STAGE_KEY: { phase: Phase; body: string }[] = [
+  { phase: "selling", body: "Tickets are still on sale. Buying one commits a secret nobody can read." },
+  { phase: "revealing", body: "The sale has closed. Holders are publishing the secrets they committed." },
+  { phase: "drawn", body: "The winner has been generated from those secrets and paid." },
+  { phase: "void", body: "Nobody published in time, so every ticket and every bond went back." },
+];
+
+function BoardKey() {
+  return (
+    <section
+      aria-labelledby="board-key"
+      className="grid gap-[clamp(26px,3.4vw,56px)] px-pad pt-[clamp(26px,3.4vw,44px)] pb-[clamp(8px,1.4vw,18px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+    >
+      <div>
+        <h2 id="board-key" className="label text-fg-3">
+          Reading this page
+        </h2>
+        <p className="mt-2.5 max-w-[46ch] text-lg text-fg-2">
+          Every row below is one raffle, and the bar of blocks in it is that raffle&rsquo;s
+          tickets, one block each.
+        </p>
+
+        <ul className="mt-[clamp(18px,2.2vw,26px)] flex flex-wrap gap-x-[clamp(16px,2vw,28px)] gap-y-3">
+          {TICKET_KEY.map(({ state, word }) => (
+            <li key={state} className="flex items-center gap-2.5">
+              <span
+                aria-hidden="true"
+                className="c block h-[18px] w-3 border border-bound"
+                data-s={state}
+              />
+              <span className="text-sm text-fg-2">{word}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="label text-fg-3">The four stages</h3>
+        <dl className="mt-2.5 grid gap-x-[clamp(16px,2vw,28px)] gap-y-3.5 min-[560px]:grid-cols-2">
+          {STAGE_KEY.map(({ phase, body }) => (
+            <div key={phase}>
+              <dt>
+                <span className="phase-tag label" data-phase={phase}>
+                  {PHASE_WORD[phase]}
+                </span>
+              </dt>
+              <dd className="mt-2 max-w-[40ch] text-sm text-fg-3">{body}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
+}
+
 /* -------------------------------------------------------------------------- the board */
 
 /**
@@ -200,7 +291,15 @@ function Record({ raffles }: { raffles: readonly Raffle[] }) {
 
   return (
     <section aria-labelledby="board-record" className="inv bg-panel text-fg">
-      <SectionHead id="board-record" title="The record" meta={meta} className="pt-4" />
+      <SectionHead
+        id="board-record"
+        title="The record"
+        meta={meta}
+        lead="Raffles that have already closed. Open one to see the secrets that were published, the seed they made, and who won."
+        className="pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]"
+      />
+
+      <ColumnHead />
 
       <div className="rows">
         {raffles.map((raffle) => (
@@ -241,10 +340,11 @@ function Floor({ raffles }: { raffles: readonly Raffle[] }) {
         id="board-floor"
         title="On the floor"
         meta={[`${raffles.length} live`, `${sold} of ${supply} tickets gone`]}
-        className="pt-[clamp(18px,2.6vw,30px)]"
+        lead="Raffles you can still take part in. Open one to buy a ticket, or to publish the secret you committed when you bought it."
+        className="pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]"
       />
 
-      <LiveRows rows={rows} />
+      <LiveRows rows={rows} head={<ColumnHead />} />
     </section>
   );
 }
@@ -260,24 +360,62 @@ function SectionHead({
   id,
   title,
   meta,
+  lead,
   className = "",
 }: {
   id: string;
   title: string;
   meta: readonly string[];
+  /**
+   * One plain sentence saying what is in this block. "On the floor" and "The record" are this
+   * product's own names for the two halves of the board and they are worth keeping, but neither
+   * tells someone arriving for the first time whether they can still enter anything. The sentence
+   * does, in words that need nothing explained first.
+   */
+  lead?: string;
   className?: string;
 }) {
   return (
-    <div
-      className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-pad pb-2.5 ${className}`}
-    >
-      <h2 id={id} className="label text-fg-3">
-        {title}
-      </h2>
+    <div className={`px-pad ${className}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <h2 id={id} className="label text-fg-3">
+          {title}
+        </h2>
 
-      <p className="label text-fg-3">
-        <MetaLine parts={meta} />
-      </p>
+        <p className="label text-fg-3">
+          <MetaLine parts={meta} />
+        </p>
+      </div>
+
+      {lead ? <p className="mt-2 max-w-[54ch] text-sm text-fg-2">{lead}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * THE COLUMN HEADER.
+ *
+ * Six words over the six columns of the rows below, drawn on the same grid by app/cell.css so the
+ * widths cannot drift apart from the widths they label.
+ *
+ * `aria-hidden`, and that is deliberate rather than lazy. Every row below is one link carrying an
+ * `aria-label` that already names the raffle, its phase, its ticket count and its pool as a
+ * sentence, so a screen reader that also met six column names would hear them once and then hear
+ * the same facts again, differently worded, on every row. The header is a visual aid for the one
+ * reader who cannot hear the row's own sentence: someone looking at six unlabelled facts.
+ *
+ * It is not rendered inside `.rows`, because `.rows` is `overflow-x: clip` for the row's 4px open
+ * gesture and the header neither moves nor needs clipping.
+ */
+function ColumnHead() {
+  return (
+    <div className="rowhead label" aria-hidden="true">
+      <span className="a-serial">No.</span>
+      <span className="a-title">Raffle</span>
+      <span className="a-phase">Stage</span>
+      <span className="a-strip">Tickets</span>
+      <span className="a-pool">Pool</span>
+      <span className="a-count">Closes</span>
     </div>
   );
 }
@@ -366,8 +504,9 @@ export function Board({ raffles }: { raffles: readonly Raffle[] }) {
       {/* The band names the soonest deadline of the raffles still moving. With nothing moving
           there is no next deadline, and an empty band is more honest than a zeroed one. */}
       {live[0] ? <NextDeadline raffle={live[0]} /> : null}
-      <Record raffles={record} />
+      <BoardKey />
       <Floor raffles={live} />
+      <Record raffles={record} />
     </>
   );
 }

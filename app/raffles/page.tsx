@@ -65,10 +65,23 @@ export default function Page() {
 
       <Board raffles={MOCK_RAFFLES} />
 
-      <section className="px-pad py-[clamp(36px,7vw,88px)]">
-        <div className="grid items-start gap-[clamp(22px,3vw,44px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      {/*
+        THE NOTES, AND WHY THEY STAY AT THE FOOT WHILE THE KEY MOVED TO THE TOP.
+
+        These four paragraphs are qualifications: what the clock is measuring, what a figure that
+        does not roll means, and the limit on the draw. Every one of them is a correction to an
+        assumption a reader can only have formed by looking at the board first, so they belong
+        after it. What did NOT belong after it is the key to the blocks and the stage words, which
+        is the vocabulary needed to read the board at all; that is now the first thing under the
+        countdown. The old page had both down here, which is why the page opened on a dense grid
+        with nothing explaining it and closed with an explanation nobody had reached yet.
+      */}
+      <section className="px-pad py-[clamp(44px,7vw,96px)]">
+        <div className="grid items-start gap-[clamp(26px,3.4vw,52px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
           <div>
-            <p className="max-w-[46ch] text-lg text-fg-2">
+            <h2 className="label text-fg-3">Notes on what you are reading</h2>
+
+            <p className="mt-2.5 max-w-[46ch] text-lg text-fg-2">
               A raffle inside its reveal window sits on a different surface, not a different badge.
               The black is not decoration either: it is where the record begins.
             </p>
@@ -79,19 +92,19 @@ export default function Page() {
               every countdown adds that to the pinned instant, so two tabs opened an hour apart
               disagree by an hour and neither of them is lying about a block.
             */}
-            <p className="mt-[clamp(18px,2.4vw,28px)] max-w-[58ch] text-sm text-fg-3">
+            <p className="mt-[clamp(20px,2.6vw,30px)] max-w-[58ch] text-sm text-fg-3">
               The countdowns above advance from a pinned instant, {utcStamp(NOW.toISOString())},
               plus the time this tab has been open. Time passing is not a chain event, so nothing
               here pretends one happened.
             </p>
 
-            <p className="mt-4 max-w-[58ch] text-sm text-fg-3">
+            <p className="mt-[18px] max-w-[58ch] text-sm text-fg-3">
               No figure on this board rolls on an odometer. A rolling figure means the number came
               off a node in the last few seconds, and the only one in this product is the block
               height in the masthead. Everything here steps.
             </p>
 
-            <p className="mt-4 max-w-[58ch] text-sm text-fg-3">
+            <p className="mt-[18px] max-w-[58ch] text-sm text-fg-3">
               The draw is randomized, not unbiasable. Withholding a reveal does move the seed.
               Biasing it needs a party who both produces blocks and reveals last, and the bond they
               forfeit is the price of trying.

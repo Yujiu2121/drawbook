@@ -84,7 +84,7 @@ function order(rows: readonly LiveRow[], by: SortKey): LiveRow[] {
   return sorted.sort((a, b) => a.deadline - b.deadline);
 }
 
-export function LiveRows({ rows }: { rows: readonly LiveRow[] }) {
+export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: ReactNode }) {
   const reduce = useReducedMotion();
   const [by, setBy] = useState<SortKey>("deadline");
   const [delays, setDelays] = useState<Record<number, number>>({});
@@ -141,6 +141,12 @@ export function LiveRows({ rows }: { rows: readonly LiveRow[] }) {
           ))}
         </div>
       </div>
+
+      {/* The column header, handed in by the board rather than built here: the header's six words
+          belong to the row's grid, which this island does not own, and the board renders the same
+          one over the record list. It sits under the sort control, because sorting changes which
+          rows are under the header and not what the header says. */}
+      {head}
 
       {/* `.rows` is not optional around any list of rows: an opened row translates 4px to the
           right, and a transform's overflow reaches the document. See app/cell.css. */}

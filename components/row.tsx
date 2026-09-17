@@ -150,11 +150,20 @@ export function RaffleRowCells({ raffle, mini = false, countdown, strip }: Raffl
         {serialOf(raffle)}
       </span>
 
+      {/*
+          THE SUB-LINE IS SENTENCE CASE AND NOT A LABEL, WHICH IS A READABILITY DECISION.
+          It was set in the 11px uppercase mono label instance at 0.14em, the same voice the
+          chrome uses for column names and section heads. That voice is right for a word you scan
+          past and wrong for a fact you are meant to read: uppercase removes the word shapes, and
+          "16 OF 16 SOLD · 11 REVEALED" is the one line on the row that tells a newcomer how far
+          along this raffle is. At 13px in the running face it is the same information and it
+          reads at a glance.
+      */}
       <span className="a-title">
         <b>{raffle.config.title}</b>
-        <span className="label text-fg-3">
+        <span className="block text-sm text-fg-3">
           <span className="whitespace-nowrap">
-            {s.sold} of {raffle.config.supply} sold
+            {s.sold} of {raffle.config.supply} tickets sold
           </span>
           {s.revealed > 0 ? (
             <>

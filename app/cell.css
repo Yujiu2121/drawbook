@@ -433,16 +433,37 @@
   overflow-x: clip;
 }
 
-.row {
-  position: relative;
+/*
+   THE COLUMNS ARE DECLARED ONCE AND THE HEADER READS THEM.
+
+   `.rowhead` below is the same six columns with the same gutter, so a column label sits over the
+   column it names without either measurement being written twice. A header whose widths are
+   retyped is a header that drifts the first time a column changes, and it drifts silently: the
+   labels simply stop pointing at anything.
+*/
+.row,
+.rowhead {
   display: grid;
   align-items: center;
-  gap: clamp(10px, 1.6vw, 22px);
+  gap: clamp(12px, 1.8vw, 24px);
   grid-template-columns: 64px minmax(90px, 1.1fr) 96px minmax(120px, 1.7fr) 92px 118px;
   grid-template-areas: "serial title phase strip pool count";
   width: 100%;
-  padding: 15px var(--pad);
+  padding-inline: var(--pad);
   text-align: left;
+}
+
+.row {
+  position: relative;
+
+  /*
+     ROOM. This was a flat 15px, which is tight for two lines of type at 13px and 11px and reads
+     as a spreadsheet rather than as a list of things you can enter. The row is the one object on
+     this page a newcomer has to parse, and the cheapest way to make it parseable is to stop
+     stacking five rows inside one screen height. The clamp keeps a phone close to where it was
+     and gives a desk the air.
+  */
+  padding-block: clamp(18px, 2vw, 26px);
 
   /* var(--fg), not `inherit`. The row is an <a>, so it needs a colour of its own or the UA
      paints it link blue; and `inherit` would carry down the rgb that body already resolved,
@@ -486,6 +507,28 @@
    keyboard user saw a three-sided box. The ring is inside the row. */
 .row:focus-visible {
   outline-offset: -3px;
+}
+
+/*
+   THE COLUMN HEADER.
+
+   Six words over six columns, and the reason it exists is that without it the row is six
+   unlabelled facts: a four-digit number, a name, a word like REVEALING, a bar of blocks, a
+   figure, and a clock. Someone who has used the product reads that instantly and someone who has
+   not reads a dashboard. The labels cost one line per list and they are the difference.
+
+   It is `aria-hidden` at the call site rather than a real `<th>`, because the list below it is a
+   list of links and not a table: a screen reader gets each row's own `aria-label`, which already
+   names every figure in a sentence, and a second set of column names would be read before every
+   row for no gain.
+
+   It disappears at the narrow layout, where the row restacks into four lines and a column header
+   would be labelling columns that no longer exist.
+*/
+.rowhead {
+  padding-block: 0 10px;
+  color: var(--fg-3);
+  border-bottom: 1px solid var(--rule);
 }
 
 .a-serial { grid-area: serial; }
@@ -597,6 +640,10 @@
     grid-template-columns: repeat(var(--cols-n, var(--cols, 20)), minmax(0, 1fr));
   }
 
+  .rowhead {
+    display: none;
+  }
+
   .row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -604,7 +651,7 @@
       "title title"
       "phase pool"
       "strip strip";
-    gap: 8px 12px;
+    gap: 10px 12px;
   }
 
   .a-serial { align-self: center; }
