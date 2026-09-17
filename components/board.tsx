@@ -219,11 +219,34 @@ const STAGE_KEY: { phase: Phase; body: string }[] = [
   { phase: "void", body: "Nobody published in time, so every ticket and every bond went back." },
 ];
 
+/**
+ * THE KEY IS A PLATE, AND THAT IS WHAT BREAKS THE PAGE INTO SECTIONS.
+ *
+ * Measured before this existed: five sections on this route, every gap between them exactly
+ * 0px, four of the five transparent on the same ground, and not one border on any of them. The
+ * top 631px was the countdown, the key and the floor list running together as one surface with
+ * three different jobs in it. The only break the page had was the record's inversion.
+ *
+ * A hairline would have been the cheap fix and it is the wrong one. Every row already carries
+ * `border-bottom: 1px solid var(--rule)`, so a section separated by that same line makes the
+ * page's strongest structural signal and its weakest identical, and the result reads as more
+ * grid rather than as fewer sections. A section break has to be a different KIND of thing from
+ * a row break.
+ *
+ * So it is a surface change, which is the device the landing uses to get eight legible
+ * sections, and the surface is --panel-2, which is the row's own. No new material enters the
+ * system: the key stops being more text on the ground and becomes an object sitting between
+ * the hero and the list, which is what a legend is. One change buys both missing breaks, the
+ * end of the countdown and the start of the floor.
+ *
+ * Full bleed, with a --rule edge top and bottom, because a plate inset from the gutter would
+ * be a card, and a card is a thing you can open.
+ */
 function BoardKey() {
   return (
     <section
       aria-labelledby="board-key"
-      className="grid gap-[clamp(26px,3.4vw,56px)] px-pad pt-[clamp(26px,3.4vw,44px)] pb-[clamp(8px,1.4vw,18px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+      className="grid gap-[clamp(26px,3.4vw,56px)] border-y border-rule bg-panel-2 px-pad py-[clamp(26px,3.4vw,44px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
     >
       <div>
         <h2 id="board-key" className="label text-fg-3">
@@ -377,8 +400,21 @@ function SectionHead({
 }) {
   return (
     <div className={`px-pad ${className}`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <h2 id={id} className="label text-fg-3">
+      {/*
+          THE HEAD IS A HEADING NOW, NOT A CAPTION.
+
+          "On the floor" and "The record" were set in the same 11px uppercase label as the column
+          names, the sort control and the meta line beside them, which made the two entry points of
+          the page indistinguishable from its smallest furniture. A reader scrolling had nothing to
+          land on between the countdown and the first row.
+
+          --text-title in the serif is 34px at the cap, against a countdown that is about 200px, so
+          it cannot compete with the monument and does not try to. The meta line stays at label
+          size and drops to its own line under the heading, because a 34px serif and an 11px mono
+          sharing a baseline is a pairing neither of them wins.
+      */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
+        <h2 id={id} className="m-0 font-serif text-title">
           {title}
         </h2>
 
@@ -387,7 +423,7 @@ function SectionHead({
         </p>
       </div>
 
-      {lead ? <p className="mt-2 max-w-[54ch] text-sm text-fg-2">{lead}</p> : null}
+      {lead ? <p className="mt-3 max-w-[54ch] text-sm text-fg-2">{lead}</p> : null}
     </div>
   );
 }
