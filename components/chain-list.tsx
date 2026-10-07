@@ -200,7 +200,7 @@ export function ChainRaffleList() {
 
   return (
     <section aria-labelledby="chain-floor" className="border-b border-rule">
-      <div className="px-pad pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]">
+      <div className="px-gutter pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
           <h2 id="chain-floor" className="m-0 font-serif text-title">
             On chain
@@ -222,15 +222,15 @@ export function ChainRaffleList() {
       </div>
 
       {state.kind === "loading" || (state.kind === "ready" && now === 0) ? (
-        <p className="px-pad pb-[clamp(20px,3vw,32px)] text-sm text-fg-3">
+        <p className="px-gutter pb-[clamp(20px,3vw,32px)] text-sm text-fg-3">
           Reading the raffle program&rsquo;s accounts from {NETWORK}.
         </p>
       ) : state.kind === "error" ? (
-        <p className="px-pad pb-[clamp(20px,3vw,32px)] text-sm text-fg-3">
+        <p className="px-gutter pb-[clamp(20px,3vw,32px)] text-sm text-fg-3">
           The {NETWORK} node did not answer ({state.message}). Trying again every thirty seconds.
         </p>
       ) : rows.length === 0 ? (
-        <div className="px-pad pb-[clamp(20px,3vw,32px)]">
+        <div className="px-gutter pb-[clamp(20px,3vw,32px)]">
           {/* No deploy button even here: the masthead carries one on every route, and this page's
               header explains why a third copy does not belong on it. */}
           <p className="max-w-[58ch] text-sm text-fg-2">
@@ -254,13 +254,13 @@ export function ChainRaffleList() {
             ))}
           </div>
           {rows.length > MAX_ROWS && (
-            <p className="px-pad py-3 text-sm text-fg-3">
+            <p className="px-gutter py-3 text-sm text-fg-3">
               Showing the first {MAX_ROWS} of {rows.length}, open ones first. Each raffle has its own
               address; a link to one opens it whatever this list shows.
             </p>
           )}
           {state.kind === "ready" && state.stale && (
-            <p className="px-pad py-3 text-sm text-fg-3">
+            <p className="px-gutter py-3 text-sm text-fg-3">
               The last read failed ({state.stale}); the list is as it was last read.
             </p>
           )}

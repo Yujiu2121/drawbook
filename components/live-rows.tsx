@@ -157,7 +157,7 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2.5 px-pad pb-3.5">
+      <div className="flex flex-wrap items-center gap-2.5 px-gutter pb-3.5">
         <span id="sort-by" className="label text-fg-3 mr-1">
           Sort
         </span>

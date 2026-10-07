@@ -449,7 +449,7 @@
   grid-template-columns: 64px minmax(90px, 1.1fr) 96px minmax(120px, 1.7fr) 92px 118px;
   grid-template-areas: "serial title phase strip pool count";
   width: 100%;
-  padding-inline: var(--pad);
+  padding-inline: var(--gutter);
   text-align: left;
 }
 

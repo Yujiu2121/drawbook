@@ -234,7 +234,7 @@ export function Hero({
   }, []);
 
   return (
-    <div className="grid items-center gap-[clamp(30px,4vw,60px)] px-pad py-[clamp(40px,6vw,88px)] min-[1000px]:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)]">
+    <div className="grid items-center gap-[clamp(30px,4vw,60px)] px-gutter py-[clamp(40px,6vw,88px)] min-[1000px]:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)]">
       <div>
         <p className="label m-0 mb-[clamp(18px,2.4vw,30px)] flex items-center gap-2.5 text-fg-3">
           {/* The signal band, at the size it is on the mark. It is not a control, it never

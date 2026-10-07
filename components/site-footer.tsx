@@ -60,10 +60,11 @@ import { Wordmark } from "./logo";
  * the surface really is a different material, the same trade the masthead makes at the other end of
  * the page, and the film has no business diffusing a block whose whole job is that the light stops.
  *
- * FULL BLEED, LIKE THE MASTHEAD AND EVERY BLOCK IN THE SYSTEM. The block is never centred: `--pad`
- * is the product's single gutter and `px-pad` is the whole horizontal story on every surface, so the
- * first column sits under the masthead's mark at every width. The grid inside it is argued at its
- * own comment below.
+ * FULL BLEED, LIKE THE MASTHEAD AND EVERY BLOCK IN THE SYSTEM. The surface runs edge to edge and
+ * `px-gutter` is the whole horizontal story on every surface, so the first column sits under the
+ * masthead's mark at every width. The gutter equals `--pad` up to a 1600px viewport and then grows,
+ * so on a wide monitor the content is bounded to a 93rem measure while the surface still bleeds.
+ * The grid inside it is argued at its own comment below.
  *
  * THE LINK TARGETS ARE 31.5px TALL RATHER THAN 14px, which is the one measured defect the previous
  * system had here. Measured in Chromium at 390: a bare 13px inline anchor is a 14px-high hit area,
@@ -150,7 +151,7 @@ const LINK =
 
 export function SiteFooter() {
   return (
-    <footer className="inv bg-panel text-fg px-pad py-[clamp(40px,6vw,80px)]">
+    <footer className="inv bg-panel text-fg px-gutter py-[clamp(40px,6vw,80px)]">
       {/*
         THE BLOCK IS FULL BLEED AND THE INDEX INSIDE IT SPANS IT, which is the same shape every block
         in this system has, and the reason the cap that used to sit here is gone.
@@ -167,7 +168,7 @@ export function SiteFooter() {
         track keeps the narrow columns from crowding the sentence (at 1024: 356px and three of
         152.6px). From `xl` up the three link columns stop at 200px, which is the width they had
         arrived at naturally by then, and the first column absorbs every pixel after that. The index
-        therefore ends on `--pad` at every width, aligned with the masthead's right edge, and the
+        therefore ends on the gutter at every width, aligned with the masthead's right edge, and the
         switch is invisible: at 1280 the tracks go from 458.5/196.5 to 448/200.
       */}
       <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,0.6fr)] xl:grid-cols-[1fr_repeat(3,minmax(0,200px))]">

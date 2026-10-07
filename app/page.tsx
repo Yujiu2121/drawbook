@@ -333,7 +333,7 @@ export default function LandingPage() {
 
       {/* ============================================================ 2. WHAT IS DRAWBOOK */}
       <section
-        className="px-pad py-[clamp(48px,8vw,112px)]"
+        className="px-gutter py-[clamp(48px,8vw,112px)]"
         aria-labelledby="what-heading"
       >
         <div className="max-w-[58ch]">
@@ -374,7 +374,7 @@ export default function LandingPage() {
       {/* =============================================================== 3. HOW IT WORKS */}
       <section
         id="how"
-        className="inv scroll-mt-mast bg-panel px-pad py-[clamp(48px,8vw,112px)] text-fg"
+        className="inv scroll-mt-mast bg-panel px-gutter py-[clamp(48px,8vw,112px)] text-fg"
         aria-labelledby="how-heading"
       >
         <h2
@@ -393,7 +393,7 @@ export default function LandingPage() {
       {/* ================================================================ 4. LIVE RAFFLES */}
       <section
         id="raffles"
-        className="scroll-mt-mast px-pad py-[clamp(48px,8vw,112px)]"
+        className="scroll-mt-mast px-gutter py-[clamp(48px,8vw,112px)]"
         aria-labelledby="raffles-heading"
       >
         {/* The title is now literally true: the raffles that are live are one click away, at the
@@ -487,7 +487,7 @@ export default function LandingPage() {
       {CEREMONY && TRACE.length > 0 ? (
         <>
           <section
-            className="inv bg-panel px-pad py-[clamp(48px,8vw,112px)] text-fg"
+            className="inv bg-panel px-gutter py-[clamp(48px,8vw,112px)] text-fg"
             aria-labelledby="draw-heading"
           >
             <SectionHead
@@ -514,7 +514,7 @@ export default function LandingPage() {
 
       {/* ====================================================== 6. VERIFIABLE BY DESIGN */}
       {CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY ? (
-        <section className="px-pad py-[clamp(48px,8vw,112px)]" aria-labelledby="verify-heading">
+        <section className="px-gutter py-[clamp(48px,8vw,112px)]" aria-labelledby="verify-heading">
           <div className="mb-[clamp(30px,4vw,52px)] max-w-[58ch]">
             <h2 id="verify-heading" className="m-0 max-w-[18ch] font-serif text-display">
               Don&rsquo;t trust the result. Verify it.
@@ -540,7 +540,7 @@ export default function LandingPage() {
       {/* ================================================================ 7. BUILT ON RIALO */}
       <section
         id="rialo"
-        className="scroll-mt-mast px-pad py-[clamp(48px,8vw,112px)]"
+        className="scroll-mt-mast px-gutter py-[clamp(48px,8vw,112px)]"
         aria-labelledby="rialo-heading"
       >
         <div className="grid items-center gap-[clamp(30px,4vw,64px)] min-[900px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -584,7 +584,7 @@ export default function LandingPage() {
       </section>
 
       {/* ==================================================================== 8. THE CLOSE */}
-      <section className="inv bg-panel px-pad py-[clamp(64px,10vw,140px)] text-fg">
+      <section className="inv bg-panel px-gutter py-[clamp(64px,10vw,140px)] text-fg">
         <h2 className="m-0 max-w-[16ch] font-serif text-display">Ready to see it in action?</h2>
         <p className="m-0 mt-[clamp(18px,2vw,24px)] max-w-[52ch] text-fg-2">
           Live raffles are on Rialo testnet, and a raffle you deploy is a real account there. Your

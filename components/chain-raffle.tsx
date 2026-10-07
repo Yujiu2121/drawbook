@@ -510,7 +510,7 @@ export function ChainRaffleView({ address }: { address: string }) {
   if (load.kind !== "ready" || raffle === null || now === 0) {
     return (
       <main className="pt-mast pb-[clamp(48px,8vw,104px)]">
-        <div className="px-pad pt-[clamp(24px,4vw,52px)]">
+        <div className="px-gutter pt-[clamp(24px,4vw,52px)]">
           <BackToBoard />
           <h1 className="font-serif mt-[clamp(16px,2.4vw,28px)] text-display">
             {load.kind === "invalid"
@@ -861,7 +861,7 @@ export function ChainRaffleView({ address }: { address: string }) {
     >
       <ChainBlade raffle={r} label={fieldLabel} />
 
-      <div className="px-pad pt-[clamp(24px,4vw,52px)]">
+      <div className="px-gutter pt-[clamp(24px,4vw,52px)]">
         <BackToBoard />
 
         <div className="mt-[clamp(16px,2.4vw,28px)] grid items-start gap-[clamp(22px,3vw,44px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">

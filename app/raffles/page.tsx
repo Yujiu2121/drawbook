@@ -76,7 +76,7 @@ export default function Page() {
         so the page reads as two sections of equal rank, and a sentence that says what the second
         one is before its countdown can be mistaken for a live one.
       */}
-      <section aria-labelledby="samples-heading" className="px-pad pt-[clamp(32px,4.4vw,60px)]">
+      <section aria-labelledby="samples-heading" className="px-gutter pt-[clamp(32px,4.4vw,60px)]">
         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
           <h2 id="samples-heading" className="m-0 font-serif text-title">
             Sample raffles
@@ -103,7 +103,7 @@ export default function Page() {
         countdown. The old page had both down here, which is why the page opened on a dense grid
         with nothing explaining it and closed with an explanation nobody had reached yet.
       */}
-      <section className="px-pad py-[clamp(44px,7vw,96px)]">
+      <section className="px-gutter py-[clamp(44px,7vw,96px)]">
         <div className="grid items-start gap-[clamp(26px,3.4vw,52px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
           <div>
             <h2 className="label text-fg-3">Notes on what you are reading</h2>

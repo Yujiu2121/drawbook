@@ -142,7 +142,7 @@ export function MobileNav() {
         <div
           ref={panelRef}
           id={panelId}
-          className="fixed inset-x-0 top-mast z-[79] grid gap-0.5 border-b border-rule bg-panel px-pad pt-2 pb-5 xl:hidden"
+          className="fixed inset-x-0 top-mast z-[79] grid gap-0.5 border-b border-rule bg-panel px-gutter pt-2 pb-5 xl:hidden"
         >
           {[...NAV, SECONDARY].map((d) => {
             const current = pathname === d.href || (d.also?.test(pathname) ?? false);

@@ -1040,7 +1040,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
       className="inv border-y border-rule bg-panel text-fg"
       aria-label={`The recorded draw of sample raffle ${SERIAL}`}
     >
-      <div className="flex flex-wrap items-center gap-x-[18px] gap-y-2.5 border-b border-rule px-pad py-4">
+      <div className="flex flex-wrap items-center gap-x-[18px] gap-y-2.5 border-b border-rule px-gutter py-4">
         {/* "Sample" is the first word on the bar because this island is the one place the
             sample record looks most like a live chain event: a draw, replayed. */}
         <span className="label border border-bound px-2 py-1 text-fg-2">
@@ -1072,7 +1072,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
         )}
       </div>
 
-      <div className="grid gap-[clamp(20px,3vw,44px)] px-pad py-[clamp(18px,3vw,34px)] min-[980px]:grid-cols-[minmax(0,1.6fr)_minmax(230px,1fr)]">
+      <div className="grid gap-[clamp(20px,3vw,44px)] px-gutter py-[clamp(18px,3vw,34px)] min-[980px]:grid-cols-[minmax(0,1.6fr)_minmax(230px,1fr)]">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)]">
           {phase === "idle" ? (
             <Record poster={poster} trace={trace} />
@@ -1207,7 +1207,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
       </div>
 
       {audit ? (
-        <div className="border-t border-rule px-pad py-4">
+        <div className="border-t border-rule px-gutter py-4">
           <RecomputePanel />
         </div>
       ) : null}

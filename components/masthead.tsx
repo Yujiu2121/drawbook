@@ -120,7 +120,7 @@ import { BUTTON_PRIMARY_SM } from "@/lib/controls";
  */
 export function Masthead() {
   return (
-    <header className="fixed inset-x-0 top-0 z-[80] flex h-mast flex-nowrap items-center gap-[clamp(10px,2vw,26px)] border-b border-rule bg-panel px-pad whitespace-nowrap">
+    <header className="fixed inset-x-0 top-0 z-[80] flex h-mast flex-nowrap items-center gap-[clamp(10px,2vw,26px)] border-b border-rule bg-panel px-gutter whitespace-nowrap">
       {/*
         The identity and the nav are wrapped rather than handed a class. Every child of this bar is
         owned by another file, and a wrapper asks those files for nothing but their name.

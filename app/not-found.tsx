@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <main className="pt-mast">
-      <section className="px-pad pt-[clamp(48px,8vw,112px)] pb-[clamp(56px,9vw,120px)]">
+      <section className="px-gutter pt-[clamp(48px,8vw,112px)] pb-[clamp(56px,9vw,120px)]">
         <p className="label text-fg-3">Page not found</p>
         <h1 className="mt-5 max-w-[16ch] font-serif text-display text-fg">
           Nothing lives at this address.

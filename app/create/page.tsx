@@ -704,7 +704,7 @@ export default function CreatePage() {
 
   return (
     <main className="pt-mast pb-[clamp(48px,8vw,104px)]">
-      <div className="px-pad pt-[clamp(20px,3vw,36px)]">
+      <div className="px-gutter pt-[clamp(20px,3vw,36px)]">
         <Link
           href="/raffles"
           className="label inline-flex items-center gap-1.5 text-fg-3 transition-colors hover:text-fg"

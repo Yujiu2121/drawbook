@@ -192,7 +192,7 @@ export default function RootLayout({
         */}
         <a
           href="#content"
-          className="label fixed top-2.5 left-pad z-[90] -translate-y-[calc(100%+20px)] border border-bound bg-panel px-3 py-2.5 text-fg focus:translate-y-0"
+          className="label fixed top-2.5 left-gutter z-[90] -translate-y-[calc(100%+20px)] border border-bound bg-panel px-3 py-2.5 text-fg focus:translate-y-0"
         >
           Skip to content
         </a>

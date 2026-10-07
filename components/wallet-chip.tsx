@@ -216,7 +216,7 @@ export function ChainNotice() {
         {sentence}
       </span>
       {sentence === null ? null : (
-        <div className="fixed right-0 left-0 top-mast z-[78] flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule bg-panel-2 px-pad py-2.5 whitespace-normal">
+        <div className="fixed right-0 left-0 top-mast z-[78] flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule bg-panel-2 px-gutter py-2.5 whitespace-normal">
           <p aria-hidden="true" title={detail ?? undefined} className="min-w-0 flex-1 text-sm text-fg">
             {sentence}
           </p>

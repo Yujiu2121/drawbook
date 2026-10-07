@@ -154,7 +154,7 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
   return (
     <section
       aria-label="Next sample deadline"
-      className="group overflow-x-clip px-pad pt-[clamp(16px,2.4vw,34px)] pb-[clamp(14px,2vw,24px)]"
+      className="group overflow-x-clip px-gutter pt-[clamp(16px,2.4vw,34px)] pb-[clamp(14px,2vw,24px)]"
     >
       <p className="label text-fg-3">
         {selling ? "Sale closes" : "Reveals close"}
@@ -277,7 +277,7 @@ function BoardKey() {
   return (
     <section
       aria-labelledby="board-key"
-      className="grid gap-[clamp(26px,3.4vw,56px)] border-y border-rule bg-panel-2 px-pad py-[clamp(26px,3.4vw,44px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+      className="grid gap-[clamp(26px,3.4vw,56px)] border-y border-rule bg-panel-2 px-gutter py-[clamp(26px,3.4vw,44px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
     >
       <div>
         <h2 id="board-key" className="label text-fg-3">
@@ -436,7 +436,7 @@ function SectionHead({
   className?: string;
 }) {
   return (
-    <div className={`px-pad ${className}`}>
+    <div className={`px-gutter ${className}`}>
       {/*
           THE HEAD IS A HEADING NOW, NOT A CAPTION.
 
@@ -527,7 +527,7 @@ function MetaLine({ parts }: { parts: readonly string[] }) {
  */
 function EmptyBoard() {
   return (
-    <section className="px-pad pt-[clamp(24px,4vw,56px)] pb-[clamp(24px,4vw,56px)]">
+    <section className="px-gutter pt-[clamp(24px,4vw,56px)] pb-[clamp(24px,4vw,56px)]">
       <span
         aria-hidden="true"
         className="strip max-w-[26rem]"

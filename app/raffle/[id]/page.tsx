@@ -793,7 +793,7 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
         <Blade raffle={raffle} />
       </ViewTransition>
 
-      <div className="px-pad pt-[clamp(24px,4vw,52px)]">
+      <div className="px-gutter pt-[clamp(24px,4vw,52px)]">
         <SampleNotice raffle={raffle} />
 
         <div className="grid items-start gap-[clamp(22px,3vw,44px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">

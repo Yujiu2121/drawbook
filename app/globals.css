@@ -159,6 +159,12 @@
      need as a scroll offset as well as a padding. */
   --pad: clamp(20px, 4.4vw, 56px);
   --mast: 56px;
+  /* The horizontal gutter. Equal to --pad up to a 1600px viewport, so every phone and laptop is
+     unchanged; past that the content stops at a 93rem (1488px) measure and the gutter takes the
+     rest, so rows, tables and text no longer stretch across a 1920 or 2560 monitor. Surfaces,
+     bands and the ticket strips still run edge to edge: only what sits inside them is bounded.
+     Vertical padding and gaps stay on --pad, which is why this is a second token, not a new --pad. */
+  --gutter: max(var(--pad), calc((100vw - 93rem) / 2));
 }
 
 /* --------------------------------------------------------------------- 3. THE ROLES
@@ -325,9 +331,10 @@
   --ease-blade: var(--ease-blade);
   --ease-settle: var(--ease-settle);
 
-  /* ---- RHYTHM. --spacing-* is the padding, margin and gap namespace, so px-pad, py-pad, gap-pad,
+  /* ---- RHYTHM. --spacing-* is the padding, margin and gap namespace, so px-gutter, py-pad, gap-pad,
      pt-mast and scroll-mt-mast all compile. */
   --spacing-pad: var(--pad);
+  --spacing-gutter: var(--gutter);
   --spacing-mast: var(--mast);
 }
 
