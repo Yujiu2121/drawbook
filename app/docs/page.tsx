@@ -560,7 +560,7 @@ seed_v1 = sha256(
                 </>,
               ],
               [
-                "105",
+                "138",
                 <>
                   <span className="figure block">scripts/verify-chain.ts</span>
                   <span className="text-fg-2">

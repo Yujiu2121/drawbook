@@ -81,14 +81,14 @@ The port is 3333, not 3000, set in `package.json` as `${PORT:-3333}`. The RPC en
 ## Verification
 
 ```bash
-pnpm verify    # offline: three suites, 200 checks
+pnpm verify    # offline: three suites, 233 checks
 ```
 
 | Suite | Checks | What it asserts |
 |---|---:|---|
 | `scripts/verify-sha256.ts` | 20 | SHA-256 against FIPS 180-4 vectors, plus 400 random cross-checks against `node:crypto` |
 | `scripts/verify-raffle.ts` | 75 | the draw in `lib/raffle.ts`: determinism, distinct winners, independence from reveal order, the winner cap, payout conservation, a tamper-rejecting audit, chi-square uniformity, the sample data |
-| `scripts/verify-chain.ts` | 105 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals |
+| `scripts/verify-chain.ts` | 138 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals |
 
 Count the `PASS` lines rather than trusting this table. The chi-square statistic is computed from
 fresh random seeds on every run, so it changes each time; the test passes while it stays under the
