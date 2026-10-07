@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 
 /**
  * THE OPENING, AND THE ONLY CLIENT ISLAND ABOVE THE FOLD.
@@ -51,6 +51,15 @@ const BEAT_MS = 100;
 const useArmEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
+ * False on the server and in the hydration render, true in a render that is not hydrating, which
+ * for this component means a client-side navigation to "/". The store never changes, so nothing
+ * subscribes; only the server/client snapshot split is used.
+ */
+const noSubscribe = () => () => {};
+const onClient = () => true;
+const onServer = () => false;
+
+/**
  * Read a duration token off an element. `--t-blade` is `260ms`, so `parseFloat` is the whole
  * parser; a token in seconds would need more, and there are none.
  */
@@ -89,6 +98,11 @@ export function Hero({
   const stage = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
+  /* Read once, on the first render, and kept: the store re-renders this component with `true`
+     straight after hydration, but whether the FIRST commit was a hydration is what decides below. */
+  const clientRender = useSyncExternalStore(noSubscribe, onClient, onServer);
+  const mountedOnClient = useRef(clientRender);
+
   const words = sentence.split(" ");
 
   useArmEffect(() => {
@@ -103,6 +117,39 @@ export function Hero({
 
     const blade = tokenMs(musterEl, "--t-blade", 260);
     const timers: number[] = [];
+
+    /* ALREADY SEEN, SO NOT FOLDED. "Before the browser paints" is true of a client-side navigation
+       to this page and false of a hard load: there the server's HTML has painted the headline and
+       the field before this island hydrates, and arming at hydration hid content the visitor had
+       already read, then raised it again. On a throttled phone that was a second of headline gone.
+       So when this first commit was a hydration over HTML that has had a contentful paint, the
+       fold and the rise are skipped and the hero stays as painted. Only the draw line runs, since
+       it hides nothing: one stroke across a field that is already there. A browser without paint
+       timing reports no paint and keeps the full opening, which is the old behaviour. */
+    const seen =
+      !mountedOnClient.current &&
+      typeof performance !== "undefined" &&
+      typeof performance.getEntriesByName === "function" &&
+      performance.getEntriesByName("first-contentful-paint").length > 0;
+
+    if (seen && !reduce) {
+      timers.push(
+        window.setTimeout(() => {
+          stageEl.dataset.draw = "run";
+        }, BEAT_MS * 3),
+      );
+      timers.push(
+        window.setTimeout(
+          () => {
+            stageEl.dataset.draw = "done";
+          },
+          BEAT_MS * 3 + DRAW_MS + DRAW_HOLD_MS,
+        ),
+      );
+      return () => {
+        for (const t of timers) window.clearTimeout(t);
+      };
+    }
 
     /* ARM, BEFORE THE BROWSER PAINTS. The field folds to nothing and the sentence drops below the
        overflow of its own word boxes. Under a reduced-motion preference app/cell.css turns the
@@ -131,8 +178,8 @@ export function Hero({
         r.style.transition = `transform ${WORD_MS}ms var(--ease-settle) ${i * WORD_STEP_MS}ms`;
         r.style.transform = "translateY(0)";
       }
-      /* The draw line starts as the last word lands, not after it: the sentence says nobody picks
-         the winner, and the line is the thing that picked it. */
+      /* The draw line starts as the last word lands, not after it: the sentence names the
+         product, and the line is the draw that the product is. */
       timers.push(
         window.setTimeout(() => {
           stageEl.dataset.draw = "run";

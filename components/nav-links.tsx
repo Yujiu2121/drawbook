@@ -43,7 +43,8 @@ export interface Destination {
 export const NAV: Destination[] = [
   // A raffle's detail page is still the Raffles section, and `/raffle/5` does not begin with
   // `/raffles/`, so the one relationship in the product that a prefix test would miss is named.
-  { href: "/raffles", label: "Raffles", also: /^\/raffle\// },
+  // `/r/<address>` is a raffle that lives on chain, listed on the same board, so it is named too.
+  { href: "/raffles", label: "Raffles", also: /^\/(raffle|r)\// },
   { href: "/learn", label: "How it works" },
   { href: "/docs", label: "Docs" },
 ];

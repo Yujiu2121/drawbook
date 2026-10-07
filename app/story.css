@@ -211,8 +211,12 @@
    separators for free and leaves a filled rectangle wherever a row is short of cards, which is
    exactly what happens on a five-raffle book: the record row has two cards in a three-column
    grid. Each card carries its own boundary instead. */
+/* The one-column track is declared, not left implicit. An implicit column sizes to the card's
+   min-content, which at 320px was 303px inside 280px of measure, and the page scrolled sideways
+   by 3px. `minmax(0, 1fr)` lets the card shrink to the measure the way the wider tracks do. */
 .rcards {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(14px, 1.5vw, 20px);
 }
 

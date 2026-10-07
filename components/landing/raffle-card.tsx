@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Strip, PHASE_WORD } from "@/components/cell";
 import { Countdown } from "@/components/countdown";
 import { activeDeadline, isInverted, isLive, serialOf } from "@/lib/cell";
+import { voidReturns } from "@/lib/mock-raffles";
 import { formatRLO, summarize, type Raffle } from "@/lib/raffle";
 
 /**
@@ -34,6 +35,12 @@ import { formatRLO, summarize, type Raffle } from "@/lib/raffle";
  *
  * CONTRAST for every pair on this card is computed in the header of app/story.css, against the
  * surface each one sits on rather than against the page. The floor is 4.53.
+ *
+ * EVERY CARD IS A SAMPLE, AND SAYS SO ON ITS FACE. The landing draws these from lib/mock-raffles.ts,
+ * fixed demonstration data that is not on chain. The raffles on chain are listed on /raffles. So
+ * the serial reads "Sample 0001", the accessible name starts with "Sample raffle", and a card still
+ * on the floor offers "Open sample" rather than "Enter raffle": nothing on a sample page is signed
+ * or sent, and a call to action that says "enter" would promise a transaction that does not exist.
  */
 
 /** The wording under the clock, which is a different question in each phase. */
@@ -62,13 +69,15 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
         href={`/raffle/${config.id}`}
         className="rcard"
         data-phase={raffle.phase}
-        aria-label={`${config.title}, raffle ${serial}, prize ${formatRLO(config.prize)} RLO, ${sold} of ${config.supply} tickets sold, ${PHASE_WORD[raffle.phase].toLowerCase()}`}
+        aria-label={`Sample raffle ${serial}, ${config.title}, prize ${formatRLO(config.prize)} RLO, ${sold} of ${config.supply} tickets sold, ${PHASE_WORD[raffle.phase].toLowerCase()}`}
       >
         <div className="mb-[clamp(22px,2.6vw,32px)] flex items-center justify-between gap-2.5">
           <span className="label border border-bound px-2 py-1 text-fg-2">
             {PHASE_WORD[raffle.phase]}
           </span>
-          <span className="serial text-label text-fg-3">{serial}</span>
+          <span className="label text-fg-3">
+            Sample <span className="serial">{serial}</span>
+          </span>
         </div>
 
         {/* The prize, and the largest thing on the card. --text-pool is the step this figure is
@@ -94,9 +103,14 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
               {sold} / {config.supply}
             </dd>
           </div>
+          {/* A void raffle's third fact is what it handed back, not its pool. `summarize` leaves the
+              reveal bonds out of a void pool, so this is `voidReturns(r).total` from
+              lib/mock-raffles.ts, the figure /raffle/5 and the board print: 1.65 for sample 0005. */}
           <div className="grid gap-[3px]">
-            <dt className="label text-fg-3">Pool</dt>
-            <dd className="figure m-0 text-sm">{formatRLO(pool)} RLO</dd>
+            <dt className="label text-fg-3">{raffle.phase === "void" ? "Returned" : "Pool"}</dt>
+            <dd className="figure m-0 text-sm">
+              {formatRLO(raffle.phase === "void" ? voidReturns(raffle).total : pool)} RLO
+            </dd>
           </div>
         </dl>
 
@@ -108,7 +122,12 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
           gone
         </p>
 
-        <div className="mt-auto flex items-end justify-between gap-3.5 pt-[clamp(22px,2.6vw,30px)]">
+        {/* Wraps rather than squeezes. Both halves are held on one line, so where they do not
+            fit side by side the call to action drops under the stamp instead of pushing the page
+            wider. The two labels are the same length on purpose: "See the record" made a closed
+            card's row 285px against 278 at 360, which is why its stamp used to break in two.
+            "Open record" fits from 360 up; only at 320 does the call to action drop. */}
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-3.5 gap-y-3 pt-[clamp(22px,2.6vw,30px)]">
           <span className="grid gap-[5px]">
             <span className="label text-fg-3">{clockLabel(raffle)}</span>
             {/* One element either way: `<Countdown>` already prints a stamp rather than a ladder
@@ -118,9 +137,11 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
                 The two forms take different sizes because they are different lengths, not because
                 a record card matters less. A live ladder is at most six glyphs ("3d 02h"); the
                 stamp is twelve, and at the ladder's step it breaks over two lines and drags the
-                card's own baseline away from the call to action beside it. */}
+                card's own baseline away from the call to action beside it. The smaller step was
+                not enough on its own: at 360px the stamp still shrank beside the nowrap call to
+                action and broke as "26 Jul" over "09:00", so it is held on one line as well. */}
             <span
-              className={`monument leading-none ${live ? "text-[1.375rem]" : "text-[1rem]"}`}
+              className={`monument whitespace-nowrap leading-none ${live ? "text-[1.375rem]" : "text-[1rem]"}`}
             >
               <Countdown
                 deadline={live ? activeDeadline(raffle) : config.revealDeadline}
@@ -129,7 +150,7 @@ export function RaffleCard({ raffle }: { raffle: Raffle }) {
             </span>
           </span>
           <span className="label rcard-cta whitespace-nowrap text-fg">
-            {live ? "Enter raffle" : "See the record"} <span aria-hidden="true">&rarr;</span>
+            {live ? "Open sample" : "Open record"} <span aria-hidden="true">&rarr;</span>
           </span>
         </div>
       </Link>

@@ -48,6 +48,11 @@ import { summarize, type Phase, type Raffle } from "@/lib/raffle";
  * prefetch, the `onNavigate` hook that remembers the scroll, and the view transition that makes
  * the strip grow into the raffle page. All five of those are the navigation.
  *
+ * EVERYTHING ON THIS BOARD IS THE SAMPLE RECORD, AND THE TWO LEADS SAY SO. The raffles that are
+ * really on chain are listed above it by components/chain-list.tsx and live at /r/[address]. The
+ * floor's lead used to invite the reader to "buy a ticket" here, which stopped being honest the
+ * day a real raffle could be bought one section up.
+ *
  * EVERY FIGURE IN THE TWO SECTION HEADERS IS A REDUCTION OVER THE REAL DATA.
  * The board this replaces printed "3 live, 55 of 80 tickets gone" and "2 settled, 1 void" as
  * string literals. Both are computed here, and the second was wrong: there are two settled
@@ -139,14 +144,16 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
   const deadline = activeDeadline(raffle);
 
   const meta = [
-    `Raffle ${serialOf(raffle)}`,
+    // "Sample", not "Raffle": this band now sits under the live raffles read from the chain,
+    // and its countdown runs on the sample clock, so it must not be read as one of them.
+    `Sample ${serialOf(raffle)}`,
     `${s.sold} of ${raffle.config.supply} sold`,
     `${s.revealed} of ${s.sold} revealed`,
   ];
 
   return (
     <section
-      aria-label="Next deadline"
+      aria-label="Next sample deadline"
       className="group overflow-x-clip px-pad pt-[clamp(16px,2.4vw,34px)] pb-[clamp(14px,2vw,24px)]"
     >
       <p className="label text-fg-3">
@@ -200,13 +207,34 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
    it takes its fill, its reveal bar and its strike from app/cell.css and cannot drift from the
    strips it is explaining. A hand-drawn swatch would be a second definition of the one thing on
    this page that has to be trusted.
+
+   EVERY STATE THE ROWS DRAW, ON BOTH SURFACES THEY DRAW IT ON. The key used to stop at four
+   states, so raffle 0005's refunded tickets (state 4, a sold block struck through) read as
+   "Bought". And it only showed the light floor: inside the dark record `.inv` remaps the cell
+   roles, so 0004's winners are the pale --iris-lift, the same colour as a published secret's foot
+   bar in a light-only key, and nothing on the page explained that. Each entry now shows the cell
+   twice, as a one-cell strip on the floor and again inside a chip of the record's own surface, so
+   the reader can match either half of the board against it.
 */
-const TICKET_KEY: { state: 0 | 1 | 2 | 3; word: string }[] = [
+const TICKET_KEY: { state: 0 | 1 | 2 | 3 | 4; word: string }[] = [
   { state: 0, word: "Not sold yet" },
   { state: 1, word: "Bought" },
   { state: 2, word: "Secret published" },
   { state: 3, word: "Won" },
+  { state: 4, word: "Refunded" },
 ];
+
+/**
+ * One cell as the rows draw it: a one-cell `.strip`, so the bed, the 1px gap and the winner's
+ * hairline (`.strip .c[data-s="3"]`) all come from the same rules as the board's own strips.
+ */
+function KeyCell({ state }: { state: 0 | 1 | 2 | 3 | 4 }) {
+  return (
+    <span className="strip w-3.5" style={{ "--strip-h": "20px" } as CSSProperties}>
+      <i className="c" data-s={state} />
+    </span>
+  );
+}
 
 /**
  * The four stages, in the order a raffle passes through them. The words are `PHASE_WORD`'s own, so
@@ -215,8 +243,11 @@ const TICKET_KEY: { state: 0 | 1 | 2 | 3; word: string }[] = [
 const STAGE_KEY: { phase: Phase; body: string }[] = [
   { phase: "selling", body: "Tickets are still on sale. Buying one commits a secret nobody can read." },
   { phase: "revealing", body: "The sale has closed. Holders are publishing the secrets they committed." },
-  { phase: "drawn", body: "The winner has been generated from those secrets and paid." },
-  { phase: "void", body: "Nobody published in time, so every ticket and every bond went back." },
+  { phase: "drawn", body: "The winners have been drawn from those secrets and a chain value." },
+  {
+    phase: "void",
+    body: "Nobody published in time, so every ticket and bond went back to its holder and the deposit to the creator.",
+  },
 ];
 
 /**
@@ -260,15 +291,21 @@ function BoardKey() {
         <ul className="mt-[clamp(18px,2.2vw,26px)] flex flex-wrap gap-x-[clamp(16px,2vw,28px)] gap-y-3">
           {TICKET_KEY.map(({ state, word }) => (
             <li key={state} className="flex items-center gap-2.5">
-              <span
-                aria-hidden="true"
-                className="c block h-[18px] w-3 border border-bound"
-                data-s={state}
-              />
+              <span aria-hidden="true" className="flex items-center gap-1.5">
+                <KeyCell state={state} />
+                {/* The record's surface, painted: `.inv` remaps the roles, `bg-panel` paints them. */}
+                <span className="inv flex bg-panel p-[3px]">
+                  <KeyCell state={state} />
+                </span>
+              </span>
               <span className="text-sm text-fg-2">{word}</span>
             </li>
           ))}
         </ul>
+
+        <p className="mt-3 max-w-[46ch] text-sm text-fg-3">
+          Each block is shown twice: as the light rows draw it, and as the dark record does.
+        </p>
       </div>
 
       <div>
@@ -318,7 +355,7 @@ function Record({ raffles }: { raffles: readonly Raffle[] }) {
         id="board-record"
         title="The record"
         meta={meta}
-        lead="Raffles that have already closed. Open one to see the secrets that were published, the seed they made, and who won."
+        lead="Sample raffles that have already closed. Open one to see the secrets that were published, the seed they made, and who won."
         className="pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]"
       />
 
@@ -352,7 +389,7 @@ function Floor({ raffles }: { raffles: readonly Raffle[] }) {
       id: raffle.config.id,
       deadline: Date.parse(activeDeadline(raffle)),
       pool: s.pool,
-      filled: s.sold / raffle.config.supply,
+      supply: raffle.config.supply,
       node: <BoardRow raffle={raffle} />,
     };
   });
@@ -363,7 +400,7 @@ function Floor({ raffles }: { raffles: readonly Raffle[] }) {
         id="board-floor"
         title="On the floor"
         meta={[`${raffles.length} live`, `${sold} of ${supply} tickets gone`]}
-        lead="Raffles you can still take part in. Open one to buy a ticket, or to publish the secret you committed when you bought it."
+        lead="Sample raffles still on the floor. Open one to see how buying a ticket and publishing its secret work; nothing there is signed or sent."
         className="pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]"
       />
 

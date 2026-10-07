@@ -9,15 +9,11 @@ import "./globals.css";
 /**
  * The faces are self-hosted from `app/fonts`, not fetched through `next/font/google`.
  *
- * This is not a preference. `next/font/google` reads the stylesheet from fonts.googleapis.com and
- * then downloads each face from **fonts.gstatic.com**, and that second host is unreachable from this
- * machine: it resolves (74.125.200.94 and an IPv6 address) and then times out on `curl -4`, `curl -6`
- * and node with no proxy configured. The build failed outright with `module-not-found` inside the
- * generated `geist_mono_*.module.css` once the `.next` cache was cleared, so the app could not be
- * built at all until the fetch was removed from the build.
- *
- * Self-hosting also costs nothing at runtime and removes a third-party request from a page that is
- * going to be judged on how fast its first screen lands.
+ * Two durable reasons: a first paint that is being judged should make no third-party request, and
+ * a self-hosted build cannot be broken by a font host flapping. That second one is not
+ * hypothetical. During the port fonts.gstatic.com was unreachable from the build machine and
+ * `next/font/google` failed the build outright with `module-not-found`. That outage ended (both
+ * Google hosts answered on 2026-09-14), and reachability is not a reason to go back.
  *
  * The files came from the google/fonts repository through jsdelivr, which IS reachable, then were
  * subset to latin and converted with fontTools. Fontsource was checked first and rejected: its
@@ -68,32 +64,64 @@ const serif = localFont({
  * Absolute URLs for the social card.
  *
  * Scrapers do not resolve relative image paths, so without a metadataBase Next emits a bare
- * `/opengraph-image.png` and every unfurl silently fails. The production host is read from Vercel's
- * own system variable rather than hardcoded, which keeps preview deployments pointing at themselves
- * instead of at production, and falls back to the dev port so the tags are testable locally.
+ * `/opengraph-image.png` and every unfurl silently fails. The host is read from Vercel's own system
+ * variables rather than hardcoded, and falls back to the dev port so the tags are testable locally.
+ *
+ * A PREVIEW NAMES ITSELF, AND THAT TAKES ITS OWN VARIABLE (OFF-6). This comment used to say that
+ * `VERCEL_PROJECT_PRODUCTION_URL` keeps previews pointing at themselves. It does the opposite:
+ * Vercel's documentation says it "is always set, even in preview deployments", and it is always the
+ * production domain. So a preview, which is where the on-chain build is shown first, unfurled as
+ * production pages that do not have its routes. On a preview the branch alias (stable across pushes
+ * to the branch) or the deployment's own URL is used instead; production keeps its domain.
  */
-const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
-  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-  : `http://localhost:${process.env.PORT ?? 3333}`;
+const previewHost =
+  process.env.VERCEL_ENV === "preview"
+    ? (process.env.VERCEL_BRANCH_URL ?? process.env.VERCEL_URL)
+    : undefined;
+const siteUrl = previewHost
+  ? `https://${previewHost}`
+  : process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : `http://localhost:${process.env.PORT ?? 3333}`;
 
+/**
+ * Every word here is checked against what is true of the deployed program, because it is the
+ * sentence a search result and every link unfurl carry for every route that does not set its own.
+ * It used to open "On-chain raffles", written before any program existed (K5, OFF-13, CHROME-K5).
+ * What it may say now: the raffle program runs on Rialo testnet and the actions are real testnet
+ * transactions. What it may not: "provably fair", "trustless", "nobody can rig", or an automatic
+ * draw. "Randomized and checkable" is the claim the draw supports, and it is the one made.
+ */
 const description =
-  "On-chain raffles on Rialo testnet, settled by a commit-reveal draw. Every ticket buyer feeds the seed, so anyone can recompute the winner.";
+  "A commit-reveal raffle program on Rialo testnet. Deploy a raffle, buy, reveal, draw and claim with real testnet transactions, then recompute the draw yourself. Randomized and checkable.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Drawbook",
+  /*
+    A template, so a route that sets `title: "Raffles"` gets "Raffles · Drawbook" in its tab and
+    five raffle tabs can be told apart (OFF-3, CHROME-N5). A route that wants a title with no
+    suffix, such as the landing, sets `title: { absolute: "..." }`.
+  */
+  title: { default: "Drawbook", template: "%s · Drawbook" },
   description,
   /*
     og:title and og:description are not inferred from `title` and `description` above; without this
     block a share would carry the image and nothing else. The image itself comes from the
     app/opengraph-image.png file convention, with its alt text alongside it.
+
+    `url: "./"` IS RESOLVED AGAINST EACH ROUTE'S OWN PATH, NOT THIS LAYOUT'S. Next's
+    resolveAbsoluteUrlWithPathname (next/dist/lib/metadata/resolvers/resolve-url.js) resolves a
+    `./` og:url against the pathname being rendered, then against metadataBase. With `url: siteUrl`
+    here every route inherited the home page's address, and Facebook and LinkedIn treat og:url as
+    canonical, so a shared /raffle/4 unfurled as the landing. A route that sets its own openGraph
+    replaces this whole block, url included, which leaves it with no og:url rather than a wrong one.
   */
   openGraph: {
     type: "website",
     siteName: "Drawbook",
     title: "Drawbook",
     description,
-    url: siteUrl,
+    url: "./",
   },
   // X reuses og:image when no twitter:image is set, so the card only needs its type declaring.
   twitter: {
@@ -139,11 +167,38 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      /*
+        translate="no" (K6, CHROME-K6). The product is English by decision, and the browsers it is
+        demonstrated on may be set to another language, where Chrome offers to translate the page. A
+        machine-translated "Reveal", "Draw" or "Claim" is a different instruction, and translation
+        rewrites the text nodes React owns, which can break hydration outright.
+      */
+      translate="no"
       className={`${display.variable} ${mono.variable} ${serif.variable}`}
     >
       <body>
+        {/*
+          THE SKIP LINK (CHROME-N7). The first Tab on every route used to walk the identity, the
+          destinations and the chips, seven to nine stops, before reaching the page. This is the
+          first stop instead, invisible until it has focus and then drawn over the masthead's left
+          end as a chip on its own surface.
+
+          It targets an empty element placed after the masthead rather than each route's <main>,
+          because the mains belong to their routes and none carries an id. A fragment link moves
+          focus to a `tabIndex={-1}` target, so the next Tab lands on the first control of the page
+          whichever route it is. Hidden by moving it above the viewport, not by `sr-only`: the
+          visible state would then be `not-sr-only`, which puts it back in the flow and shoves the
+          column down by its own height while it is focused.
+        */}
+        <a
+          href="#content"
+          className="label fixed top-2.5 left-pad z-[90] -translate-y-[calc(100%+20px)] border border-bound bg-panel px-3 py-2.5 text-fg focus:translate-y-0"
+        >
+          Skip to content
+        </a>
         <div className="flex min-h-dvh flex-col">
           <Masthead />
+          <div id="content" tabIndex={-1} className="outline-none" />
           {children}
           {/* mt-auto, not a footer rule: it pins the footer to the bottom of a short route
               without the footer itself having to know it is in a flex column. */}

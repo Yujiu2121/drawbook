@@ -4,9 +4,11 @@
  * THE CEREMONY.
  *
  * The largest client island in Drawbook, and the only one that animates for more than a third of
- * a second. It replays raffle 0004's settled draw: 20 tickets sold, 18 revealed, 2 bonds
- * forfeited, one chain value, one seed, two winners. It replays history and it does nothing else.
- * There is no live raffle it can settle, no spin, no near miss and no acceleration into a result.
+ * a second. It replays sample raffle 0004's settled draw: 20 tickets sold, 18 revealed, 2 bonds
+ * forfeited, one chain value, one seed, two winners. Raffle 0004 is fixed demonstration data in
+ * lib/mock-raffles.ts, not an account on chain, and every surface here labels it a sample. It
+ * replays that record and does nothing else. There is no live raffle it can settle, no spin, no
+ * near miss and no acceleration into a result.
  *
  * THE STATIC RECORD IS THE PRIMARY COMPOSITION, NOT A FALLBACK
  * ------------------------------------------------------------
@@ -68,7 +70,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useReducedMotion } from "motion/react";
 
 import { serialOf, utcStamp } from "@/lib/cell";
-import { MOCK_RAFFLES, VIEWER } from "@/lib/mock-raffles";
+import { MOCK_RAFFLES, VIEWER, VIEWER_LABEL } from "@/lib/mock-raffles";
 import {
   deriveSeed,
   deriveWinnerTrace,
@@ -88,7 +90,7 @@ import { concat, fromHex, sha256, toHex, utf8 } from "@/lib/sha256";
    reads a random source or a wall clock, so the server render and the hydration render are
    identical and the draw reproduces on every reload. */
 
-/** The one raffle this surface may show. Settled, audited, and the only one with a draw to replay. */
+/** The one raffle this surface may show. Settled, recomputed, and the only one with a draw to replay. */
 export const CEREMONY_RAFFLE_ID = 4;
 
 function recordedRaffle(): Raffle {
@@ -105,7 +107,8 @@ const PAYOUTS = payouts(RAFFLE);
 const SERIAL = serialOf(RAFFLE);
 const CHAIN_SEED = RAFFLE.chainSeed ?? "";
 
-/** Sold but silent: the two holders who let their bond go rather than reveal. */
+/** Sold but silent: the two tickets whose holders let the bond go rather than reveal. Counted
+ * as tickets, never holders, because one address can hold several (DET-4). */
 const SILENT: Ticket[] = RAFFLE.tickets.filter((t) => t.holder !== null && t.nonce === null);
 
 /** The revealed tickets in the order the record has them arriving. */
@@ -127,19 +130,24 @@ const SEED = deriveSeed(RAFFLE.config.id, SORTED_NONCES, CHAIN_SEED);
  * surface that could drift away from the function it describes. Rather than trust it, the bytes
  * are assembled here exactly as `deriveSeed` assembles them and hashed: if the digest does not
  * come back equal to the seed, the prefix is wrong and act 2 says so instead of printing it.
- * That check costs one SHA-256 over about 300 bytes, once, at module load.
+ * That check costs one SHA-256 over about 340 bytes, once, at module load.
+ *
+ * WHAT IS PRINTED IS THOSE BYTES, AS HEX, AND NOT A READABLE STRING THAT LOOKS LIKE THEM. The
+ * record used to print the domain text, then each nonce's hex followed by "|", then the chain
+ * value's hex. `deriveSeed` hashes the nonces and the chain value as raw bytes, so a reader who
+ * copied that line under a heading telling them to verify it and hashed it as text got a
+ * different digest. Hex of the exact bytes is the one form that can be pasted into any SHA-256
+ * tool that takes hex input and come back as the seed, so that is the form printed.
  */
 const PREIMAGE_PREFIX = `rialo-raffle-v1|seed|${RAFFLE.config.id}|`;
-const PREIMAGE_VERIFIED =
-  toHex(
-    sha256(
-      concat(
-        utf8(PREIMAGE_PREFIX),
-        ...SORTED_NONCES.flatMap((n) => [fromHex(n), utf8("|")]),
-        fromHex(CHAIN_SEED),
-      ),
-    ),
-  ) === SEED;
+const PREFIX_HEX = toHex(utf8(PREIMAGE_PREFIX));
+const BAR_HEX = toHex(utf8("|"));
+const PREIMAGE_BYTES = concat(
+  utf8(PREIMAGE_PREFIX),
+  ...SORTED_NONCES.flatMap((n) => [fromHex(n), utf8("|")]),
+  fromHex(CHAIN_SEED),
+);
+const PREIMAGE_VERIFIED = toHex(sha256(PREIMAGE_BYTES)) === SEED;
 
 const POOL_RLO = formatRLO(SUMMARY.pool);
 const PER_WINNER_RLO = formatRLO(SUMMARY.perWinner);
@@ -262,9 +270,14 @@ export function CeremonyLedger() {
  * winner card rather than one here and one on app/page.tsx.
  *
  * Ticket 17 is held by the address lib/mock-raffles.ts calls VIEWER. That is a fact about the
- * demo record, so it is stated as one. It deliberately does not read "Yours": no wallet is
- * connected, this component knows nothing about one, and claiming a win for a reader who has not
- * connected anything would be the exact kind of flattery this product refuses everywhere else.
+ * sample record, so it is stated as one. It deliberately does not read "Yours": this component
+ * knows nothing about the connected wallet, and claiming a win for a reader on a raffle that is
+ * not even on chain would be the exact kind of flattery this product refuses everywhere else.
+ *
+ * The tag is `VIEWER_LABEL` from lib/mock-raffles.ts, the one name every page uses for this
+ * address, in a bounded, unlit tag. This card used to say "Demo viewer" in the accent while
+ * /raffle/4 said "Example holder", so one sample address had two names a click apart, and the
+ * replay there put both on one screen. The accent is for winners and live state, not for a name.
  */
 export function CeremonyWinners() {
   return (
@@ -286,8 +299,8 @@ export function CeremonyWinners() {
                 {ticket?.holder ? shortAddress(ticket.holder, 8, 8) : "no holder"}
               </div>
               {ticket?.holder === VIEWER ? (
-                <div className="label mt-1.5 inline-block border border-event px-1.5 py-0.5 text-event">
-                  Demo viewer
+                <div className="label mt-2 inline-block border border-bound px-1.5 py-0.5 text-fg-2">
+                  {VIEWER_LABEL}
                 </div>
               ) : null}
             </div>
@@ -311,18 +324,50 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-/** The preimage, with its two computed ingredients marked. */
+/**
+ * The preimage as the hex of the exact bytes hashed, with its parts told apart by ink: the domain
+ * text and the chain value in the accent, each nonce in full ink, and each one-byte separator
+ * (`7c`, which is "|") dimmed. If the bytes assembled above do not hash to the seed, nothing is
+ * printed that a reader could mistake for a checkable preimage.
+ */
 function Preimage() {
+  if (!PREIMAGE_VERIFIED) {
+    return (
+      <div className={WELL}>
+        <span className="text-event">
+          [the preimage assembled here did not hash to the seed, so it is not printed]
+        </span>
+      </div>
+    );
+  }
   return (
     <div className={WELL}>
-      {PREIMAGE_VERIFIED ? (
-        <span className="text-event">{PREIMAGE_PREFIX}</span>
-      ) : (
-        <span className="text-event">[the domain prefix did not verify against the seed]</span>
-      )}
-      {SORTED_NONCES.map((n) => `${n}|`).join("")}
+      <span className="text-event">{PREFIX_HEX}</span>
+      {SORTED_NONCES.map((n) => (
+        <span key={n}>
+          {n}
+          <span className="text-fg-2">{BAR_HEX}</span>
+        </span>
+      ))}
       <span className="text-event">{CHAIN_SEED}</span>
     </div>
+  );
+}
+
+/** How to check the printed preimage, in one place for both surfaces that print it. */
+function PreimageNote({ className }: { className: string }) {
+  return (
+    <p className={`${NOTE} ${className}`}>
+      {/* Explicit spaces after the counts here and in the Recompute note: the compiler drops the
+          leading space of a multi-line JSX text run containing an entity ("337bytes"). */}
+      These are the {PREIMAGE_BYTES.length}{" "}bytes the seed is the SHA-256 of, written as hex: the
+      text &ldquo;{PREIMAGE_PREFIX}&rdquo; as UTF-8, then each sorted nonce&rsquo;s 16 bytes
+      followed by one &ldquo;|&rdquo; byte ({BAR_HEX}), then the chain value&rsquo;s 8 bytes. Hash
+      them as bytes, decoded from the hex, and you get the seed below; hashing the hex as text gives
+      a different digest. The chain value, the last {CHAIN_SEED.length} characters, is read at the
+      draw after every nonce is public, so a holder deciding whether to stay silent cannot know it.
+      Whoever produces the draw block may be able to influence it.
+    </p>
   );
 }
 
@@ -354,17 +399,22 @@ function TraceRows({ trace }: { trace: TraceStep[] }) {
 /**
  * The complete draw as a document. At rest, with JavaScript off, and under reduced motion this is
  * what the section is. Note the word is "randomized" and never the two-word phrase this industry
- * uses for a draw it wants believed without checking: biasing this one needs a party who both
- * produces the block and reveals last, and the product says so rather than burying it.
+ * uses for a draw it wants believed without checking. The limit is stated as it is, not as it was
+ * once written here: the chain value is read after every nonce is public, so whoever produces the
+ * draw block may be able to try values on their own, with no ticket and no late reveal needed.
+ *
+ * Raffle 0004 is a sample, fixed demonstration data and not an account on chain, and the first
+ * sentence says so, because this record also prints on /raffle/4 where nothing else would.
  */
 function Record({ poster, trace }: { poster: ReactNode; trace: TraceStep[] }) {
   return (
     <div className="col-start-1 row-start-1 grid gap-[clamp(18px,2.4vw,28px)]">
       <p className="max-w-[62ch] text-lg text-fg-2">
-        Raffle {SERIAL} is settled. {SUMMARY.sold} tickets sold, {SUMMARY.revealed} revealed,{" "}
-        {SUMMARY.outstanding} bonds forfeited into a pool of {POOL_RLO} RLO. Tickets {WINNER_LIST}{" "}
-        won {PER_WINNER_RLO} RLO each, drawn from a seed anyone holding the public reveals can
-        recompute. The replay walks exactly this and invents nothing.
+        Sample raffle {SERIAL} is settled. It is fixed demonstration data, not an account on chain.{" "}
+        {SUMMARY.sold} tickets sold, {SUMMARY.revealed} revealed, {SUMMARY.outstanding} bonds
+        forfeited into a pool of {POOL_RLO} RLO. Tickets {WINNER_LIST} won {PER_WINNER_RLO} RLO
+        each, drawn from a seed anyone holding the public reveals can recompute. The replay walks
+        exactly this and invents nothing.
       </p>
 
       <Step n={1} title={`the ${SORTED_NONCES.length} revealed nonces, sorted`}>
@@ -378,13 +428,9 @@ function Record({ poster, trace }: { poster: ReactNode; trace: TraceStep[] }) {
         </p>
       </Step>
 
-      <Step n={2} title="the preimage, chain value last">
+      <Step n={2} title="the preimage as bytes, chain value last">
         <Preimage />
-        <p className={`${NOTE} mt-3`}>
-          The last {CHAIN_SEED.length} characters are the chain value. It is the only ingredient
-          nobody could know in advance, which is why staying silent to move the seed is a bet a
-          griefer cannot price.
-        </p>
+        <PreimageNote className="mt-3" />
       </Step>
 
       <Step n={3} title="the seed">
@@ -399,9 +445,9 @@ function Record({ poster, trace }: { poster: ReactNode; trace: TraceStep[] }) {
         <p className={`${NOTE} mt-3`}>
           Each sample is 48 bits of a SHA-256 keystream over the seed, reduced modulo the pool
           that is still standing. The pool shrinks between the samples, which is why the second
-          winner could not be the first. The draw is randomized, not unbiasable by construction:
-          anyone who both produced the block and revealed last could have moved it, and no one
-          here could do both.
+          winner could not be the first. The draw is randomized and checkable, not unbiasable:
+          whoever produces the draw block may be able to try other chain values once every nonce
+          is public, and a holder can withhold a reveal to move the seed at the cost of their bond.
         </p>
       </Step>
 
@@ -484,9 +530,10 @@ function totalMs(trace: TraceStep[]): number {
 
 /* ====================================================== the recomputation
 
-   RECOMPUTE IT. Not a demonstration of a computation, the computation: SHA-256 over the public
-   nonces and the chain value, in this tab, right now, and then a comparison against what the
-   record says. Nothing is read back out of the record except the two lines being compared.
+   RECOMPUTE IT. The real computation, not an animation of one: SHA-256 over the public nonces and
+   the chain value, in this tab, right now, and then a comparison against what the record says.
+   Nothing is read back out of the record except the two lines being compared. On this sample the
+   comparison cannot fail, for the reason given below, and the copy beside the button says so.
 
    IT IS ITS OWN COMPONENT SO THERE CAN ONLY EVER BE ONE OF IT ON A PAGE. It used to be the
    ceremony's footer, which was correct while the ceremony was the only surface making the
@@ -496,32 +543,57 @@ function totalMs(trace: TraceStep[]): number {
    and this component is mounted once, in the section that is about it.
 
    Every value it reads is module scope in this file and derived from lib/mock-raffles.ts, so the
-   move changed where the button is and nothing about what it computes. */
+   move changed where the button is and nothing about what it computes.
+
+   WHAT THIS CHECK CAN AND CANNOT SHOW, SAID BESIDE THE BUTTON. Raffle 0004 is a sample. Its
+   recorded winners came out of `drawRaffle` at module load and its "recorded" seed is
+   `deriveSeed` in this same file, so the comparison re-runs the code that made the record and can
+   never print "no". It demonstrates the method; it is not an audit, and the note says so. The
+   check that can fail is the one on a live raffle's page, which compares against what the chain
+   holds (lib/chain/program.ts `auditDraw`).
+
+   THE RESULT IS A LIST AND NOT A PADDED <pre>. The padded form put a 20-character label in front
+   of each 64-character seed and scrolled sideways inside its box, so the two seeds the reader is
+   meant to compare were cut at the same character at 1280 and showed nine characters on a phone.
+   Each value now sits under its label and breaks anywhere, so both seeds are whole at every
+   width. */
+
+type Audit =
+  | { kind: "rows"; rows: [string, string][] }
+  | { kind: "none"; lines: string[] };
+
 export function RecomputePanel() {
-  const [audit, setAudit] = useState<string[] | null>(null);
+  const [audit, setAudit] = useState<Audit | null>(null);
 
   const recompute = useCallback(() => {
     const nonces = RAFFLE.tickets.filter((t) => t.nonce !== null).map((t) => t.nonce as string);
     if (nonces.length === 0 || !RAFFLE.chainSeed) {
-      setAudit([
-        "No nonce was ever revealed, so there is no seed to recompute.",
-        "That is what void means, and it is the correct answer rather than a failure.",
-      ]);
+      setAudit({
+        kind: "none",
+        lines: [
+          "No nonce was ever revealed, so there is no seed to recompute.",
+          "That is what void means, and it is the correct answer rather than a failure.",
+        ],
+      });
       return;
     }
     const seed = deriveSeed(RAFFLE.config.id, nonces, RAFFLE.chainSeed);
     const steps = deriveWinnerTrace(SUMMARY.eligible, seed, RAFFLE.config.winners);
     const winners = steps.map((s) => s.winner);
     const matches =
+      seed === SEED &&
       winners.length === RAFFLE.winningTickets.length &&
       winners.every((w, i) => w === RAFFLE.winningTickets[i]);
-    setAudit([
-      `recomputed seed     ${seed}`,
-      `recorded seed       ${SEED}`,
-      `recomputed winners  ${winners.join(", ")}`,
-      `recorded winners    ${RAFFLE.winningTickets.join(", ")}`,
-      `matches             ${matches ? "yes" : "no"}`,
-    ]);
+    setAudit({
+      kind: "rows",
+      rows: [
+        ["Seed, recomputed in this tab", seed],
+        ["Seed in the sample record", SEED],
+        ["Winners, recomputed", winners.join(", ")],
+        ["Winners in the sample record", RAFFLE.winningTickets.join(", ")],
+        ["Same", matches ? "yes" : "no"],
+      ],
+    });
   }, []);
 
   return (
@@ -530,15 +602,34 @@ export function RecomputePanel() {
         Recompute it
       </button>
       {audit ? (
-        <pre className="mono mt-3.5 w-fit max-w-full overflow-x-auto bg-recess p-3.5 text-sm text-fg">
-          {audit.join("\n")}
-        </pre>
+        // `recess` as well as `bg-recess`: inside an inverted block the class is what lifts
+        // --fg-3 to a passing ratio on this surface (app/globals.css, `.inv .recess`).
+        <div className="recess mt-3.5 bg-recess p-3.5" aria-live="polite">
+          {audit.kind === "rows" ? (
+            <dl className="m-0 grid gap-2.5">
+              {audit.rows.map(([term, value]) => (
+                <div key={term} className="grid gap-0.5">
+                  <dt className="label text-fg-3">{term}</dt>
+                  <dd className="digest m-0 text-sm text-fg">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            audit.lines.map((line) => (
+              <p key={line} className="m-0 text-sm text-fg">
+                {line}
+              </p>
+            ))
+          )}
+        </div>
       ) : null}
       <p className={`${NOTE} mt-3`}>
-        Recompute runs SHA-256 over the {SORTED_NONCES.length} public nonces and the chain value in
-        this tab, then compares the result with the record. The draw is randomized. It is not
-        unbiasable: moving it would take a party who both produces the block the chain value comes
-        from and reveals last.
+        Recompute runs SHA-256 over the {SORTED_NONCES.length}{" "}published nonces and the chain value
+        in this tab and draws the winners again. This raffle is a sample, so the record it compares
+        with was made by the same code: the check shows the method and cannot fail. On a live
+        raffle&rsquo;s page the same check runs against what the chain holds, and there it can
+        fail. The draw is randomized, not unbiasable: whoever produces the draw block may be able
+        to influence the chain value.
       </p>
     </>
   );
@@ -562,6 +653,16 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
   const preferReduced = useReducedMotion();
 
   const [phase, setPhase] = useState<Phase>("idle");
+  /**
+   * WHICH RUN THIS IS, AND WHY IT EXISTS. A press while a replay is already playing used to wedge
+   * the island for good: `play` cancelled the running sequence through the token, then set
+   * `phase` to "playing", which it already was, so React bailed out, the sequence effect neither
+   * re-ran nor cleaned up, and the stage sat on Act 0 forever with "Replay again" still offered. A
+   * double-click on "Replay the draw" was enough. Every press now takes a new run number and the
+   * effect is keyed on it, so a second press is an ordinary restart: React runs the old run's
+   * cleanup (token bumped, every animation cancelled, fills gone) and then starts the new one.
+   */
+  const [run, setRun] = useState(0);
   const [act, setAct] = useState(0);
   const [figure, setFigure] = useState<Figure>(REST_FIGURE);
   const [seedText, setSeedText] = useState("");
@@ -575,6 +676,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
   const noncesRef = useRef<HTMLDivElement>(null);
   const bladeRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const playRef = useRef<HTMLButtonElement>(null);
   const tokenRef = useRef(0);
 
   const seconds = useMemo(() => Math.round(totalMs(trace) / 1000), [trace]);
@@ -602,14 +704,27 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
     // the one that is still correct if the preference changed after this island mounted.
     if (preferReduced) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Stops a running sequence at its next await at once, before React has committed anything.
+    // The restart itself is the new run number below, not this.
     tokenRef.current += 1;
+    setRun((n) => n + 1);
     setDrawn([]);
     setSeedText("");
     setPickStatus("");
     setAct(0);
-    setFigure({ value: String(SUMMARY.revealed), label: `of ${SUMMARY.sold} holders revealed` });
+    setFigure({ value: String(SUMMARY.revealed), label: `of ${SUMMARY.sold} tickets revealed` });
     setPhase("playing");
   }, [preferReduced]);
+
+  /**
+   * Stop and "Show the record" unmount themselves (the bar only offers them while a replay is up),
+   * so a keyboard press on either used to leave focus on <body>. The primary button is always
+   * mounted, only its label changes, so focus moves there: the next Enter replays.
+   */
+  const stop = useCallback(() => {
+    reset();
+    playRef.current?.focus();
+  }, [reset]);
 
   /**
    * THE SEQUENCE. It starts when the acts have mounted, which is what makes every ref below
@@ -617,8 +732,10 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
    *
    * Cancellation is a token plus a set of live animations. Every await checks the token, so a
    * Stop, a second press, or the component unmounting stops the sequence at its next boundary;
-   * the animations are cancelled outright, which removes their fills; and the acts unmount, so
-   * there is no element left holding a transform that nothing will clear.
+   * the animations are cancelled outright, which removes their fills; and on a Stop the acts
+   * unmount, so there is no element left holding a transform that nothing will clear. On a second
+   * press the acts stay mounted, which is safe because the cleanup has cancelled every fill and the
+   * preparation below rewrites every inline style before the first act is shown again.
    */
   useEffect(() => {
     if (phase !== "playing") return;
@@ -911,8 +1028,9 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
       for (const animation of live) animation.cancel();
       live.clear();
     };
-    // `reset` is stable and `trace` is the record; neither changes under a running sequence.
-  }, [phase, trace, reset]);
+    // `reset` is stable and `trace` is the record; neither changes under a running sequence. `run`
+    // is what makes a press during a replay a restart rather than a no-op; see its declaration.
+  }, [phase, run, trace, reset]);
 
   const status =
     phase === "playing" ? ACT_NAMES[act] : phase === "done" ? "Settled. Nothing loops after this." : "The record";
@@ -920,11 +1038,13 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
   return (
     <section
       className="inv border-y border-rule bg-panel text-fg"
-      aria-label={`The recorded draw of raffle ${SERIAL}`}
+      aria-label={`The recorded draw of sample raffle ${SERIAL}`}
     >
       <div className="flex flex-wrap items-center gap-x-[18px] gap-y-2.5 border-b border-rule px-pad py-4">
+        {/* "Sample" is the first word on the bar because this island is the one place the
+            sample record looks most like a live chain event: a draw, replayed. */}
         <span className="label border border-bound px-2 py-1 text-fg-2">
-          Recorded. Raffle {SERIAL}, settled {SETTLED_STAMP}
+          Sample raffle {SERIAL}, settled {SETTLED_STAMP}
         </span>
         <span className="label text-fg-3" aria-live="polite">
           {status}
@@ -940,11 +1060,11 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
             <span className="label text-fg-3">
               About {seconds} seconds. No spin, no near miss, no acceleration.
             </span>
-            <button type="button" className={BUTTON_PRIMARY} onClick={play}>
+            <button ref={playRef} type="button" className={BUTTON_PRIMARY} onClick={play}>
               {phase === "idle" ? "Replay the draw" : "Replay again"}
             </button>
             {phase === "idle" ? null : (
-              <button type="button" className={BUTTON} onClick={reset}>
+              <button type="button" className={BUTTON} onClick={stop}>
                 {phase === "done" ? "Show the record" : "Stop"}
               </button>
             )}
@@ -961,12 +1081,12 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
               {/* ACT 0 */}
               <Act on={act === 0}>
                 <Caption>
-                  Reveals closed on {SETTLED_STAMP}. {SUMMARY.revealed} of {SUMMARY.sold} holders
+                  Reveals closed on {SETTLED_STAMP}. {SUMMARY.revealed} of {SUMMARY.sold} tickets
                   revealed. {SUMMARY.outstanding} bonds forfeited.
                 </Caption>
                 <p className={NOTE}>
                   Nothing that follows is simulated forward. Every figure is read out of the
-                  settled record and recomputed in this tab as it is shown.
+                  sample record and recomputed in this tab as it is shown.
                 </p>
               </Act>
 
@@ -1007,11 +1127,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
                   value that only exists at the draw.
                 </Caption>
                 <Preimage />
-                <p className={`${NOTE} mt-3.5`}>
-                  The last {CHAIN_SEED.length} characters are the chain value. It is the only
-                  ingredient nobody could know in advance, which is why staying silent to move the
-                  seed is a bet a griefer cannot price.
-                </p>
+                <PreimageNote className="mt-3.5" />
                 <div className="relative mt-[18px] overflow-hidden bg-recess p-4">
                   <div className="digest text-[clamp(10px,1.5vw,20px)] leading-[1.6] text-fg">
                     {seedText || "…"}

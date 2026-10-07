@@ -71,6 +71,15 @@ function scatter(supply: number, count: number, key: string): number[] {
 
 export const VIEWER: Address = fakeAddress("viewer");
 
+/**
+ * What every page calls VIEWER, in one place. The landing called this address "Demo viewer" while
+ * /raffle/4 called it "Example holder", and the replay on /raffle/4 put both badges on one screen
+ * for the same ticket. One string here and every page imports it, so the name cannot split again.
+ * "Sample" because that is the word every other part of the site uses for this record, and
+ * "holder" because it holds tickets: it is not the visitor and it is not any wallet.
+ */
+export const VIEWER_LABEL = "Sample holder";
+
 const HOLDERS: Address[] = Array.from({ length: 22 }, (_, i) => fakeAddress(`holder-${i}`));
 const CREATORS: Address[] = Array.from({ length: 5 }, (_, i) => fakeAddress(`creator-${i}`));
 
@@ -280,4 +289,33 @@ export function nonceOf(raffleId: number, ticketIndex: number): string | undefin
 
 export function raffleById(id: number): Raffle | undefined {
   return MOCK_RAFFLES.find((r) => r.config.id === id);
+}
+
+/**
+ * The raffle a URL segment names, or nothing. Only the canonical spelling of an id is accepted.
+ *
+ * `raffleById(Number(segment))` was the old route lookup, and `Number` reads "01", "1.0", "1e0",
+ * "0x1" and "0b1" all as 1, so each of those served raffle 0001 with a 200 at its own duplicate URL.
+ * A segment is an id only if it is the exact decimal string the board links to.
+ */
+export function raffleBySegment(segment: string): Raffle | undefined {
+  return /^[1-9][0-9]{0,5}$/.test(segment) ? raffleById(Number(segment)) : undefined;
+}
+
+/**
+ * What a void raffle handed back, split by who it went back to.
+ *
+ * `summarize` hard-zeroes `forfeited` on the void branch, correctly, so its `pool` is the deposit
+ * plus ticket revenue and leaves every reveal bond out. Raffle 0005 then read three ways at once:
+ * the board said Pool 1.60, the page said "Returned to holders 1.65" with the creator's 1.50 inside
+ * it, and the money really went to two different parties. So the split is named: the creator gets
+ * the deposit back, each holder gets their ticket price and their bond back, and the total is the
+ * one figure the board and the page both print for a void raffle. It is the same sum the program's
+ * void Claims pay out (SPEC.md: prize to the creator, ticket price plus bond to each holder).
+ */
+export function voidReturns(raffle: Raffle): { creator: number; holders: number; total: number; tickets: number } {
+  const tickets = raffle.tickets.filter((t) => t.holder !== null).length;
+  const creator = raffle.config.prize;
+  const holders = tickets * (raffle.config.ticketPrice + raffle.config.revealBond);
+  return { creator, holders, total: creator + holders, tickets };
 }

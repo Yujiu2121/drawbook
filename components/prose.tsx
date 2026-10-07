@@ -1,8 +1,11 @@
 /**
  * Reading typography for the two written pages, in SWEEP / CELL.
  *
- * THIS FILE IS THE WHOLE PORT OF /learn AND /docs. Both routes are built from the twelve exports
+ * THIS FILE IS THE WHOLE PORT OF /learn AND /docs. Both routes are built from the fifteen exports
  * below and nothing else, so the primitives carry the system and the two pages carry the argument.
+ * That includes their links: a page that writes its own link classes is how /learn and /docs came
+ * to carry `text-text-2` and `bg-stock`, names the token reset compiles to nothing, so the link
+ * styling lives here once, in role names that exist.
  * Every export is a pure Server Component: no state, no effect, no client directive, and no scroll
  * spy on the contents list, because a list of seven anchors does not need to watch the viewport to
  * be useful.
@@ -50,6 +53,9 @@
  * this file ever puts fg-3 into a well. Fact keys are fg-3 and the facts table has no fill.
  */
 
+import Link from "next/link";
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
+
 /**
  * The measure.
  *
@@ -65,7 +71,11 @@ export function Article({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`max-w-[62ch] ${className}`}>{children}</div>;
+  // `min-w-0` because this is a grid item, and a grid item's automatic minimum width is its
+  // min-content width. Without it the widest unbreakable thing inside (a formula in a well) sets
+  // the column's floor, and on a phone the whole page scrolled sideways to 466px instead of the
+  // formula scrolling inside its own box.
+  return <div className={`min-w-0 max-w-[62ch] ${className}`}>{children}</div>;
 }
 
 /**
@@ -99,7 +109,11 @@ export function Reading({
     // `justify-between` on the grid rather than a `1fr` filler track. The two tracks then sit under
     // the two ends of the head rule, so the rule reads as spanning the document instead of
     // overshooting a narrow column, which is what it did while the article was alone beneath it.
-    <div className="mt-12 grid gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,62ch)_17rem] lg:justify-between">
+    //
+    // Below `lg` the single track is written out as `minmax(0,1fr)` rather than left implicit. An
+    // implicit track is `auto`, which sizes to the article's min-content, and that is the other
+    // half of how a code block used to widen /docs to 466px on a 390px phone.
+    <div className="mt-12 grid grid-cols-[minmax(0,1fr)] gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,62ch)_17rem] lg:justify-between">
       <nav
         aria-label="Contents"
         // The sticky offset is read from --mast rather than written as a number, so the index
@@ -207,7 +221,10 @@ export function LI({ children }: { children: React.ReactNode }) {
  * the formula three lines below it.
  */
 export function C({ children }: { children: React.ReactNode }) {
-  return <code className="mono bg-recess px-1.5 py-0.5 text-sm text-fg">{children}</code>;
+  // `wrap-anywhere` because an identifier has no spaces to break at. A 43-character program id
+  // or `rialo_s_random_seed::get_random_seed()` is wider than a 320px phone's measure, and an
+  // inline token that cannot break pushes the page sideways however the grid is sized.
+  return <code className="mono bg-recess px-1.5 py-0.5 text-sm text-fg wrap-anywhere">{children}</code>;
 }
 
 /**
@@ -278,6 +295,121 @@ export function Facts({ rows }: { rows: [string, string][] }) {
             <td className="figure border-b border-rule py-2.5 text-right align-top break-words text-fg">
               {v}
             </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * A link inside running text.
+ *
+ * Full ink, because it is part of the sentence, with the underline in `--bound` so it reads as a
+ * link and not as emphasis: the underline is a non-text mark and `--bound` is 5.18 on the panel,
+ * clear of the 3:1 such a mark needs. Under the hand the underline goes to full ink. Nothing
+ * moves and no colour is spent: `--event` means a winner here and never answers the pointer.
+ *
+ * `href` starting with `#` or `/` stays inside the site through next/link. Every class named here
+ * is a role that block 4 of globals.css maps, which is the whole point of the export.
+ */
+export function TextLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="text-fg underline decoration-bound underline-offset-4 transition-colors duration-[var(--t-open)] ease-settle hover:decoration-fg"
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * The control a reading page ends on, in the live system's two kinds.
+ *
+ * The same shell as the controls on a raffle page (`app/raffle/[id]/counter.tsx`), copied rather
+ * than imported because that file and `components/chain-ui.tsx` are client modules: a string
+ * imported from one reaches a Server Component as a client reference, not as the string, and the
+ * class list would silently be empty. Primary is reversed print, full ink with panel lettering,
+ * and steps to `--fg-2` under the hand instead of lifting, because nothing in this room casts a
+ * shadow to lift out of. Secondary is a bounded control on the panel. The press is a one-pixel
+ * translate, which repaints nothing.
+ */
+export function Action({
+  href,
+  children,
+  primary = false,
+}: {
+  href: string;
+  children: React.ReactNode;
+  primary?: boolean;
+}) {
+  const shell =
+    "label inline-flex items-center justify-center gap-2 border px-3.5 py-2.5 transition-colors duration-[var(--t-open)] ease-settle active:translate-y-px";
+  const kind = primary
+    ? "border-fg bg-fg text-panel hover:border-fg-2 hover:bg-fg-2"
+    : "border-bound text-fg hover:bg-panel-2";
+  return (
+    <Link href={href} className={`${shell} ${kind}`}>
+      {children}
+      {primary && <ArrowRight size={14} weight="bold" aria-hidden="true" />}
+    </Link>
+  );
+}
+
+/**
+ * A reference table: several columns of left-aligned text, for the places where a description has
+ * to line up down the page (error codes, the instructions at a glance).
+ *
+ * Facts is for a measured value against its name and right-aligns the value; this is for words
+ * against words, so nothing is right-aligned. `table-fixed` with stated column widths for the same
+ * reason Facts uses it: under the auto layout the widest token sets a column's floor and a phone
+ * gets a sideways scroll. Cells wrap, and the first column is set in the figure face because in
+ * every table on these pages it is a number or an identifier.
+ *
+ * The header row is `fg-3` labels on a `--rule` hairline, the same head the contents list and the
+ * footer columns carry. No fill under it, for the reason Facts gives: fg-3 in a well is the
+ * tightest pair in the system.
+ */
+export function Table({
+  head,
+  widths,
+  rows,
+}: {
+  head: string[];
+  /** One CSS width per column, for example ["4.5rem", "auto"]. */
+  widths: string[];
+  rows: React.ReactNode[][];
+}) {
+  return (
+    <table className="mt-6 w-full table-fixed border-collapse text-sm">
+      <colgroup>
+        {widths.map((w, i) => (
+          <col key={i} style={{ width: w }} />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          {head.map((h) => (
+            <th key={h} scope="col" className="label border-b border-rule pb-2.5 pr-4 text-left align-bottom text-fg-3 last:pr-0">
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((cells, r) => (
+          <tr key={r}>
+            {cells.map((cell, c) => (
+              <td
+                key={c}
+                className={`border-b border-rule py-2.5 pr-4 text-left align-top text-fg last:pr-0 ${
+                  c === 0 ? "figure" : ""
+                } wrap-break-word`}
+              >
+                {cell}
+              </td>
+            ))}
           </tr>
         ))}
       </tbody>

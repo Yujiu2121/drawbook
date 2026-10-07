@@ -1,6 +1,9 @@
 /**
  * The document clock.
  *
+ * SAMPLES ONLY. The raffles on chain count against real time in components/chain-ui.tsx and never
+ * read this module.
+ *
  * `lib/mock-raffles.ts` is pinned at `NOW` so commitments verify and reloads reproduce, but a
  * countdown is the monument of this interface and a frozen one is a dead one. So the clock does
  * the only honest thing available: it starts at the pinned instant and adds the time this tab has
@@ -43,11 +46,19 @@ export const PINNED_STAMP =
   `${NOW.getUTCDate()} ${MONTHS[NOW.getUTCMonth()]} ${NOW.getUTCFullYear()} ` +
   `${pad2(NOW.getUTCHours())}:${pad2(NOW.getUTCMinutes())} UTC`;
 
-/** The note that has to sit near any countdown. Stating the pin is cheaper than being caught at it. */
+/**
+ * The note that has to sit near any sample countdown. Stating the pin is cheaper than being caught
+ * at it.
+ *
+ * It names the samples because the site now has two kinds of clock on one page. The raffles read
+ * from the chain count against the real time and the chain's own deadlines; only the sample record
+ * runs from the pin, so a note that said "the countdowns" without qualification would be wrong
+ * about every live raffle printed beside it.
+ */
 export const CLOCK_NOTE =
-  `The countdowns advance from a pinned instant, ${PINNED_STAMP}, plus the time this tab has been ` +
-  `open. Time passing is not a chain event, so nothing here pretends one happened. Two tabs opened ` +
-  `an hour apart will disagree, and that is true of any clock.`;
+  `Sample countdowns start from a pinned instant, ${PINNED_STAMP}, and add the time this tab has ` +
+  `been open. The samples are fixed demonstration data, so time passing here is not a chain event ` +
+  `and nothing pretends one happened. Two tabs opened an hour apart will disagree.`;
 
 /* ------------------------------------------------------------------ store */
 

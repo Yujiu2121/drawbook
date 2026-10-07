@@ -1,0 +1,6 @@
+# Build output. The deployable blob is rebuilt from source with rialo-build, never committed.
+/artifacts/
+/target/
+# Keypairs live in ~/.rialo and must never land in the repo, even by accident.
+*.keypair
+*-keypair.json

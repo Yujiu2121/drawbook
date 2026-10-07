@@ -15,12 +15,15 @@ import {
 } from "@/components/landing/sections";
 import { VerifyPanel } from "@/components/landing/verify-panel";
 import { activeDeadline, isLive, serialOf } from "@/lib/cell";
+import { PROGRAM_ID } from "@/lib/chain/program";
+import { PINNED_STAMP } from "@/lib/clock";
 import { BUTTON, BUTTON_PRIMARY } from "@/lib/controls";
-import { MOCK_RAFFLES } from "@/lib/mock-raffles";
+import { MOCK_RAFFLES, voidReturns } from "@/lib/mock-raffles";
 import {
   auditSeed,
   deriveWinnerTrace,
   formatRLO,
+  payouts,
   summarize,
   type Raffle,
 } from "@/lib/raffle";
@@ -57,9 +60,18 @@ export const metadata = {
  * entire ceremony poster ship as HTML.
  *
  * NOT ONE QUANTITY BELOW IS A LITERAL. Every figure is a reduction over MOCK_RAFFLES through
- * `summarize`, `auditSeed` and `deriveWinnerTrace`, computed at render time, which is the only way
- * the note at the foot gets to say every figure is read out of lib/mock-raffles.ts and be telling
- * the truth.
+ * `summarize`, `payouts`, `auditSeed` and `deriveWinnerTrace`, computed at render time, which is
+ * the only way the note at the foot of section four gets to say its figures are read out of
+ * lib/mock-raffles.ts and be telling the truth.
+ *
+ * TWO SOURCES, AND THE COPY NEVER BLURS THEM. Drawbook's raffle program runs on Rialo testnet, and
+ * /create deploys real raffle accounts that /raffles lists and /r/[address] opens. Nothing on this
+ * page reads one: every card, figure, the field, the chain, the ceremony and the working are the
+ * five sample raffles, fixed demonstration data that is not on chain. So the page sends people to
+ * /raffles and /create for the real thing, and every surface drawn from the samples says "sample"
+ * on its face. What the copy may claim is fixed by the claims sheet for the testnet launch: the
+ * draw is a button anyone may press once the raffle is ready, not automatic yet; the result is
+ * randomized and checkable, not unbiasable; and the limit is the draw-block producer, stated whole.
  */
 
 /* --------------------------------------------------------------------- the record, counted */
@@ -83,7 +95,11 @@ const TOTALS = {
   tickets: sum(MOCK_RAFFLES, (r) => r.config.supply),
   sold: sum(MOCK_RAFFLES, (r) => summarize(r).sold),
   livePool: sum(LIVE, (r) => summarize(r).pool),
-  gonePool: sum(RECORD, (r) => summarize(r).pool),
+  paid: sum(RECORD, (r) => [...payouts(r).values()].reduce((a, b) => a + b, 0)),
+  returned: sum(
+    RECORD.filter((r) => r.phase === "void"),
+    (r) => voidReturns(r).total,
+  ),
   drawn: MOCK_RAFFLES.filter((r) => r.phase === "drawn").length,
   voided: MOCK_RAFFLES.filter((r) => r.phase === "void").length,
   liveTickets: sum(LIVE, (r) => r.config.supply),
@@ -91,21 +107,25 @@ const TOTALS = {
 };
 
 /**
- * THE AGGREGATE THAT IS SPLIT RATHER THAN SUMMED. The design this descends from printed "In the
- * pools 40.75 RLO", the sum of every raffle's pool. It is false as worded: the live raffles hold
- * 33.05, while raffle 0004 has already paid 6.10 out to its two winners and raffle 0005 has
- * already refunded 1.60. 7.70 of that 40.75 is money that has left. It is split here into what is
- * still in the pools and what has already gone, which is the more interesting half anyway. The
- * second label is "Paid and refunded" rather than "Settled" because this same line already carries
- * a "Settled" row counting drawn raffles, and two rows reading SETTLED 1 and SETTLED 7.70 would be
- * a worse defect than the one being fixed.
+ * THE AGGREGATE THAT IS SPLIT RATHER THAN SUMMED, AND THEN SPLIT AGAIN. The design this descends
+ * from printed "In the pools 40.75 RLO", the sum of every raffle's pool, which counted money that
+ * had already left. The fix that followed printed "Paid and refunded 7.70": 6.10 paid to raffle
+ * 0004's winners plus raffle 0005's 1.60 pool. That was wrong too, because a void pool leaves the
+ * reveal bonds out, and /raffle/5 says 1.65 was returned. So the money that left is two figures
+ * from two functions: what `payouts` paid the winners of a drawn raffle (6.10), and what a void
+ * raffle handed back, `voidReturns(r).total` from lib/mock-raffles.ts (1.65), the one function
+ * /raffle/5 and the board both print from. Together 7.75 has left the sample pools, and each
+ * figure agrees with the page one click away because it is that page's own arithmetic.
+ *
+ * Every label says "sample" or sits under a heading that does: none of this is on chain.
  */
 const FIGURES: [string, string][] = [
-  ["Raffles", String(TOTALS.raffles)],
+  ["Sample raffles", String(TOTALS.raffles)],
   ["Tickets", String(TOTALS.tickets)],
   ["Sold", String(TOTALS.sold)],
-  ["In the live pools", `${formatRLO(TOTALS.livePool)} RLO`],
-  ["Paid and refunded", `${formatRLO(TOTALS.gonePool)} RLO`],
+  ["In the open pools", `${formatRLO(TOTALS.livePool)} RLO`],
+  ["Paid to winners", `${formatRLO(TOTALS.paid)} RLO`],
+  ["Returned", `${formatRLO(TOTALS.returned)} RLO`],
   ["Settled", String(TOTALS.drawn)],
   ["Void", String(TOTALS.voided)],
 ];
@@ -188,7 +208,9 @@ const CHAIN: ChainLink[] =
           name: "Chain value",
           value: CEREMONY.chainSeed ?? "",
           hex: true,
-          note: "Arrives last, and nobody sees it coming.",
+          // Not "nobody sees it coming": the producer of the draw block may be able to influence
+          // it, and section seven says so. What is true is when it is read.
+          note: "Read at the draw, once every secret is public.",
         },
         {
           name: "Seed",
@@ -224,33 +246,45 @@ const STEPS: Step[] = [
     n: "01",
     title: "Commit",
     body:
-      "Buy a ticket and commit a secret. It is bound to your address, this raffle and this exact ticket, and nobody, the creator included, can read it.",
+      "Buy a ticket and commit a secret, paying the ticket price plus a bond. The secret is bound to your address, this raffle and this exact ticket, and nobody, the creator included, can read it.",
   },
   {
     n: "02",
     title: "Reveal",
     body:
-      "When the sale closes, publish your secret to become eligible. The chain checks it against what you committed. Stay silent and your bond goes into the pool.",
+      "When the sale closes, publish your secret to become eligible. The program checks it against what you committed and hands your bond back. Stay silent and your bond goes into the pool.",
   },
   {
     n: "03",
     title: "Draw",
     body:
-      "The winner is generated from every published secret at once, in sorted order, plus one value the chain adds last. Revealing late buys nothing.",
+      "Once every ticket is revealed or the deadline passes, anyone can run the draw. The winners come out of every published secret at once, in sorted order, plus one value the chain adds last. Winners collect with Claim.",
   },
 ];
 
+/**
+ * THE DESIGN, NOT TODAY'S PATH, AND THE PAGE LABELS IT AS SUCH. The Subscriber predicate that
+ * would fire the draw at the deadline is not wired: today the third plate is a person pressing
+ * Draw, which the program accepts from anyone once the raffle is ready. The diagram stays because
+ * it is the argument for building this on Rialo, but it sits under a label saying it is the
+ * design, and the last plate no longer says winners were paid with nothing pressed: even in the
+ * design, a winner is paid by Claim.
+ */
 const FLOW: FlowStep[] = [
   { title: "Reveal deadline", body: "an absolute instant, written into the raffle" },
   { title: "Condition met", body: "the chain notices, not a server" },
   { title: "Reactive transaction", body: "the draw is its body" },
-  { title: "Draw executed", body: "winners paid, and nothing was pressed" },
+  { title: "Draw executed", body: "no keeper, no cron job, no relayer; winners then Claim" },
 ];
 
+/**
+ * Three claims, each true of the program on testnet today. The third used to be "Automatic: the
+ * draw executes itself the moment the reveal period ends", which is the design and not the fact.
+ */
 const BENEFITS: [string, string, string][] = [
-  ["01", "Transparent", "Every step of the draw can be inspected while it is still open."],
-  ["02", "Verifiable", "Anyone can recompute the result from data the chain already holds."],
-  ["03", "Automatic", "The draw executes itself the moment the reveal period ends."],
+  ["01", "Transparent", "Every ticket, commitment and reveal sits in the raffle's account, where anyone can read it while the raffle is open."],
+  ["02", "Verifiable", "Anyone can recompute a drawn raffle from data its account holds, and its page does that in your browser."],
+  ["03", "Open to anyone", "Once every ticket is revealed or the reveal deadline passes, anyone can press Draw. Firing it automatically is the design, not wired yet."],
 ];
 
 /* -------------------------------------------------------------------------------- the page */
@@ -262,32 +296,36 @@ export default function LandingPage() {
     <main className="pt-mast">
       {/* ==================================================================== 1. THE HERO */}
       <section aria-label="Drawbook">
+        {/* The second call to action used to be "How it works" scrolling to #how, while the
+            masthead's "How it works" opens /learn: one label, two destinations, on one screen.
+            It is now the other real destination this page exists to send people to. */}
         <Hero
-          eyebrow="Built on Rialo"
+          eyebrow="On Rialo testnet"
           sentence="Fair raffles, built on Rialo."
-          lead="Drawbook makes raffle results transparent, verifiable and automatic, so nobody has to pick the winner."
+          lead="Drawbook draws raffle winners from secrets every ticket holder commits and then reveals, so the result is randomized and anyone can check it."
           actions={
             <>
               <Link href="/raffles" className={BUTTON_PRIMARY}>
                 Explore raffles <span aria-hidden="true">&rarr;</span>
               </Link>
-              <Link href="#how" className={BUTTON}>
-                How it works
+              <Link href="/create" className={BUTTON}>
+                Deploy a raffle
               </Link>
             </>
           }
           field={<MusterBands raffles={MOCK_RAFFLES} />}
           fieldHead={
             <figcaption className="label mb-3.5 flex justify-between gap-3 text-fg-3">
-              <span>Every ticket in Drawbook</span>
+              <span>Every ticket in the sample raffles</span>
               <span>{TOTALS.tickets} tickets</span>
             </figcaption>
           }
           fieldNote={
             <p className="m-0 mt-3.5 max-w-[52ch] text-sm text-fg-3">
-              One block per ticket, {TOTALS.raffles} raffles deep. Filled is sold, a light foot is a
-              published secret, and the two lit blocks are raffle {serial}&rsquo;s winners. Open a
-              band and those blocks become the page.
+              One block per ticket across the {TOTALS.raffles} sample raffles, fixed demonstration
+              data rather than accounts on chain. Filled is sold, a light foot is a published
+              secret, and the two lit blocks are sample {serial}&rsquo;s winners. Open a band and
+              those blocks become the page.
             </p>
           }
         />
@@ -303,8 +341,20 @@ export default function LandingPage() {
             What is Drawbook?
           </h2>
           <p className="m-0 mt-5 text-lg text-fg-2">
-            Drawbook is an on-chain raffle system where the winner is decided by a commit-reveal
-            process instead of by a person choosing the result.
+            Drawbook is an on-chain raffle where the winners come out of a commit-reveal draw over
+            secrets the ticket holders publish, rather than being chosen by whoever runs it.
+          </p>
+          {/* WHAT IS LIVE, IN ONE PLACE, NEAR THE TOP. Everything below this paragraph that shows
+              a raffle is the sample record, so the true sentence about the real program goes
+              before any of it rather than after. */}
+          <p className="m-0 mt-4 text-fg-2">
+            Its raffle program runs on Rialo testnet. Deploying a raffle, buying a ticket,
+            revealing, drawing and claiming are real signed transactions from a burner wallet held
+            in your browser. Testnet only, and testnet can be reset.
+          </p>
+          <p className="m-0 mt-3 text-sm text-fg-3">
+            <span className="label">Program</span>{" "}
+            <span className="mono break-all">{PROGRAM_ID}</span>
           </p>
         </div>
 
@@ -346,20 +396,45 @@ export default function LandingPage() {
         className="scroll-mt-mast px-pad py-[clamp(48px,8vw,112px)]"
         aria-labelledby="raffles-heading"
       >
+        {/* The title is now literally true: the raffles that are live are one click away, at the
+            top of /raffles, and anyone can deploy one. The cards under it are not those raffles
+            and are headed as samples before the first one is drawn. */}
         <SectionHead
           id="raffles-heading"
           title="Try a live raffle."
-          lead="Explore active and completed draws on Drawbook."
+          lead="Raffles deployed on Rialo testnet are listed at the top of the raffle board, and anyone can deploy one. Buying, revealing, drawing and claiming there are real signed transactions."
           aside={
-            <p className="m-0 grid gap-1.5 text-right">
-              <span className="label text-fg-3">On the floor</span>
-              <span className="figure text-sm">
-                {TOTALS.liveSold} of {TOTALS.liveTickets} tickets gone &middot;{" "}
-                {formatRLO(TOTALS.livePool)} RLO in the live pools
-              </span>
-            </p>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Link href="/raffles" className={BUTTON_PRIMARY}>
+                Live raffles <span aria-hidden="true">&rarr;</span>
+              </Link>
+              <Link href="/create" className={BUTTON}>
+                Deploy a raffle
+              </Link>
+            </div>
           }
         />
+
+        <h3 className="label m-0 mb-2.5 flex flex-wrap justify-between gap-3 border-t border-rule pt-3.5 font-normal text-fg-3">
+          <span>Sample raffles &middot; not on chain</span>
+          <span>
+            {TOTALS.liveSold} of {TOTALS.liveTickets} tickets gone &middot;{" "}
+            {formatRLO(TOTALS.livePool)} RLO in the open pools
+          </span>
+        </h3>
+        {/* The clock disclosure sits directly above the first countdown it qualifies. The sample
+            clocks start at a pinned instant in July, so on any later day a countdown reading
+            "24:59:58" is a demonstration, and the sentence says so before it can be read as a
+            deadline. */}
+        {/* The explicit {" "} after the count is load-bearing: the compiler drops the leading
+            space of a multi-line JSX text run that contains an entity, and this printed
+            "These 5raffles" without it. */}
+        <p className="m-0 mb-[clamp(18px,2vw,26px)] max-w-[64ch] text-sm text-fg-3">
+          These {TOTALS.raffles}{" "}raffles are fixed demonstration data kept in this site&rsquo;s
+          code, so every draw in them can be recomputed. Nothing done on them is signed or sent.
+          Their clocks start from a pinned instant, {PINNED_STAMP}, and add the time this tab has
+          been open.
+        </p>
 
         <ul className="rcards m-0 list-none p-0">
           {LIVE.map((r) => (
@@ -370,10 +445,11 @@ export default function LandingPage() {
         {RECORD.length > 0 ? (
           <>
             <h3 className="label m-0 mt-[clamp(40px,5vw,72px)] mb-[clamp(18px,2vw,26px)] flex flex-wrap justify-between gap-3 border-t border-rule pt-3.5 font-normal text-fg-3">
-              <span>The record</span>
+              <span>The sample record</span>
               <span>
                 {TOTALS.drawn} settled &middot; {TOTALS.voided} void &middot;{" "}
-                {formatRLO(TOTALS.gonePool)} RLO paid and refunded
+                {formatRLO(TOTALS.paid)} RLO paid to winners &middot;{" "}
+                {formatRLO(TOTALS.returned)} RLO returned
               </span>
             </h3>
             <ul className="rcards m-0 list-none p-0">
@@ -386,13 +462,18 @@ export default function LandingPage() {
 
         {/* The figure line, once, at the foot of the section whose subject it is. It used to be
             printed twice, the second time directly under a note vouching that every figure comes
-            out of the record. */}
+            out of the record.
+
+            The note used to end "nothing here is connected to a node" while the masthead on the
+            same screen rolled a live block height read from one. It now says which figures are
+            the sample record and which one thing on the page is read live. */}
         <div className="mt-[clamp(40px,5vw,72px)] border-t border-rule pt-[clamp(18px,2vw,26px)]">
           <Figures />
           <p className="m-0 mt-5 max-w-[60ch] text-sm text-fg-3">
-            Every figure on this page is read out of lib/mock-raffles.ts at render time, whose
-            settled raffles are settled by a real call to drawRaffle. Nothing rolls on an odometer,
-            because nothing here is connected to a node.
+            Every figure in this section and the two after it is read out of the sample record in
+            lib/mock-raffles.ts at render time, and its settled raffles are settled by a real call
+            to drawRaffle. None of it is on chain. The only thing on this page read from a node is
+            the network chip in the masthead.
           </p>
         </div>
       </section>
@@ -412,7 +493,7 @@ export default function LandingPage() {
             <SectionHead
               id="draw-heading"
               title="See how a winner is drawn."
-              lead={`Raffle ${serial} settled in July. This is its draw, recomputed in your browser rather than read back off a server.`}
+              lead={`Sample raffle ${serial} is fixed demonstration data, not on chain. This is its draw, recomputed in your browser with the same winner selection a live raffle’s page uses to check its own.`}
             />
             <DrawChain links={CHAIN} />
             <p className="m-0 mt-[clamp(26px,3vw,40px)] max-w-[62ch] text-sm text-fg-3">
@@ -439,8 +520,9 @@ export default function LandingPage() {
               Don&rsquo;t trust the result. Verify it.
             </h2>
             <p className="m-0 mt-[18px] text-lg text-fg-2">
-              Every settled draw leaves behind the data needed to recompute the result. Nothing
-              below is summarised: it is the record.
+              Every settled draw leaves behind the data needed to recompute the result. Below is
+              the whole working of sample raffle {serial}, unsummarised. A live raffle&rsquo;s page
+              prints the same working from its account on chain and checks it in your browser.
             </p>
           </div>
 
@@ -463,13 +545,17 @@ export default function LandingPage() {
       >
         <div className="grid items-center gap-[clamp(30px,4vw,64px)] min-[900px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <div>
+            {/* "Designed", not "Built": the trigger in the diagram beside this is not wired. The
+                paragraph says what happens today first, then what the design adds. */}
             <h2 id="rialo-heading" className="m-0 max-w-[18ch] font-serif text-display">
-              Built for automatic execution.
+              Designed for automatic execution.
             </h2>
             <p className="m-0 mt-5 max-w-[52ch] text-lg text-fg-2">
-              Drawbook uses Rialo&rsquo;s reactive transactions so the draw can execute when the
-              reveal deadline passes, without relying on a keeper, a cron job or a relayer. There is
-              nobody to pay to press it, and nobody who can choose not to.
+              Today the draw is a button anyone can press. The program refuses it until every sold
+              ticket is revealed after the sale closes, or the reveal deadline passes, and accepts
+              it from anyone after that. The design is for Rialo&rsquo;s reactive transactions to
+              fire it at the deadline, with no keeper, cron job or relayer. That trigger, a
+              Subscriber predicate, is not wired yet.
             </p>
 
             {/*
@@ -480,24 +566,36 @@ export default function LandingPage() {
               "stated rather than buried" means.
             */}
             <p className="m-0 mt-[22px] max-w-[58ch] text-sm text-fg-3">
-              This is randomized. It is not a claim that the draw cannot be biased. Rialo&rsquo;s own
-              randomness is a bare 64-bit number with no proof attached, which is why the seed is
-              built out of the participants&rsquo; secrets and the chain value is only mixed in on
-              top. Withholding a reveal does move the seed; biasing it needs a party who both
-              produces blocks and reveals last, and the bond they forfeit is the price of trying.
+              This is randomized and checkable. It is not a claim that the draw cannot be biased.
+              Rialo&rsquo;s own randomness is a bare 64-bit number with no proof attached, which is
+              why the seed is built out of the participants&rsquo; secrets and the chain value is
+              only mixed in on top. Two levers remain. The chain value is read at the draw, after
+              every secret is public, so whoever produces the draw block may be able to try values
+              and keep one they like, with no ticket needed. And a holder can withhold a reveal to
+              move the seed, blind to the chain value still to come, at the cost of their bond.
             </p>
           </div>
 
-          <Flow steps={FLOW} />
+          <figure className="m-0">
+            <figcaption className="label mb-3.5 text-fg-3">The design, not wired yet</figcaption>
+            <Flow steps={FLOW} />
+          </figure>
         </div>
       </section>
 
       {/* ==================================================================== 8. THE CLOSE */}
       <section className="inv bg-panel px-pad py-[clamp(64px,10vw,140px)] text-fg">
         <h2 className="m-0 max-w-[16ch] font-serif text-display">Ready to see it in action?</h2>
+        <p className="m-0 mt-[clamp(18px,2vw,24px)] max-w-[52ch] text-fg-2">
+          Live raffles are on Rialo testnet, and a raffle you deploy is a real account there. Your
+          wallet is a burner key held in this browser.
+        </p>
         <div className="mt-[clamp(28px,3.4vw,44px)] flex flex-wrap items-center gap-2.5">
           <Link href="/raffles" className={BUTTON_PRIMARY}>
-            Explore raffles
+            Live raffles
+          </Link>
+          <Link href="/create" className={BUTTON}>
+            Deploy a raffle
           </Link>
           <Link href="/docs" className={BUTTON}>
             Read the docs

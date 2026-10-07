@@ -333,12 +333,16 @@ section("mock data integrity");
     [...addresses].every((a) => BASE58.test(a)),
   );
 
+  // Two flags, not one: these used to share a single boolean, so two PASS lines with different
+  // labels asserted the same thing, and a stray commitment on an unsold ticket would have been
+  // reported as a bad hash.
   let commitmentsOk = true;
+  let unsoldClean = true;
   let nonceCoverage = true;
   for (const r of MOCK_RAFFLES) {
     for (const t of r.tickets) {
       if (!t.holder) {
-        if (t.commitment !== null || t.nonce !== null) commitmentsOk = false;
+        if (t.commitment !== null || t.nonce !== null) unsoldClean = false;
         continue;
       }
       const n = nonceOf(r.config.id, t.index);
@@ -351,7 +355,7 @@ section("mock data integrity");
     }
   }
   ok("every sold ticket's commitment is the real hash of its nonce", commitmentsOk);
-  ok("unsold tickets carry no commitment or nonce", commitmentsOk);
+  ok("unsold tickets carry no commitment or nonce", unsoldClean);
   ok("every sold ticket has a retrievable nonce", nonceCoverage);
 
   const drawn = MOCK_RAFFLES.find((r) => r.phase === "drawn")!;
@@ -373,8 +377,8 @@ section("mock data integrity");
   );
 
   const voided = MOCK_RAFFLES.find((r) => r.phase === "void")!;
-  ok("the void raffle has no winners", voided.winningTickets.length === 0);
-  ok("the void raffle forfeits nothing", summarize(voided).forfeited === 0);
+  ok("the void sample raffle has no winners", voided.winningTickets.length === 0);
+  ok("the void sample raffle forfeits nothing", summarize(voided).forfeited === 0);
 
   const revealing = MOCK_RAFFLES.find((r) => r.phase === "revealing")!;
   const rs = summarize(revealing);

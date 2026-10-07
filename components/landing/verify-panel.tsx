@@ -4,6 +4,11 @@ import type { DrawStep } from "@/lib/raffle";
 /**
  * VERIFIABLE BY DESIGN: the working of one settled draw, collapsed.
  *
+ * THE DRAW SHOWN IS A SAMPLE, AND THE SUMMARY LINE SAYS SO. Raffle 0004 is fixed demonstration
+ * data, not an account on chain, so its recompute re-runs the code that made it and cannot fail.
+ * `<RecomputePanel>` states that beside its button; a live raffle's own page carries the check
+ * that can fail.
+ *
  * WHY IT IS COLLAPSED AND WHY THAT IS NOT A DEMOTION. Everything in here was previously on the
  * first screen, above any sentence explaining what Drawbook is. It is the most interesting thing
  * in the product and it is the last thing a first-time reader needs, and those two facts are not
@@ -27,7 +32,7 @@ import type { DrawStep } from "@/lib/raffle";
  */
 
 export interface VerifyPanelProps {
-  /** The settled raffle's four-digit serial. */
+  /** The settled sample raffle's four-digit serial. */
   serial: string;
   /** Every revealed nonce, already sorted, paired with the ticket it came off. */
   nonces: readonly { index: string; nonce: string }[];
@@ -52,7 +57,7 @@ export function VerifyPanel({
   return (
     <details className="vpanel border border-bound bg-panel-2">
       <summary className="flex items-center gap-4 px-[clamp(18px,2vw,26px)] py-5">
-        <span className="serial text-sm">The working, raffle {serial}</span>
+        <span className="serial text-sm">The working, sample raffle {serial}</span>
         <span className="label ml-auto hidden text-fg-3 sm:block">
           {nonces.length} nonces &middot; 1 chain value &middot; 1 seed &middot; {trace.length}{" "}
           winners

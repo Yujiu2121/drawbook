@@ -46,7 +46,7 @@
  * is active survives a greyscale print and does not depend on the hue at all.
  */
 
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 /** The three orders the board offers, and the labels printed on their buttons. */
@@ -65,10 +65,47 @@ export interface LiveRow {
   deadline: number;
   /** The pool in kelvin. Sorted descending: the largest prize, first. */
   pool: number;
-  /** Tickets sold over supply, 0 to 1. Sorted descending: the fullest raffle, first. */
-  filled: number;
+  /**
+   * How many tickets the raffle has in all. Sorted descending: the largest raffle, first.
+   *
+   * This used to be the fill fraction under the same "Supply" label, which sorted fullest first.
+   * On this record that is exactly the deadline order (the fullest raffles are the ones about to
+   * close), so pressing Supply moved nothing and read as a dead button. The word on the button is
+   * the field it sorts by now.
+   */
+  supply: number;
   /** The row itself, rendered on the server. */
   node: ReactNode;
+}
+
+/*
+  THE ORDER OUTLIVES THE BOARD, FOR THE LENGTH OF ONE VISIT.
+
+  The choice used to live in `useState`, which resets when the page mounts again, so a reader who
+  sorted by Pool, opened a row and came Back found the board in Deadline order. Worse, the back
+  link restores the scroll the board had in Pool order, so the row they left from could land off
+  screen and the return morph had nothing to shrink into.
+
+  It is module memory read through `useSyncExternalStore`: a client navigation remounts the board
+  inside the same bundle and its very first render already has the remembered order, so the
+  restored scroll and the rows agree before anything paints. The server snapshot is always
+  "deadline", which is also the first hydration render, so a cold load cannot mismatch. A reload
+  starts over at Deadline on purpose: this is a convenience for one visit, not a preference, and
+  nothing is written to storage.
+*/
+let remembered: SortKey = "deadline";
+const sortListeners = new Set<() => void>();
+
+function subscribeSort(onChange: () => void): () => void {
+  sortListeners.add(onChange);
+  return () => {
+    sortListeners.delete(onChange);
+  };
+}
+
+function setRemembered(next: SortKey): void {
+  remembered = next;
+  for (const notify of sortListeners) notify();
 }
 
 /** 320ms on the settling curve, the same pair app/globals.css publishes as --t-settle. */
@@ -79,14 +116,18 @@ const STAGGER_MS = 40;
 
 function order(rows: readonly LiveRow[], by: SortKey): LiveRow[] {
   const sorted = rows.slice();
-  if (by === "pool") return sorted.sort((a, b) => b.pool - a.pool);
-  if (by === "supply") return sorted.sort((a, b) => b.filled - a.filled);
+  if (by === "pool") return sorted.sort((a, b) => b.pool - a.pool || a.deadline - b.deadline);
+  if (by === "supply") return sorted.sort((a, b) => b.supply - a.supply || a.deadline - b.deadline);
   return sorted.sort((a, b) => a.deadline - b.deadline);
 }
 
 export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: ReactNode }) {
   const reduce = useReducedMotion();
-  const [by, setBy] = useState<SortKey>("deadline");
+  const by = useSyncExternalStore(
+    subscribeSort,
+    () => remembered,
+    () => "deadline" as SortKey,
+  );
   const [delays, setDelays] = useState<Record<number, number>>({});
 
   const shown = order(rows, by);
@@ -111,7 +152,7 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
     });
 
     setDelays(next_delays);
-    setBy(next);
+    setRemembered(next);
   }
 
   return (

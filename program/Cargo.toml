@@ -1,0 +1,48 @@
+[package]
+name = "drawbook-raffle"
+version = "0.1.0"
+edition = "2021"
+description = "Drawbook's commit-reveal raffle as a plain rialo-s-* program. The byte layout is program/SPEC.md."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+# The entrypoint macro checks for `custom-panic` in this crate. It is on by default because the
+# stock handler formats the PanicInfo, which drags core::fmt into the blob for no benefit: every
+# expected failure in this program is a ProgramError::Custom code, never a panic.
+default = ["custom-panic"]
+custom-panic = []
+# Declared only so the entrypoint macro's cfg check is satisfied; the default bump heap is kept.
+custom-heap = []
+no-entrypoint = []
+
+# Pinned exactly to the toolchain the testnet runs (alpha 0.21.0-alpha.0). A caret range would let
+# cargo pick up a later alpha whose syscalls the deployed validators do not have.
+[dependencies]
+rialo-s-account-info = "=0.21.0-alpha.0"
+rialo-s-cpi = "=0.21.0-alpha.0"
+rialo-s-instruction = { version = "=0.21.0-alpha.0", default-features = false }
+# Draw reads the instructions sysvar to prove it is the only instruction in its transaction.
+rialo-s-instructions-sysvar = "=0.21.0-alpha.0"
+rialo-s-msg = "=0.21.0-alpha.0"
+rialo-s-program-entrypoint = "=0.21.0-alpha.0"
+rialo-s-program-error = "=0.21.0-alpha.0"
+rialo-s-pubkey = { version = "=0.21.0-alpha.0", default-features = false }
+rialo-s-random-seed = "=0.21.0-alpha.0"
+rialo-s-sha256-hasher = "=0.21.0-alpha.0"
+# `bincode` only to bring the Sysvar trait (and so Clock::get) into scope; the clock itself is
+# read by a syscall into a plain struct, and nothing here serialises with bincode.
+rialo-s-sysvar = { version = "=0.21.0-alpha.0", features = ["bincode"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+
+# The entrypoint macro tests target_os = "solana", which a host build (cargo test) does not know.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

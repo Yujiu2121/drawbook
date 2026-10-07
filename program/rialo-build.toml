@@ -1,0 +1,4 @@
+# Without this, a crate that depends on rialo-s-* is sent down `cargo build-sbf`, and the SBF
+# result is not deployable on Rialo's RISC-V loader.
+[build]
+type = "riscv"

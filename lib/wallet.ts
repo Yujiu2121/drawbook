@@ -20,7 +20,12 @@
 
 import { encodeBase58 } from "./base58.ts";
 
-const STORAGE_KEY = "drawbook-testnet-key-v1";
+/**
+ * Exported so the store can listen for the `storage` event on exactly this key: that event is how a
+ * second tab learns that the first one connected, or forgot, the wallet they share.
+ */
+export const WALLET_STORAGE_KEY = "drawbook-testnet-key-v1";
+const STORAGE_KEY = WALLET_STORAGE_KEY;
 
 export interface Wallet {
   /** base58 of the 32-byte public key. */
@@ -53,8 +58,22 @@ async function addressFromPublicKey(key: CryptoKey): Promise<string> {
   return encodeBase58(new Uint8Array(raw));
 }
 
-/** Create a new burner keypair and persist it. */
+/**
+ * Create a new burner keypair and persist it, unless this browser already holds one.
+ *
+ * NEVER OVERWRITE A STORED KEY. The key is the only copy there is: it is not derived from anything,
+ * it is not backed up, and it may hold faucet grants and the right to reveal tickets bought from it.
+ * Every tab of this origin shares one localStorage, so a second tab that booted before the first
+ * one connected used to generate a fresh key here and write it straight over the first one, and the
+ * first key, with its balance, was gone for good (CHROME-N1). So storage is read again immediately
+ * before the write, after the slow part (key generation is async), and if a key has appeared in the
+ * meantime that key is loaded and the new one is thrown away unused. localStorage is synchronous,
+ * so nothing can land between that read and the write that follows it.
+ */
 export async function createWallet(): Promise<Wallet> {
+  const before = await loadWallet();
+  if (before) return before;
+
   if (await ed25519Available()) {
     const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, [
       "sign",
@@ -63,7 +82,8 @@ export async function createWallet(): Promise<Wallet> {
 
     const address = await addressFromPublicKey(pair.publicKey);
     const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
-    persist({ address, jwk });
+    const raced = await persistIfAbsent({ address, jwk });
+    if (raced) return raced;
     return { address, canSign: true, privateKey: pair.privateKey };
   }
 
@@ -71,8 +91,20 @@ export async function createWallet(): Promise<Wallet> {
   const raw = new Uint8Array(32);
   crypto.getRandomValues(raw);
   const address = encodeBase58(raw);
-  persist({ address, jwk: null });
+  const raced = await persistIfAbsent({ address, jwk: null });
+  if (raced) return raced;
   return { address, canSign: false };
+}
+
+/**
+ * Write the key only if no key is stored. Resolves to the wallet that was already there when one
+ * was, or null when this key was written (or storage refused it, in which case the new key still
+ * works for this page view, as it always has).
+ */
+async function persistIfAbsent(wallet: StoredWallet): Promise<Wallet | null> {
+  if (read() !== null) return loadWallet();
+  persist(wallet);
+  return null;
 }
 
 export async function loadWallet(): Promise<Wallet | null> {

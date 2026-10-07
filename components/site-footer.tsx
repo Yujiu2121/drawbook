@@ -83,9 +83,14 @@ import { Wordmark } from "./logo";
  * on. External links say where they go, because a link that leaves the site without warning is a
  * small betrayal of the reader.
  *
- * The disclosure about which parts are live and which are sample data is not here. It lives in the
- * Status section of /docs, where someone looking for it will actually be, rather than as a paragraph
- * of small print under every page.
+ * The full disclosure about which parts are live and which are sample data is not here. It lives in
+ * the first and the "What does not hold" sections of /docs, where someone looking for it will
+ * actually be, rather than as a paragraph of small print under every page.
+ *
+ * THE ONE SENTENCE UNDER THE WORDMARK IS ON EVERY PAGE, SO IT MAY CLAIM ONLY WHAT IS TRUE
+ * EVERYWHERE. It used to promise that no party could choose the winner, which is wider than the
+ * truth: whoever produces the draw block may be able to grind the chain's value. It now names the
+ * network, says "randomized and checkable", and points at where the limits are written down.
  */
 
 const COLUMNS = [
@@ -99,7 +104,9 @@ const COLUMNS = [
   {
     heading: "Read",
     links: [
-      { label: "Learn", href: "/learn" },
+      // "How it works", the masthead's own word for /learn and the page's eyebrow. The footer
+      // used to say "Learn", so one route answered to two names a scroll apart.
+      { label: "How it works", href: "/learn" },
       { label: "Docs", href: "/docs" },
     ],
   },
@@ -175,7 +182,8 @@ export function SiteFooter() {
           */}
           <Wordmark className="-my-1 py-1" />
           <p className="mt-3.5 max-w-[38ch] text-sm text-fg-2">
-            On-chain raffles settled by a commit-reveal draw, so nobody picks the winner.
+            Commit-reveal raffles on Rialo testnet. The draw is randomized and checkable, and its
+            limits are written down in Docs.
           </p>
         </div>
 

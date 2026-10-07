@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start --port ${PORT:-3333}",
     "lint": "eslint",
-    "verify": "node scripts/verify-sha256.ts && node scripts/verify-raffle.ts"
+    "verify": "node scripts/verify-sha256.ts && node scripts/verify-raffle.ts && node scripts/verify-chain.ts"
   },
   "dependencies": {
     "@number-flow/react": "^0.6.2",

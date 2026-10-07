@@ -154,9 +154,10 @@ export function BackLink({ className = "" }: { className?: string }) {
       /*
         `relative` is for the pending mark below, which is out of flow and pinned to this chip's
         leading edge. Everything else here is the chip: a hairline box, the label face, and the
-        surface it takes under the pointer.
+        surface it takes under the pointer. The minimum height is the wallet chip's, one label line
+        plus padding and border, so the arrow-only form below 640 stays as tall as its neighbours.
       */
-      className={`label relative inline-flex items-center gap-1.5 border border-bound px-2 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-panel-2 ${className}`}
+      className={`label relative inline-flex min-h-[calc(1.4em+0.75rem+2px)] items-center gap-1.5 border border-bound px-2 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-panel-2 ${className}`}
     >
       {/*
         The way back is prerendered and prefetched like the way in, so this paints on a slow
@@ -166,7 +167,10 @@ export function BackLink({ className = "" }: { className?: string }) {
       */}
       <PendingMark />
       <ArrowLeft size={11} weight="bold" aria-hidden="true" />
-      Back
+      {/* The word leaves below 640 and the arrow stays, with the full name on aria-label. At 360 a
+          connected phone has no 40px to spare in the bar, and an arrow pointing left beside the
+          mark is the one icon in the chrome that needs no word. */}
+      <span className="hidden sm:inline">Back</span>
     </Link>
   );
 }

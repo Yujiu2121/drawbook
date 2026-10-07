@@ -3,7 +3,22 @@ import Link from "next/link";
 
 import { PHASE_WORD, Strip } from "./cell";
 import { COUNTDOWN_RESERVE, isLive, serialOf, utcShort } from "@/lib/cell";
+import { voidReturns } from "@/lib/mock-raffles";
 import { formatRLO, summarize, type Raffle } from "@/lib/raffle";
+
+/**
+ * The money figure the row prints, and what to call it.
+ *
+ * A void raffle has no pool: nothing was drawn. What it has is what it handed back, the creator's
+ * deposit plus every ticket and every bond, and that is the figure its own page leads with. The
+ * row used to print `summarize().pool` here, which on the void branch leaves the bonds out, so the
+ * board said 1.60 for raffle 0005 while its page said 1.65. Both now read `voidReturns`, and the
+ * row names the figure "returned" so it is not read as a pool under the column head.
+ */
+function rowMoney(raffle: Raffle): { amount: number; word: "pool" | "returned" } {
+  if (raffle.phase === "void") return { amount: voidReturns(raffle).total, word: "returned" };
+  return { amount: summarize(raffle).pool, word: "pool" };
+}
 
 /**
  * THE BOARD ROW.
@@ -123,10 +138,11 @@ export function rowContainerProps(raffle: Raffle, mini = false) {
  */
 export function rowLabel(raffle: Raffle): string {
   const s = summarize(raffle);
+  const money = rowMoney(raffle);
   return (
-    `Raffle ${serialOf(raffle)}, ${raffle.config.title}. ` +
+    `Sample raffle ${serialOf(raffle)}, ${raffle.config.title}. ` +
     `${PHASE_WORD[raffle.phase]}, ${s.sold} of ${raffle.config.supply} tickets sold, ` +
-    `pool ${formatRLO(s.pool)} RLO.`
+    `${money.word} ${formatRLO(money.amount)} RLO.`
   );
 }
 
@@ -140,6 +156,7 @@ export function rowLabel(raffle: Raffle): string {
 export function RaffleRowCells({ raffle, mini = false, countdown, strip }: RaffleRowProps) {
   const s = summarize(raffle);
   const live = isLive(raffle);
+  const money = rowMoney(raffle);
 
   return (
     <>
@@ -186,9 +203,23 @@ export function RaffleRowCells({ raffle, mini = false, countdown, strip }: Raffl
         {strip ?? <Strip raffle={raffle} scale={mini ? "mini" : undefined} />}
       </span>
 
+      {/*
+          THE PHONE LABELS. Under 760px app/cell.css hides the column header, because the row
+          restacks into four lines and there are no columns left to head. That left the two
+          figures bare: a "24:59:57" top right and an "11.20 RLO" with nothing saying which clock
+          or which money. Each now carries its own word, shown only at the narrow layout
+          (`min-[760px]:hidden`), so the wide layout keeps its single header and is unchanged.
+          A void row's figure is a return, not a pool, and says so at every width.
+      */}
       <span className="a-pool">
-        <span className="figure text-sm">{formatRLO(s.pool)}</span>{" "}
+        <span className="label text-fg-3 min-[760px]:hidden">
+          {money.word === "pool" ? "Pool " : "Returned "}
+        </span>
+        <span className="figure text-sm">{formatRLO(money.amount)}</span>{" "}
         <span className="label text-fg-3">RLO</span>
+        {money.word === "returned" ? (
+          <span className="label hidden text-fg-3 min-[760px]:block">returned</span>
+        ) : null}
       </span>
 
       {/* The reservation sits on the grid cell, and the cell carries the mono face, so the 8ch
@@ -196,6 +227,7 @@ export function RaffleRowCells({ raffle, mini = false, countdown, strip }: Raffl
           crosses to `HH:MM:SS` after about 27 hours of an open tab; without this the narrow
           layout's auto column would move the moment it does. */}
       <span className="a-count figure text-sm" style={COUNTDOWN_RESERVE}>
+        <span className="label text-fg-3 min-[760px]:hidden">{live ? "Closes in " : "Closed "}</span>
         {countdown ??
           (live ? null : (
             <span className="text-fg-3">{utcShort(raffle.config.revealDeadline)}</span>

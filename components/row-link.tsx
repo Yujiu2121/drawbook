@@ -57,7 +57,13 @@
  */
 
 import Link, { useLinkStatus } from "next/link";
-import { useLayoutEffect, ViewTransition, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  ViewTransition,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 
 import { remember } from "@/lib/nav-memory";
 
@@ -68,6 +74,13 @@ import { remember } from "@/lib/nav-memory";
  * the same reason `recall` is: one navigation may place the scroll once.
  */
 let divedFromRow = false;
+
+/**
+ * Which row the last dive left from, so focus can go back to it when the board mounts again.
+ * Single-shot like `divedFromRow`: the first board mount after the dive consumes it, whether or
+ * not it moves focus, so a much later visit to /raffles cannot be handed a stale target.
+ */
+let leftFrom: number | null = null;
 
 /**
  * Everything an anchor takes, minus the four props this component is the sole owner of. Omitting
@@ -95,9 +108,27 @@ export type RowLinkProps = Omit<
 };
 
 export function RowLink({ id, children, ...rest }: RowLinkProps) {
+  const ref = useRef<HTMLAnchorElement>(null);
+
+  /*
+    THE RETURN HALF OF KEYBOARD FOCUS. Going back to the board, the raffle page's Back link (or
+    whatever held focus there) is unmounted with the page, focus falls to the body, and the next
+    Tab used to start again from the masthead. The row the reader left from takes focus back
+    instead, without scrolling: components/back-link owns the scroll on the way out and has
+    already placed it. A focus that is somewhere real, such as a masthead link that survived the
+    navigation, is left where it is.
+  */
+  useLayoutEffect(() => {
+    if (leftFrom !== id) return;
+    leftFrom = null;
+    const active = document.activeElement;
+    if (active === null || active === document.body) ref.current?.focus({ preventScroll: true });
+  }, [id]);
+
   return (
     <Link
       {...rest}
+      ref={ref}
       href={`/raffle/${id}`}
       /*
         The app owns the scroll on both directions, so the router is told to keep its hands off it
@@ -123,6 +154,7 @@ export function RowLink({ id, children, ...rest }: RowLinkProps) {
       */
       onNavigate={() => {
         divedFromRow = true;
+        leftFrom = id;
         remember(id, window.scrollY);
       }}
     >
@@ -260,7 +292,7 @@ export function NamedStrip({ id, children }: { id: number; children: ReactNode }
  * animation and the navigation is a cut, the raffle page still opens at the top: measured at
  * scrollY 0 in both.
  */
-export function ArrivalScroll() {
+export function ArrivalScroll({ focusId }: { focusId?: string }) {
   useLayoutEffect(() => {
     if (!divedFromRow) return;
     divedFromRow = false;
@@ -268,7 +300,23 @@ export function ArrivalScroll() {
     // `behavior: "instant"` rather than a bare scrollTo, so a `scroll-behavior: smooth` inherited
     // from the page cannot turn the placement into a visible glide happening underneath the morph.
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, []);
+
+    /*
+      FOCUS, ON THE SAME TERMS AS THE SCROLL: only after a row click, never on a cold load. The row
+      that held focus was unmounted with the board, so focus fell to the body and Chrome resumed
+      sequential navigation from where the row used to be, which on a raffle page is the footer:
+      the next Tab skipped the Back link and every control on the page. Landing it on the page's
+      heading (which carries tabIndex -1 for this) puts the next Tab on the first control after
+      it. `preventScroll`, because the placement above is the one scroll this navigation gets.
+      Only when focus really was dropped: a focus that something else placed is left alone.
+    */
+    if (focusId) {
+      const active = document.activeElement;
+      if (active === null || active === document.body) {
+        document.getElementById(focusId)?.focus({ preventScroll: true });
+      }
+    }
+  }, [focusId]);
 
   return null;
 }
