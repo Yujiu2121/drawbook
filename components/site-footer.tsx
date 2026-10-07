@@ -109,6 +109,10 @@ const COLUMNS = [
       // used to say "Learn", so one route answered to two names a scroll apart.
       { label: "How it works", href: "/learn" },
       { label: "Docs", href: "/docs" },
+      // Drawbook's own source, public since 2026-10-07: the program, its spec and its tests are
+      // what make "checkable" more than a word, so the claim links to the evidence. A third row
+      // here does not grow the footer, because the Rialo column is already taller.
+      { label: "Source on GitHub", href: "https://github.com/Yujiu2121/drawbook", external: true },
     ],
   },
   {
@@ -125,7 +129,8 @@ const COLUMNS = [
       by everyone as "follow us". Sitting these under the column already headed Rialo makes the
       ownership obvious without a disclaimer, which is why they are here rather than in a bottom bar.
 
-      GitHub is deliberately absent. Rialo's own homepage links github.com/rialo, which belongs to an
+      Rialo's GitHub is deliberately absent (Drawbook's own repository is under Read). Rialo's own
+      homepage links github.com/rialo, which belongs to an
       unrelated account registered in 2015 whose only repository is a tutorial last touched in 2016.
       The real one, SubzeroLabs/rialo, is private. Verified 2026-08-12; worth re-checking rather than
       assuming it stays wrong.
