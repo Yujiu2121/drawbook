@@ -33,9 +33,11 @@ export const metadata = {
  * more than it could ever gain". All three were wider than the truth: the bond is a small fixed
  * amount (under 1% of the pool in every sample), and a void raffle forfeits nothing at all.
  *
- * THE DRAW IS PRESSED, NOT AUTOMATIC. Anyone can send Draw once it is ready; the Subscriber trigger
- * that would send it by itself is designed and not wired, and this page must not describe it in the
- * present tense.
+ * THE DRAW IS SENT BY RIALO, AND ANYONE CAN STILL PRESS IT. Since the Subscriber schedule was added,
+ * Create asks Rialo to send Draw five seconds after the reveal deadline, and it fired on testnet on
+ * 2026-10-08 with nobody pressing anything. That is said in the present tense, as what happens, and
+ * never as a guarantee: the page also says that a person can draw sooner, that raffles deployed
+ * before the schedule have none, and that the button comes back if Rialo's draw does not arrive.
  *
  * Apostrophes are the character itself, not `&rsquo;`, for the reason given at the head of
  * app/docs/page.tsx: an entity in a text run right after an element's closing tag drops a space.
@@ -45,7 +47,8 @@ export const metadata = {
  *
  * THE BOUNDS AND THE TESTNET FACTS ARE program/SPEC.md's, in words: a sale of at most 31 days, a
  * reveal window of one minute to seven days, a Draw that runs alone and a block after the last
- * reveal, a program its deployer can still upgrade, and a rent reserve each raffle account keeps.
+ * reveal, a program nobody can upgrade any more, and a rent reserve each raffle account keeps. Why
+ * nobody can upgrade it is told in /docs and the README, not here.
  *
  * QUIET BY DESIGN, like /docs. A reading room, lit flat: no ticket, no drum, no signal hue and no
  * motion. The single bright thing is the reversed-print control at the end, because in this room
@@ -124,15 +127,29 @@ export default function LearnPage() {
 
           <H2 id="draw">The draw</H2>
           <P>
-            Once every sold ticket is revealed, or the reveal window has closed, the raffle is ready.
-            Anyone can then press Draw: the person who made the raffle, a ticket holder or a passer-by.
-            It does not happen by itself yet. The program combines every revealed secret with a number
-            the chain gives it at that moment, and that decides the winning tickets.
+            The draw happens by itself. When a raffle is deployed, the same transaction asks
+            Rialo’s Subscriber program to send the draw five seconds after the reveal window
+            closes, and Rialo does, in the creator’s name, with nobody pressing anything. The
+            creator pays for that: a deposit of about 0.0028 RLO, which they take back on the raffle
+            page after the draw, and a fee of 0.000005 RLO when Rialo sends it.
+          </P>
+          <P>
+            It can also happen sooner. Once every sold ticket is revealed the raffle is ready, and
+            anyone can press Draw: the person who made the raffle, a ticket holder or a passer-by.
+            Either way, the program combines every revealed secret with a number the chain gives it
+            at that moment, and that decides the winning tickets.
+          </P>
+          <P>
+            Raffles deployed before Drawbook began scheduling the draw have no schedule, and their
+            draw is a button anyone can press once the reveal window closes. The button also comes
+            back on any raffle whose scheduled draw does not arrive, because Rialo does not send it
+            twice.
           </P>
           <P>
             Draw has to travel alone, in a transaction with nothing else in it, and it is refused in
             the same block as the latest reveal; one block later it goes through. Both rules stop the
-            person pressing it from seeing the result first and backing out until they like it.
+            person pressing it from seeing the result first and backing out until they like it. The
+            draw Rialo sends is that same Draw, alone, so the same rules hold for it.
           </P>
           <P>
             Winners collect with Claim, which can only pay the address on the winning ticket. Because
@@ -163,10 +180,10 @@ export default function LearnPage() {
             details are in <TextLink href="/docs#limits">Docs</TextLink>.
           </P>
           <P>
-            Two more things are true while this runs on testnet. The program can still be upgraded by
-            the key that deployed it, so it is not fixed code yet. And each raffle account keeps its
-            rent reserve after every claim is paid, about 0.0035 RLO for a raffle of 2 tickets and
-            more for a bigger one; that reserve is not part of any prize or refund.
+            Two more things are true. The program can no longer be upgraded by anyone, so the code
+            described here is the code that runs. And each raffle account keeps its rent reserve
+            after every claim is paid, about 0.0035 RLO for a raffle of 2 tickets and more for a
+            bigger one; that reserve is not part of any prize or refund.
           </P>
 
           <H2 id="samples">Live raffles and samples</H2>
@@ -199,7 +216,10 @@ export default function LearnPage() {
               before the purchase is sent.
             </LI>
             <LI>After the sale closes, reveal from the same browser. Your bond comes back at once.</LI>
-            <LI>When the raffle is ready, anyone can press Draw. If you won, Claim pays you.</LI>
+            <LI>
+              Five seconds after reveals close, Rialo sends the draw by itself; once every ticket is
+              revealed, anyone can press Draw sooner. If you won, Claim pays you.
+            </LI>
           </UL>
 
           {/*

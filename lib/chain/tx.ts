@@ -75,6 +75,13 @@ export class ChainError extends Error {
   outcome: Outcome;
   /** On a Create whose outcome is not known, the raffle account it would have made. */
   raffle: string | null;
+  /**
+   * Which instruction of the transaction failed, 0-based, when the node named one
+   * ({"InstructionError":[2,…]}), and null otherwise. A transaction is atomic, so this says why the
+   * whole of it did not land, not that the instructions before it did. Create reads it to tell a
+   * refused schedule (index 2) from a refused raffle.
+   */
+  instruction: number | null;
 
   constructor(
     message: string,
@@ -82,6 +89,7 @@ export class ChainError extends Error {
     logs: string[] = [],
     signature: string | null = null,
     outcome: Outcome = signature === null ? "not-sent" : "failed",
+    instruction: number | null = null,
   ) {
     super(message);
     this.name = "ChainError";
@@ -90,6 +98,7 @@ export class ChainError extends Error {
     this.signature = signature;
     this.outcome = outcome;
     this.raffle = null;
+    this.instruction = instruction;
   }
 }
 
@@ -274,6 +283,18 @@ export function customErrorCode(
   return null;
 }
 
+/**
+ * The 0-based index of the instruction a failed transaction names, or null when the failure is not
+ * an instruction's (a fee payer short of the fee, a stale timestamp). Reads the status object
+ * {"InstructionError":[2,{"Custom":1}]} and the Debug text InstructionError(2, Custom(1)) alike.
+ */
+export function failedInstruction(err: unknown): number | null {
+  const text = errorText(err);
+  if (!text) return null;
+  const m = /InstructionError\W*(\d+)/.exec(text);
+  return m ? Number(m[1]) : null;
+}
+
 /** A status error as one line of text, whichever of the node's two shapes it arrived in. */
 export function errorText(err: unknown): string | null {
   if (err === null || err === undefined) return null;
@@ -379,7 +400,7 @@ export async function sendAndConfirm(
       if (attempt === 0 && /InvalidConfigHashPrefix/.test(text)) continue;
       if (/AlreadyProcessed/.test(text)) break; // Already on chain: confirm it like any other.
       const code = customErrorCode(text, logsIn(text), args.instructions, options.errorProgram);
-      throw new ChainError(explain(code, refusalText(text)), code, [], signature, "refused");
+      throw new ChainError(explain(code, refusalText(text)), code, [], signature, "refused", failedInstruction(text));
     }
   }
 
@@ -403,7 +424,14 @@ export async function sendAndConfirm(
       if (!status.err) return signature;
       const logs = await fetchLogs(client, signature);
       const code = customErrorCode(status.err, logs, args.instructions, options.errorProgram);
-      throw new ChainError(explain(code, failureText(status.err, logs)), code, logs, signature, "failed");
+      throw new ChainError(
+        explain(code, failureText(status.err, logs)),
+        code,
+        logs,
+        signature,
+        "failed",
+        failedInstruction(status.err),
+      );
     }
     if (answered) lastNotFound = Date.now();
 
@@ -414,7 +442,14 @@ export async function sendAndConfirm(
         if (landed.meta.err === null || landed.meta.err === undefined) return signature;
         const logs = Array.isArray(landed.meta.logMessages) ? landed.meta.logMessages : [];
         const code = customErrorCode(landed.meta.err, logs, args.instructions, options.errorProgram);
-        throw new ChainError(explain(code, failureText(landed.meta.err, logs)), code, logs, signature, "failed");
+        throw new ChainError(
+          explain(code, failureText(landed.meta.err, logs)),
+          code,
+          logs,
+          signature,
+          "failed",
+          failedInstruction(landed.meta.err),
+        );
       }
       // The node answered "not executed" after the window closed: it never can be now.
       if (lastNotFound > expiresAt) {

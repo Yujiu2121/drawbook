@@ -89,8 +89,11 @@ const siteUrl = previewHost
  * sentence a search result and every link unfurl carry for every route that does not set its own.
  * It used to open "On-chain raffles", written before any program existed (K5, OFF-13, CHROME-K5).
  * What it may say now: the raffle program runs on Rialo testnet and the actions are real testnet
- * transactions. What it may not: "provably fair", "trustless", "nobody can rig", or an automatic
- * draw. "Randomized and checkable" is the claim the draw supports, and it is the one made.
+ * transactions. What it may not: "provably fair", "trustless", "nobody can rig", or a guaranteed
+ * draw. Since Rialo's Subscriber sent a scheduled Draw on testnet (2026-10-08), "Rialo sends the draw
+ * by itself" is true and may be said elsewhere; a guarantee may not, because the Subscriber is closed
+ * source and the button stays for when it does not arrive. "Randomized and checkable" is the claim
+ * the draw supports, and it is the one made.
  */
 const description =
   "A commit-reveal raffle program on Rialo testnet. Deploy a raffle, buy, reveal, draw and claim with real testnet transactions, then recompute the draw yourself. Randomized and checkable.";

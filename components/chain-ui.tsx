@@ -216,6 +216,18 @@ export function stampMs(ms: number): string {
   return iso === null ? "far in the future" : utcStamp(iso);
 }
 
+/**
+ * A chain timestamp to the second: `08 Oct 2026 14:05:08 UTC`. For the scheduled draw, which falls
+ * five seconds after a deadline, so a minute stamp would print the deadline and the draw as the same
+ * instant. Total, like stampMs.
+ */
+export function stampSecondsMs(ms: number): string {
+  if (isoOf(ms) === null) return "far in the future";
+  const d = new Date(ms);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${stampMs(ms).replace(/ UTC$/, "")}:${two(d.getUTCSeconds())} UTC`;
+}
+
 /** The same instant for a dense column (`30 Jul 09:00`). Total, like stampMs. */
 export function shortMs(ms: number): string {
   const iso = isoOf(ms);

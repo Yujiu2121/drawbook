@@ -87,6 +87,25 @@ export interface SignatureInfo {
   err?: unknown;
 }
 
+/**
+ * `getSubscription`'s `subscription` field. Keys are base58, instruction data a list of byte values;
+ * the commit window is not included. Shape read from testnet on 2026-10-08. The time window arrives
+ * as JSON numbers, so an end of u64::MAX comes back rounded; read the account's bytes
+ * (lib/chain/subscriber.ts) for anything that must be exact.
+ */
+export interface WireSubscription {
+  kind: "Persistent" | "OneShot";
+  topic: string;
+  subscriber: string;
+  event_account: string | null;
+  timestamp_range: [number, number] | null;
+  instructions: {
+    program_id: string;
+    accounts: { pubkey: string; is_signer: boolean; is_writable: boolean }[];
+    data: number[];
+  }[];
+}
+
 /** The parts of `getTransaction` the raffle library reads. Everything else is passed through. */
 export interface RawTransaction {
   block_height?: number;
@@ -400,6 +419,43 @@ export class RialoClient {
   async getTransaction(signature: string): Promise<RawTransaction | null> {
     const res = await call<RawTransaction | null>(this.endpoint, "getTransaction", [{ signature }]);
     return res ?? null;
+  }
+
+  /**
+   * A subscription as the Subscriber's matcher holds it, or null when the node answers -32001
+   * "Subscription not found". Struct params only; positional ones are refused. `nonce` is the string
+   * the subscription was named with: the node turns it into raw UTF-8 bytes, zero padded to 32 (not
+   * hex). Not found also covers a OneShot that has fired or a subscription whose commit window has
+   * passed, even while its account still exists, so this is the matcher's view, not the account's.
+   */
+  async getSubscription(subscriber: string, nonce: string): Promise<WireSubscription | null> {
+    try {
+      const res = await call<{ subscription: WireSubscription }>(this.endpoint, "getSubscription", [
+        { subscriber, nonce },
+      ]);
+      return res?.subscription ?? null;
+    } catch (error) {
+      if (error instanceof RialoRpcError && error.code === -32001) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * The transactions the Subscriber sent from one subscription, newest first, keyed by the
+   * subscription ACCOUNT, not the subscriber. Positional params, with the limit as a string: a number
+   * there is refused with a misleading "Subscription pubkey is not a string" (testnet, 2026-10-08).
+   * The list outlives the account: it still answered after the account was destroyed (local, 2026-10-08).
+   */
+  async getTriggeredTransactions(
+    subscription: string,
+    limit = 10,
+  ): Promise<{ signature: string; blockNumber: number }[]> {
+    const res = await call<{ transactions?: { signature: string; blockNumber: number }[] }>(
+      this.endpoint,
+      "getTriggeredTransactions",
+      [subscription, String(limit)],
+    );
+    return Array.isArray(res?.transactions) ? res.transactions : [];
   }
 
   /** Rent-exempt minimum in kelvin. Measured as `(len + 128) * 6960` on testnet. */

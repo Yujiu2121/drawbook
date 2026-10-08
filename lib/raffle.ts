@@ -327,8 +327,8 @@ export function reveal(raffle: Raffle, ticketIndex: number, nonce: string): Raff
 }
 
 /**
- * Fire the draw. On Rialo this is the body of a reactive transaction whose predicate is the
- * absolute reveal deadline, so no bot triggers it.
+ * Fire the draw. On Rialo the program's Draw does this, sent by Rialo's Subscriber five seconds
+ * after the absolute reveal deadline (no bot triggers it), or sooner by anyone once it is ready.
  *
  * `chainSeed` is injected rather than generated so the draw is reproducible in tests and so the
  * caller decides where it comes from: `get_random_seed()` on chain, the CSPRNG in the browser.

@@ -14,9 +14,9 @@ Live at **https://drawbook-rialo.vercel.app**
 | The raffle program | **deployed on Rialo testnet**, program id `74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6` |
 | Deploy, buy, reveal, draw, claim | **real signed transactions** from a burner wallet held in the browser |
 | The draw check on a live raffle | **recomputed from chain data**; it can fail |
-| The draw trigger | **pressed, not automatic**: anyone can send Draw once it is ready; a Subscriber trigger is designed, not wired |
+| The draw trigger | **sent by Rialo**: Create schedules Draw with Rialo's Subscriber program, and Rialo sends it by itself 5 s after the reveal deadline (seen on testnet, below); anyone can also send Draw once every ticket is revealed. Raffles created before the schedule have none and are drawn by pressing Draw |
 | Raffles 1 to 5 (`/raffle/1`..`/raffle/5`) | fixed sample data, not on chain, clock starting 30 Jul 2026 |
-| Upgrades | the program is **upgradeable by its deployer** (`GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor`) during the testnet period |
+| Upgrades | the program **can no longer be upgraded by anyone**: the key of its upgrade authority (`GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor`) was lost during development on 2026-10-08, overwritten on the machine that deployed it, and no copy has been found |
 | Rent | each raffle account **keeps its rent reserve** after every claim, about 0.0035 RLO for 2 tickets; no instruction closes it |
 
 Testnet only. The coins have no value and testnet can be reset. Live raffles open at
@@ -62,6 +62,46 @@ fail the transaction to retry. It also refuses to run in the same block as the l
 The sample raffles predate the program and use the v1 text formulas (`rialo-raffle-v1|...`);
 their exact encoding is in the "sample raffles" section of `/docs`.
 
+## The scheduled draw
+
+Nobody has to press Draw. `Create` goes out as three instructions in one transaction: System
+`CreateAccount`, the raffle's `Create`, and a `Subscribe` to Rialo's Subscriber program
+(`Subscriber111111111111111111111111111111111`), signed by the creator. It registers a OneShot
+subscription on the `clock` topic whose window opens at `reveal_deadline + 5000` ms and whose one
+action is this raffle's Draw, exactly as a person would send it. When the window opens, Rialo sends
+that Draw in the creator's name. The program did not change: the triggered transaction is a
+solitary Draw, so errors 17 and 18 apply to it as they do to anyone.
+
+- **No Destroy in the action.** The crate's `subscribe_to` appends a Subscriber `Destroy` to every
+  OneShot; the triggered transaction would then hold two instructions and Draw would refuse it with
+  17. So the 310-byte `Subscribe` is encoded by hand in `lib/chain/subscriber.ts`, and
+  `scripts/verify-chain.ts` checks it against bytes from the official crate and from a transaction
+  the Rialo CLI sent. The layout is in [`program/SPEC.md`](program/SPEC.md#scheduled-draw-rialos-subscriber-program).
+- **Why 5 seconds.** A triggered transaction reads a clock slightly behind the block that matched
+  it, and a OneShot that arrives too early is refused as `NotReady` and never sent again.
+- **Cost to the creator.** A deposit of 2,797,920 kelvin (about 0.0028 RLO), the rent of the
+  274-byte subscription account, returned when the creator reclaims it on the raffle page after the
+  draw (Destroy and Unsubscribe, one transaction, 5,000 kelvin fee); plus 5,000 kelvin when Rialo
+  sends Draw, whether it succeeds or not.
+- **When it does not fire.** A OneShot is not retried. If the raffle was drawn by hand first, Rialo's
+  Draw is refused with 14 and changes nothing. If it has not arrived 30 s after its time, the raffle
+  page brings the Draw button back. If Rialo refuses the `Subscribe`, the browser creates the raffle
+  without it and says so. Raffles created before the schedule have no subscription at all.
+- **Not yet observed:** a subscription that waits weeks across node restarts or upgrades, and a
+  creator who cannot pay the firing fee. The Draw button covers both.
+
+**Seen on testnet on 2026-10-08.** Raffle `AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w` (2 tickets,
+one-minute reveal window) was drawn by Rialo 5,123 ms after its reveal deadline, with nobody
+pressing Draw: transaction
+`3uHik9GzcRC844SV78DrQg1GJ8GP4sEbQkLFEshQWzoJS7cZwJNymgcN1ThRLNVZN4RZ55NxwFovSptDQsY3v3qH`, one
+instruction, the creator its only signer and fee payer, 4,411 compute units. `auditDraw` recomputed
+the same winner, and `getTriggeredTransactions` on the subscription account lists exactly that one
+transaction. The Subscriber program is closed source, so this is behaviour observed on node build
+`ed0c9639e542`, not documented; rerun the check below when `getVersion` changes.
+
+Settling the moment the last holder reveals cannot be scheduled: a predicate matches a clock or an
+event topic, and the program emits no event.
+
 **What this does not promise.** `chain_seed` is read after every nonce is public, so whoever
 produces the draw block may be able to influence it and keep a value that suits them, without
 holding a ticket. A holder can also withhold a reveal, which changes the seed, at the cost of their
@@ -81,14 +121,14 @@ The port is 3333, not 3000, set in `package.json` as `${PORT:-3333}`. The RPC en
 ## Verification
 
 ```bash
-pnpm verify    # offline: three suites, 233 checks
+pnpm verify    # offline: three suites, 319 checks
 ```
 
 | Suite | Checks | What it asserts |
 |---|---:|---|
 | `scripts/verify-sha256.ts` | 20 | SHA-256 against FIPS 180-4 vectors, plus 400 random cross-checks against `node:crypto` |
 | `scripts/verify-raffle.ts` | 75 | the draw in `lib/raffle.ts`: determinism, distinct winners, independence from reveal order, the winner cap, payout conservation, a tamper-rejecting audit, chi-square uniformity, the sample data |
-| `scripts/verify-chain.ts` | 138 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals |
+| `scripts/verify-chain.ts` | 224 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals, and the schedule (the `Subscribe` bytes against the official crate and a CLI transaction, the exact-form check, the states the raffle page shows, the fallback when Rialo refuses it) |
 
 Count the `PASS` lines rather than trusting this table. The chi-square statistic is computed from
 fresh random seeds on every run, so it changes each time; the test passes while it stays under the
@@ -105,6 +145,18 @@ node scripts/smoke-chain.ts http://127.0.0.1:4101                # the same thro
 Both network scripts fund their wallets from the network's own faucet and refuse any endpoint that
 is not on this machine. Never point a test at the testnet faucet: it gives at most 1 RLO per call
 and rate limits per IP.
+
+The scheduled draw has its own end-to-end check, which waits for Rialo instead of pressing Draw:
+
+```bash
+node scripts/auto-draw-check.ts <rpc url> <payer keypair.json> [--fund-from-local-faucet] [--edge-cases]
+```
+
+It pays from the keypair file (64-byte array) and asks a faucet only with
+`--fund-from-local-faucet`, which it refuses for any endpoint not on this machine. `--edge-cases`
+adds a raffle drawn by hand before its schedule, one reclaimed before it is due, and one whose
+schedule Rialo refuses. The testnet run on 2026-10-08 used an adapted copy that reads the browser's
+key form and waits longer; it passed all 39 checks.
 
 `node scripts/verify-wallet.ts` is deliberately outside `pnpm verify`: it talks to live testnet.
 
@@ -126,7 +178,9 @@ rialo -u <rpc url> -a <deployer> client program deploy \
 - Pass the RPC URL with `-u https://testnet.rialo.io:4101`. The `-n testnet` preset points at a host
   that does not resolve.
 - The program id is the program keypair's address, so the same keypair gives the same id on a local
-  network and on testnet, and the browser hardcodes it once. Redeploying with it upgrades in place.
+  network and on testnet, and the browser hardcodes it once. On testnet it no longer upgrades in
+  place: the upgrade authority's key is gone, so the deployed program is fixed, and a changed
+  program would need a new program id.
 - Keep the program keypair, and every other keypair, out of the repo. `program/.gitignore` ignores
   `*.keypair`, `target/` and `artifacts/` as a backstop, not as permission.
 
@@ -153,7 +207,7 @@ components/       Sweep / Cell primitives, board, wallet chip, live raffle views
 lib/
   raffle.ts       the draw, pure; the executable spec the program reproduces
   chain/          the program as the browser sees it: layout, v2 hashes, instructions,
-                  transactions, nonce storage
+                  transactions, nonce storage, and the Subscriber schedule
   sha256.ts       synchronous SHA-256
   base58.ts       addresses
   rialo-rpc.ts    testnet client, param shapes established by probing the node
@@ -181,9 +235,12 @@ disagrees with itself in places.
 - The Wallet Standard namespace is `rialo:*`, so Solana wallets are not discovered.
 - Predicates hold a topic, an optional event account and an optional timestamp range. No value
   comparison, and no interval or calendar scheduling.
+- A clock subscription's timestamp range is in milliseconds, start inclusive, end exclusive. The
+  Subscriber's `subscribe_to` helper quietly appends a `Destroy` to every OneShot, and
+  `getSubscription` takes the nonce as a raw UTF-8 string, not hex.
 
 ## Still to do
 
-- Send Draw automatically: one Subscriber one-shot subscription at the reveal deadline whose action
-  is Draw. Settling early when the last holder reveals would also need the program to emit an event
-  topic, which it does not today.
+- Settle the moment the last holder reveals without anyone pressing Draw. Rialo can match a clock or
+  an event topic, and the program emits no event; since this program can no longer be upgraded, that would
+  mean a new program id.

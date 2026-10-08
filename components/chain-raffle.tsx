@@ -23,6 +23,7 @@ import {
   ladder,
   secondsLeft,
   stampMs,
+  stampSecondsMs,
   storageKeeps,
   useNow,
   useWallet,
@@ -31,13 +32,19 @@ import {
 import { isAddress } from "@/lib/base58";
 import { sheetVars } from "@/lib/cell";
 import {
+  ChainError,
   buyTicket,
   canReveal,
   claimAll,
   drawRaffle,
   fetchRaffle,
+  fetchSchedule,
   raffleActivity,
+  reclaimSchedule,
   revealTicket,
+  scheduleState,
+  type ScheduleRead,
+  type ScheduleState,
 } from "@/lib/chain/actions";
 import { loadNonces } from "@/lib/chain/nonces";
 import {
@@ -49,6 +56,7 @@ import {
   type ChainRaffle,
   type ChainTicket,
 } from "@/lib/chain/program";
+import { DUE_WINDOW_MS, drawAt } from "@/lib/chain/subscriber";
 import { shortAddress } from "@/lib/raffle";
 import { connect, refreshBalance } from "@/lib/wallet-store";
 
@@ -66,6 +74,17 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * executed, and shows that transaction's signature. A refusal from the program is decoded into the
  * plain-English sentence for its error code and printed in reversed print, never in a colour: the
  * signal hue in this product means a winner, and the system has no error colour on purpose.
+ *
+ * THE AUTOMATIC DRAW IS SCHEDULED, NOT PROMISED. A raffle made since the schedule shipped asks
+ * Rialo's Subscriber program, in its Create transaction, to send Draw five seconds after reveals close
+ * (lib/chain/subscriber.ts). The page reads that subscription account back, decodes it, and calls it
+ * scheduled only when it is exactly that Draw on this raffle and the node does not say it has let it
+ * go (getSubscription); it shows what Rialo sent once it fired,
+ * with the signature. The Draw button stays: it is hidden only in the half minute when Rialo's draw
+ * is due, and comes back if it does not arrive, if it was refused, or if there is no schedule. A
+ * person drawing first is fine: the later trigger is refused as already settled and changes nothing.
+ * It fired on testnet on 2026-10-08 with nobody pressing anything, which is why the copy may say
+ * Rialo sends it "by itself"; raffles made before the schedule have none, and the page says so.
  *
  * THE AUDIT IS A REAL CHECK. "Recompute in this tab" runs auditDraw from lib/chain/program over the
  * account's own bytes: the revealed nonces, the chain value the program read at the draw, and the
@@ -93,16 +112,22 @@ function startedAt(): number {
   return Date.now();
 }
 
+/** The wall clock inside a read, named for the same reason as `startedAt`: no render calls it. */
+function wallClock(): number {
+  return Date.now();
+}
+
 /**
- * A reveal run that revealed some tickets and not others. Each ticket is revealed on its own, so
- * one that cannot be revealed never blocks the rest; this carries the per-ticket account.
+ * A failure that brings its own heading. A reveal run that revealed some tickets and not others
+ * uses it (each ticket is revealed on its own, so one that cannot be revealed never blocks the
+ * rest), and so does a Draw that found the raffle already settled, which is not a fault to shout.
  */
-class PartialReveal extends Error {
+class TitledError extends Error {
   title: string;
 
   constructor(title: string, message: string) {
     super(message);
-    this.name = "PartialReveal";
+    this.name = "TitledError";
     this.title = title;
   }
 }
@@ -172,8 +197,12 @@ function winningsOf(r: ChainRaffle, t: ChainTicket): bigint {
   return r.perWinner + (t.winRank === 1 ? remainder : ZERO);
 }
 
-/** The lead paragraph: what is happening here, in the tense the raffle is actually in. */
-function leadOf(r: ChainRaffle, phase: ChainPhase): string {
+/**
+ * The lead paragraph: what is happening here, in the tense the raffle is actually in. `rialoSends`
+ * is true while reveals are closed and Rialo's scheduled Draw is on its way, when the page offers no
+ * button and so must not say "anyone can press Draw".
+ */
+function leadOf(r: ChainRaffle, phase: ChainPhase, rialoSends = false): string {
   const open = r.supply - r.sold;
   switch (phase) {
     case "selling":
@@ -181,11 +210,20 @@ function leadOf(r: ChainRaffle, phase: ChainPhase): string {
     case "revealing":
       return `The sale has closed with ${r.sold} of ${r.supply} sold, and ${r.revealed} of ${r.sold} holders have revealed. A holder who is still silent at the deadline forfeits a ${formatKelvin(r.revealBond)} RLO bond into the pool, and their secret never enters the seed.`;
     case "ready":
+      if (rialoSends && r.sold === 0) {
+        return "The sale closed with no tickets sold. Rialo's Subscriber program is set to send Draw now, which settles the raffle as void; the creator can then claim the prize back.";
+      }
+      if (rialoSends && r.revealed === 0) {
+        return "Reveals have closed with nothing revealed, so there is no secret to draw from. Rialo's Subscriber program is set to send Draw now, which settles the raffle as void; every ticket, every bond and the prize can then be claimed back.";
+      }
       if (r.sold === 0) {
         return "The sale closed with no tickets sold. Pressing Draw settles the raffle as void, and the creator can then claim the prize back.";
       }
       if (r.revealed === 0) {
         return "Reveals have closed and nobody revealed, so there is no secret to draw from. Pressing Draw settles the raffle as void, and every ticket, every bond and the prize can then be claimed back.";
+      }
+      if (rialoSends) {
+        return `Reveals have closed and ${r.revealed} secrets are public. Rialo's Subscriber program is set to send Draw now, with nobody pressing anything: the program reads the chain's random value, hashes it with those secrets, and records the winners.`;
       }
       return `${r.revealed === r.sold ? "Every sold ticket has been revealed, so the draw does not have to wait for the deadline." : "Reveals have closed."} ${r.revealed} secrets are public. Anyone can press Draw: the program reads the chain's random value, hashes it with those secrets, and records the winners.`;
     case "drawn":
@@ -193,6 +231,52 @@ function leadOf(r: ChainRaffle, phase: ChainPhase): string {
     case "void":
       return "Void. Nobody revealed before the deadline, so there was no secret to draw from and nothing honest to pick a winner with. Every ticket and bond goes back to its holder and the prize to the creator, each through Claim.";
   }
+}
+
+/* ------------------------------------------------------------ the schedule */
+
+/**
+ * The "Automatic draw" fact, in a few words. The facts column is narrow, so the sentence that
+ * explains each state lives in the action panel; this is the state itself. A raffle someone settled
+ * by hand before Rialo's draw was due is said calmly: the later Draw is turned away and changes
+ * nothing, which is the design working, not a fault.
+ */
+function scheduleWord(s: ScheduleState | null, r: ChainRaffle, settled: boolean): string {
+  if (s === null) return "reading";
+  if (settled && (s.kind === "scheduled" || s.kind === "due" || s.kind === "late" || s.kind === "dropped")) {
+    // "Before it was due" only when the chain says so: a raffle drawn by hand after Rialo's Draw
+    // failed to arrive was not settled early, and one settled at the due time may be Rialo's own
+    // Draw that the node has not listed yet.
+    return r.drawnAt < s.at ? "Not needed, settled before it was due" : "Settled; no Draw from Rialo seen";
+  }
+  if (s.kind === "sent" && !s.firing.ok && s.firing.code === 14) {
+    return "Sent by Rialo after the raffle was settled; changed nothing";
+  }
+  switch (s.kind) {
+    case "none":
+      return "Not scheduled";
+    case "withdrawn":
+      return "Withdrawn by the creator";
+    case "unrecognised":
+      return "Not a plain Draw, not counted";
+    case "scheduled":
+      return `${stampSecondsMs(s.at)}, via Rialo's Subscriber`;
+    case "due":
+      return `Due ${stampSecondsMs(s.at)}, via Rialo's Subscriber`;
+    case "late":
+      return `Was due ${stampSecondsMs(s.at)}, not arrived`;
+    case "dropped":
+      return "Rialo reports it no longer holds it";
+    case "sent":
+      return s.firing.ok
+        ? `Sent by Rialo${s.firing.at !== null ? `, ${stampSecondsMs(s.firing.at)}` : ""}`
+        : `Sent by Rialo, refused${s.firing.code !== null ? ` (error ${s.firing.code})` : ""}`;
+  }
+}
+
+/** True while Rialo's Draw is on its way and the page should wait for it rather than offer a button. */
+function rialoSending(s: ScheduleState | null, r: ChainRaffle, now: number): boolean {
+  return s !== null && (s.kind === "scheduled" || s.kind === "due") && now >= r.revealDeadline;
 }
 
 /* --------------------------------------------------------------- small pieces */
@@ -326,7 +410,7 @@ function ChainSheet({
 
 /* ---------------------------------------------------------------- the actions */
 
-type ActionKind = "buy" | "reveal" | "draw" | "claim";
+type ActionKind = "buy" | "reveal" | "draw" | "claim" | "reclaim";
 
 /**
  * Where the one action in flight is. One at a time, on purpose: every action here spends from the
@@ -410,6 +494,7 @@ export function ChainRaffleView({ address }: { address: string }) {
   const [activity, setActivity] = useState<{ signature: string; at: number | null }[] | null>(null);
   const [run, setRun] = useState<Run>({ kind: "idle" });
   const [audit, setAudit] = useState<ReturnType<typeof auditDraw> | "pending" | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleRead | null>(null);
   const reading = useRef(false);
   /*
     Set for the whole life of an action, synchronously, so a second press that arrives before React
@@ -432,8 +517,9 @@ export function ChainRaffleView({ address }: { address: string }) {
     async (withActivity: boolean) => {
       if (reading.current) return;
       reading.current = true;
+      let r: ChainRaffle | null = null;
       try {
-        const r = await fetchRaffle(address);
+        r = await fetchRaffle(address);
         setRaffle(r);
         setLoad(r ? { kind: "ready" } : { kind: "missing" });
         setStale(null);
@@ -443,6 +529,20 @@ export function ChainRaffleView({ address }: { address: string }) {
         setLoad((prev) => (prev.kind === "loading" ? { kind: "error", message } : prev));
       } finally {
         reading.current = false;
+      }
+      /*
+        The schedule with the transaction list, and on every read from the reveal deadline until
+        Rialo's draw is past due, because that is the half minute in which it lands and the page is
+        waiting on it instead of offering a button.
+      */
+      const clock = wallClock();
+      const hot = r !== null && clock >= r.revealDeadline - POLL_MS && clock < drawAt(r.revealDeadline) + DUE_WINDOW_MS + POLL_MS;
+      if (r !== null && (withActivity || hot)) {
+        try {
+          setSchedule(await fetchSchedule(r));
+        } catch {
+          // Secondary, like the transaction list: keep what was last read.
+        }
       }
       if (withActivity) {
         try {
@@ -487,7 +587,7 @@ export function ChainRaffleView({ address }: { address: string }) {
       setRun({ kind: "done", action, text, sigs: [...sigs] });
     } catch (error) {
       setRun(
-        error instanceof PartialReveal
+        error instanceof TitledError
           ? {
               kind: "failed",
               action,
@@ -546,6 +646,14 @@ export function ChainRaffleView({ address }: { address: string }) {
   const me = wallet?.address ?? null;
   const canSign = wallet !== null && wallet.canSign && wallet.privateKey !== undefined;
   const busy = run.kind === "busy";
+
+  /* The automatic draw, as read from Rialo; null until the first read answers. */
+  const sched = schedule === null ? null : scheduleState(r, schedule, now);
+  const waitingOnRialo = phase === "ready" && rialoSending(sched, r, now);
+  const reclaimable =
+    settled && me !== null && me === r.creator && sched !== null && sched.kind !== "none" && sched.kind !== "withdrawn"
+      ? sched.deposit
+      : null;
 
   const pool = poolOf(r, phase);
   const figure = figureKelvin(pool.kelvin, 6);
@@ -731,7 +839,7 @@ export function ChainRaffleView({ address }: { address: string }) {
                         }
                         const done = withNonce.length - failures.length;
                         if (failures.length > 0) {
-                          throw new PartialReveal(
+                          throw new TitledError(
                             done === 0 ? "Not revealed" : `${done} of ${withNonce.length} revealed`,
                             failures.join(" "),
                           );
@@ -763,6 +871,37 @@ export function ChainRaffleView({ address }: { address: string }) {
           ))}
       </>
     );
+  } else if (phase === "ready" && sched !== null && sched.kind === "sent" && sched.firing.ok) {
+    // The schedule was read after the account: Rialo's Draw has landed and the next read shows it.
+    panel = (
+      <>
+        <Head2 id="act-heading">Draw</Head2>
+        <Note className="mt-3">
+          Rialo sent Draw{sched.firing.at !== null ? ` at ${stampSecondsMs(sched.firing.at)}` : ""} and it
+          ran. Reading the settled raffle.
+        </Note>
+      </>
+    );
+  } else if (phase === "ready" && waitingOnRialo && sched !== null && "at" in sched && sched.at !== null) {
+    /*
+      Rialo's Draw is on its way: no button for half a minute, so a press does not race it. The
+      button comes back by itself if the draw has not landed by then (the schedule reads "late").
+    */
+    panel = (
+      <>
+        <Head2 id="act-heading">Draw</Head2>
+        <Note className="mt-3">
+          Rialo&rsquo;s Subscriber program is set to send Draw at{" "}
+          <span className="figure text-fg">{stampSecondsMs(sched.at)}</span>, five seconds after reveals
+          close, in the creator&rsquo;s name and with nobody pressing anything.{" "}
+          {sched.kind === "due" ? "It is due now; this page checks every few seconds." : ""}
+        </Note>
+        <Note className="mt-2.5">
+          If it has not landed by {stampSecondsMs(sched.at + DUE_WINDOW_MS)}, a Draw button appears here and
+          anyone can send it.
+        </Note>
+      </>
+    );
   } else if (phase === "ready") {
     panel = (
       <>
@@ -782,8 +921,21 @@ export function ChainRaffleView({ address }: { address: string }) {
                 "draw",
                 "Signing in this browser and waiting for the chain to execute the draw.",
                 async (record) => {
-                  const sent = await drawRaffle(wallet as NonNullable<typeof wallet>, r.address);
-                  record("Draw", sent.signature);
+                  try {
+                    const sent = await drawRaffle(wallet as NonNullable<typeof wallet>, r.address);
+                    record("Draw", sent.signature);
+                  } catch (error) {
+                    // Already settled: Rialo's scheduled draw or another caller got there first. The
+                    // raffle is settled either way, so this is said plainly rather than as a fault.
+                    if (error instanceof ChainError && error.code === 14) {
+                      if (error.signature) record("Draw, turned away", error.signature);
+                      throw new TitledError(
+                        "Already settled",
+                        "Someone settled this raffle a moment earlier, Rialo's scheduled draw or another caller, so this Draw changed nothing. The result is on this page.",
+                      );
+                    }
+                    throw error;
+                  }
                   return r.revealed === 0
                     ? "The raffle is settled as void. Holders and the creator can claim their money back."
                     : "The draw ran on chain. The winners and the seed are below, and this tab can recompute them.";
@@ -794,6 +946,38 @@ export function ChainRaffleView({ address }: { address: string }) {
           >
             {busy && run.action === "draw" ? "Drawing" : "Draw now"}
           </button>
+        )}
+        {sched !== null && sched.kind === "scheduled" && (
+          <Note className="mt-3">
+            If nobody draws before then, Rialo&rsquo;s Subscriber program is set to send Draw at{" "}
+            {stampSecondsMs(sched.at)}.
+          </Note>
+        )}
+        {sched !== null && sched.kind === "late" && (
+          <Note className="mt-3">
+            Rialo&rsquo;s scheduled draw was due at {stampSecondsMs(sched.at)} and has not arrived, so
+            the draw is a button again. If Rialo&rsquo;s arrives after someone presses it, the program
+            turns it away and it changes nothing.
+          </Note>
+        )}
+        {sched !== null && sched.kind === "dropped" && (
+          <Note className="mt-3">
+            This raffle&rsquo;s schedule account is still there, but Rialo&rsquo;s node reports that it no
+            longer holds the Draw, so this page does not wait for it: anyone can press Draw.
+          </Note>
+        )}
+        {sched !== null && sched.kind === "none" && (
+          <Note className="mt-3">
+            This raffle has no automatic draw: it was deployed before Drawbook began scheduling the
+            draw with Rialo, or Rialo refused its schedule. It waits for someone to press Draw.
+          </Note>
+        )}
+        {sched !== null && sched.kind === "sent" && !sched.firing.ok && (
+          <Note className="mt-3">
+            Rialo sent Draw{sched.firing.at !== null ? ` at ${stampSecondsMs(sched.firing.at)}` : ""}, and
+            the program refused it: {sched.firing.reason} It does not retry, so the draw is a button
+            again.
+          </Note>
         )}
       </>
     );
@@ -849,6 +1033,42 @@ export function ChainRaffleView({ address }: { address: string }) {
                 : "Nothing here is owed to this wallet."}
             </Note>
           ))}
+        {reclaimable !== null && sched !== null && (
+          <div className="mt-6 border-t border-rule pt-5">
+            <Head2>Schedule deposit</Head2>
+            <Note className="mt-3">
+              Rialo&rsquo;s Subscriber program holds{" "}
+              <span className="figure text-fg">{formatKelvin(reclaimable)}</span>{" "}RLO of yours for this
+              raffle&rsquo;s schedule.{" "}
+              {sched.kind === "sent"
+                ? "It has sent its Draw, so the deposit can come back."
+                : sched.kind === "scheduled"
+                  ? "The raffle is already settled, so the Draw it still holds would only be turned away. Reclaiming returns the deposit and cancels that Draw."
+                  : "The raffle is settled, so the deposit can come back."}
+            </Note>
+            {walletGate("reclaim the deposit") ?? (
+              <button
+                type="button"
+                disabled={busy}
+                aria-busy={busy && run.action === "reclaim"}
+                onClick={() =>
+                  void act(
+                    "reclaim",
+                    "Signing in this browser and waiting for the chain to close the schedule account.",
+                    async (record) => {
+                      const sent = await reclaimSchedule(wallet as NonNullable<typeof wallet>, r.address);
+                      record("Schedule deposit reclaimed", sent.signature);
+                      return `The schedule account is closed and ${formatKelvin(sent.kelvin)} RLO is back in this wallet, less the network fee.`;
+                    },
+                  )
+                }
+                className={`${SECONDARY} mt-4 w-full sm:w-auto`}
+              >
+                {busy && run.action === "reclaim" ? "Reclaiming" : `Reclaim the schedule deposit, ${formatKelvin(reclaimable)} RLO`}
+              </button>
+            )}
+          </div>
+        )}
       </>
     );
   }
@@ -929,7 +1149,30 @@ export function ChainRaffleView({ address }: { address: string }) {
               </div>
             )}
 
-            <p className="mt-[22px] max-w-[58ch] text-lg text-fg-2">{leadOf(r, phase)}</p>
+            <p className="mt-[22px] max-w-[58ch] text-lg text-fg-2">{leadOf(r, phase, waitingOnRialo)}</p>
+
+            {live && sched !== null && (sched.kind === "scheduled" || sched.kind === "due") && (
+              <Note className="mt-3">
+                The draw is scheduled: when reveals close, Rialo&rsquo;s Subscriber program is set to
+                send Draw at <span className="figure text-fg">{stampSecondsMs(sched.at)}</span> by itself. If it
+                does not arrive, anyone can press Draw.
+              </Note>
+            )}
+            {live && sched !== null && sched.kind === "dropped" && (
+              <Note className="mt-3">
+                This raffle&rsquo;s schedule account is still there, but Rialo&rsquo;s node reports that it
+                no longer holds the Draw. Once the raffle is ready to draw, anyone can press Draw.
+              </Note>
+            )}
+            {/* Said where it matters: on a raffle older than the schedule, a missing automatic draw is
+                its age, not a fault, and the reader is owed that before the deadline passes. */}
+            {live && sched !== null && sched.kind === "none" && (
+              <Note className="mt-3">
+                This raffle has no automatic draw. It was deployed before Drawbook began scheduling the
+                draw with Rialo, or Rialo refused its schedule, so once it is ready, someone has to
+                press Draw.
+              </Note>
+            )}
 
             {stale && (
               <Note className="mt-3">
@@ -1124,6 +1367,24 @@ export function ChainRaffleView({ address }: { address: string }) {
                 <Fact term="Revealed">{r.revealed}</Fact>
                 <Fact term="Winners set">{r.winners}</Fact>
                 <Fact term="Created">{stampMs(r.createdAt)}</Fact>
+                <Fact term="Automatic draw">{scheduleWord(sched, r, settled)}</Fact>
+                {sched !== null && sched.kind !== "none" && (
+                  <Fact term="Schedule account">
+                    <Long>{sched.address}</Long>
+                  </Fact>
+                )}
+                {sched !== null && sched.kind === "sent" && (
+                  <Fact term="Sent by Rialo">
+                    <Long>{sched.firing.signature}</Long>
+                  </Fact>
+                )}
+                {sched !== null && sched.kind !== "none" && (
+                  <Fact term="Schedule deposit">
+                    {sched.kind !== "withdrawn" && sched.deposit !== null
+                      ? `${formatKelvin(sched.deposit)} RLO held`
+                      : "returned to the creator"}
+                  </Fact>
+                )}
                 {settled && <Fact term="Settled">{stampMs(r.drawnAt)}</Fact>}
                 {phase === "drawn" && (
                   <>
@@ -1162,6 +1423,9 @@ export function ChainRaffleView({ address }: { address: string }) {
                     <li key={a.signature} className="border-b border-rule py-2.5">
                       <div className="label text-fg-3">
                         {a.at === null ? "time not reported" : stampMs(a.at < 1e12 ? a.at * 1000 : a.at)}
+                        {sched !== null && sched.kind === "sent" && sched.firing.signature === a.signature
+                          ? " · Draw, sent by Rialo"
+                          : ""}
                       </div>
                       <div className="digest mt-1 text-sm text-fg select-all">{a.signature}</div>
                     </li>

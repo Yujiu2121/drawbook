@@ -33,6 +33,21 @@ import {
   type CreateParams,
 } from "./program.ts";
 import {
+  drawAt,
+  FIRING_FEE,
+  readFiring,
+  reclaimScheduleIxs,
+  SCHEDULE_LEN,
+  scheduleAddress,
+  scheduleNonceText,
+  scheduleState,
+  subscribeDrawIx,
+  SUBSCRIBER_PROGRAM_ID,
+  type Firing,
+  type ScheduleRead,
+  type ScheduleState,
+} from "./subscriber.ts";
+import {
   addressBytes,
   ChainError,
   INSUFFICIENT_FUNDS,
@@ -125,20 +140,132 @@ export async function raffleActivity(raffle: string): Promise<{ signature: strin
     .map((s) => ({ signature: s.signature, at: typeof s.blockTime === "number" ? s.blockTime : null }));
 }
 
-/** What creating a raffle takes from the creator's wallet: rent, the prize, and fee headroom. */
-export async function createCost(supply: number, prize: bigint): Promise<bigint> {
-  const rent = await rialo.getMinimumBalanceForRentExemption(accountLength(supply));
-  return rent + prize + FEE_ALLOWANCE;
+/**
+ * What the automatic draw costs the creator: the subscription account's rent, held by the Subscriber
+ * program until the creator reclaims it after the draw, and the fee the node charges the creator when
+ * it sends Draw. The rent is asked of the node for the encoded length rather than written down.
+ */
+export async function scheduleCost(): Promise<{ deposit: bigint; fee: bigint }> {
+  return { deposit: await rialo.getMinimumBalanceForRentExemption(SCHEDULE_LEN), fee: FIRING_FEE };
 }
+
+/**
+ * What creating a raffle takes from the creator's wallet: the raffle account's rent, the prize, the
+ * schedule's deposit and firing fee, and fee headroom. The firing fee is charged later, when Rialo
+ * sends Draw, but it is counted now so a wallet that can deploy can also pay for its own draw.
+ */
+export async function createCost(supply: number, prize: bigint): Promise<bigint> {
+  const [rent, schedule] = await Promise.all([
+    rialo.getMinimumBalanceForRentExemption(accountLength(supply)),
+    scheduleCost(),
+  ]);
+  return rent + prize + schedule.deposit + schedule.fee + FEE_ALLOWANCE;
+}
+
+/**
+ * Where a raffle's automatic draw stands: the subscription account, whether it ever existed, whether
+ * the node still holds it, and what Rialo sent from it, read back. Triggered transactions never
+ * change once executed, so each is
+ * read once per page and kept.
+ */
+const firings = new Map<string, Firing>();
+
+export async function fetchSchedule(r: ChainRaffle): Promise<ScheduleRead> {
+  const address = scheduleAddress(r.creator, r.address);
+  const [account, triggered] = await Promise.all([
+    rialo.getAccountInfo(address),
+    rialo.getTriggeredTransactions(address, 5),
+  ]);
+  // The node's own word that the Draw is still queued, asked only while it can be: with no account,
+  // or once Rialo has sent the Draw, nothing is queued, and asking anyway makes the node answer a 404
+  // that the browser logs as an error on every page load. A failed read is "unknown", not "absent".
+  const held =
+    account !== null && triggered.length === 0
+      ? await rialo.getSubscription(r.creator, scheduleNonceText(r.address)).then(
+          (s) => s !== null,
+          () => null,
+        )
+      : false;
+  // A Subscribe and a reclaim both touch the account; the triggered Draw does not. So an absent
+  // account with a successful transaction behind it is a schedule the creator withdrew, not one
+  // never made. Failed ones are skipped: a Subscribe Rialo refused at Create made nothing to withdraw.
+  const history =
+    account !== null || triggered.length > 0
+      ? true
+      : (await rialo.getSignaturesForAddress(address, { limit: 10 })).some((s) => !s.err);
+
+  let firing: Firing | null = null;
+  const newest = triggered[0];
+  if (newest) {
+    firing = firings.get(newest.signature) ?? null;
+    if (!firing) {
+      firing = readFiring(newest.signature, await rialo.getTransaction(newest.signature), r);
+      if (firing) firings.set(newest.signature, firing);
+    }
+  }
+  return {
+    address,
+    account: account ? { owner: account.owner, kelvins: account.kelvins, data: account.data } : null,
+    history,
+    held,
+    firing,
+  };
+}
+
+export { scheduleState, type ScheduleRead, type ScheduleState };
 
 /* ---------------------------------------------------------------- actions */
 
+/** What `createRaffle` made. */
+export interface Created extends Sent {
+  raffle: string;
+  /** The subscription account holding the scheduled Draw, or null when Rialo refused the schedule. */
+  schedule: string | null;
+  /** When Rialo is asked to send Draw, in ms, or null when nothing is scheduled. */
+  drawAt: number | null;
+  /** Why the schedule was refused, in words, when it was. The raffle exists either way. */
+  scheduleError: string | null;
+  /** The refused first attempt, a receipt for the fee it cost, when the fallback ran. */
+  scheduleSignature: string | null;
+}
+
 /**
- * Create a raffle: a fresh keypair becomes the raffle account, created by the System program and
- * initialised by the raffle program in one transaction that both keys sign. The raffle key is
- * thrown away afterwards; the account is owned by the program, so nothing ever needs it again.
+ * The reason a refused Subscribe gives: a wallet short of the deposit in words, else the Subscriber's
+ * own log lines when it wrote any (the line it logged just before failing, then the failure itself),
+ * else the ChainError's sentence.
  */
-export async function createRaffle(wallet: Wallet, p: CreateParams): Promise<Sent & { raffle: string }> {
+function scheduleRefusal(error: ChainError): string {
+  if (error.logs.some((line) => /insufficient (kelvins|funds)/i.test(line))) {
+    return "this wallet could not cover the schedule's deposit";
+  }
+  const failed = error.logs.findIndex((line) => line.startsWith(`Program ${SUBSCRIBER_PROGRAM_ID} failed`));
+  if (failed >= 0) {
+    const before = error.logs
+      .slice(0, failed)
+      .reverse()
+      .find((line) => !line.startsWith("Program "));
+    const what = error.logs[failed].replace(/^Program \w+ failed: /, "");
+    return before ? `${before} (${what})` : what;
+  }
+  return error.message;
+}
+
+/**
+ * Create a raffle and schedule its draw: a fresh keypair becomes the raffle account, created by the
+ * System program and initialised by the raffle program, and the same transaction asks Rialo's
+ * Subscriber program to send Draw at the reveal deadline plus five seconds (lib/chain/subscriber.ts).
+ * One signature from each key, one wait, and the raffle and its schedule exist together or not at
+ * all. The raffle key is thrown away afterwards; the account is owned by the program, so nothing
+ * ever needs it again.
+ *
+ * IF RIALO REFUSES THE SCHEDULE. The hand-built Subscribe relies on how the closed-source Subscriber
+ * behaves on the 0.21.0-alpha.0 build. If a later build refuses it, the transaction definitely fails
+ * at instruction 2 (executed and failed, or refused by the node; never "unknown"), nothing of it
+ * landed, and the raffle is created again without the schedule, from the same raffle key so a
+ * second prize can never be moved. The result then says the draw was not scheduled and why, and
+ * Draw stays a button.
+ */
+export async function createRaffle(wallet: Wallet, p: CreateParams): Promise<Created> {
   const creator = signerOf(wallet);
 
   // The program checks all of this too; checking here first turns an obvious mistake into a
@@ -160,24 +287,48 @@ export async function createRaffle(wallet: Wallet, p: CreateParams): Promise<Sen
 
   const raffle = encodeBase58(raffleKey);
   let instructions: Instruction[];
+  let subscribe: Instruction;
   try {
     instructions = [
       systemCreateAccountIx(creator.publicKey, raffleKey, rent, len, addressBytes(PROGRAM_ID)),
       createIx(creator.publicKey, raffleKey, p),
     ];
+    subscribe = subscribeDrawIx(creator.publicKey, raffle, p.revealDeadline);
   } catch (error) {
     // An amount past u64 is refused while encoding, before anything is signed.
     throw new ChainError(`${errorMessage(5)} (${error instanceof Error ? error.message : String(error)})`);
   }
+  const raffleSigner = { publicKey: raffleKey, privateKey: pair.privateKey };
+  const schedule = scheduleAddress(wallet.address, raffle);
 
   try {
-    const signature = await send(creator, instructions, [{ publicKey: raffleKey, privateKey: pair.privateKey }]);
-    return { signature, raffle };
+    const signature = await send(creator, [...instructions, subscribe], [raffleSigner]);
+    return { signature, raffle, schedule, drawAt: drawAt(p.revealDeadline), scheduleError: null, scheduleSignature: null };
   } catch (error) {
-    // The address goes with the error, so a Create whose outcome is unknown can say where the
-    // raffle would be rather than inviting a second deploy and a second prize deposit.
-    if (error instanceof ChainError) error.raffle = raffle;
-    throw error;
+    const refusedSchedule =
+      error instanceof ChainError &&
+      (error.outcome === "failed" || error.outcome === "refused") &&
+      error.instruction === 2;
+    if (!refusedSchedule) {
+      // The address goes with the error, so a Create whose outcome is unknown can say where the
+      // raffle would be rather than inviting a second deploy and a second prize deposit.
+      if (error instanceof ChainError) error.raffle = raffle;
+      throw error;
+    }
+    try {
+      const signature = await send(creator, instructions, [raffleSigner]);
+      return {
+        signature,
+        raffle,
+        schedule: null,
+        drawAt: null,
+        scheduleError: scheduleRefusal(error),
+        scheduleSignature: error.outcome === "failed" ? error.signature : null,
+      };
+    } catch (retry) {
+      if (retry instanceof ChainError) retry.raffle = raffle;
+      throw retry;
+    }
   }
 }
 
@@ -291,6 +442,32 @@ export async function drawRaffle(wallet: Wallet, raffle: string): Promise<Sent> 
       throw error;
     }
   }
+}
+
+/**
+ * Close a settled raffle's schedule account and return its deposit to the creator: Subscriber
+ * Destroy then Unsubscribe in one transaction (lib/chain/subscriber.ts says why both). Only the
+ * creator can: the account is theirs, derived from their key. Offered only once the raffle is
+ * settled, because before that the schedule is what sends the draw; after it, reclaiming also
+ * cancels a Draw still queued, one the program would only turn away as already settled, at the
+ * creator's expense.
+ */
+export async function reclaimSchedule(wallet: Wallet, raffle: string): Promise<Sent & { kelvin: bigint }> {
+  const creator = signerOf(wallet);
+  const r = await fetchRaffle(raffle);
+  if (!r) throw new ChainError(errorMessage(4));
+  if (r.creator !== wallet.address) {
+    throw new ChainError("Only the raffle's creator holds its schedule, so only the creator can reclaim the deposit.");
+  }
+  if (r.status === "open") {
+    throw new ChainError("The schedule deposit can be reclaimed once the raffle is settled. Until then the schedule is what sends the draw.");
+  }
+  const account = await rialo.getAccountInfo(scheduleAddress(r.creator, raffle));
+  if (!account || account.owner !== SUBSCRIBER_PROGRAM_ID) {
+    throw new ChainError("There is no schedule deposit left to reclaim for this raffle.");
+  }
+  const signature = await send(creator, reclaimScheduleIxs(creator.publicKey, raffle));
+  return { signature, kelvin: account.kelvins };
 }
 
 /** One Claim transaction that landed, and what it paid. */

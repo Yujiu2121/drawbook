@@ -69,8 +69,9 @@ export const metadata = {
  * page reads one: every card, figure, the field, the chain, the ceremony and the working are the
  * five sample raffles, fixed demonstration data that is not on chain. So the page sends people to
  * /raffles and /create for the real thing, and every surface drawn from the samples says "sample"
- * on its face. What the copy may claim is fixed by the claims sheet for the testnet launch: the
- * draw is a button anyone may press once the raffle is ready, not automatic yet; the result is
+ * on its face. What the copy may claim is fixed by the claims sheet for the testnet launch: Rialo's
+ * Subscriber program sends the draw by itself five seconds after the reveal deadline (seen firing on
+ * testnet on 2026-10-08), and anyone may press Draw once the raffle is ready; the result is
  * randomized and checkable, not unbiasable; and the limit is the draw-block producer, stated whole.
  */
 
@@ -258,33 +259,34 @@ const STEPS: Step[] = [
     n: "03",
     title: "Draw",
     body:
-      "Once every ticket is revealed or the deadline passes, anyone can run the draw. The winners come out of every published secret at once, in sorted order, plus one value the chain adds last. Winners collect with Claim.",
+      "When reveals close, Rialo sends the draw by itself, and anyone can run it sooner once every ticket is revealed. The winners come out of every published secret at once, in sorted order, plus one value the chain adds last. Winners collect with Claim.",
   },
 ];
 
 /**
- * THE DESIGN, NOT TODAY'S PATH, AND THE PAGE LABELS IT AS SUCH. The Subscriber predicate that
- * would fire the draw at the deadline is not wired: today the third plate is a person pressing
- * Draw, which the program accepts from anyone once the raffle is ready. The diagram stays because
- * it is the argument for building this on Rialo, but it sits under a label saying it is the
- * design, and the last plate no longer says winners were paid with nothing pressed: even in the
- * design, a winner is paid by Claim.
+ * THE PATH A RAFFLE'S DRAW TAKES, AS OBSERVED ON TESTNET. Create registers a one-shot clock
+ * subscription with Rialo's Subscriber program whose one action is this raffle's Draw, and five
+ * seconds after the reveal deadline Rialo sends it in the creator's name (lib/chain/subscriber.ts,
+ * program/SPEC.md "Scheduled draw"). It fired on testnet on 2026-10-08 with nobody pressing anything.
+ * The plates say "five seconds later" because that margin is real: the clock a triggered Draw reads
+ * trails the block that matched it. The last plate still ends in Claim: nobody is paid by the draw.
  */
 const FLOW: FlowStep[] = [
   { title: "Reveal deadline", body: "an absolute instant, written into the raffle" },
-  { title: "Condition met", body: "the chain notices, not a server" },
-  { title: "Reactive transaction", body: "the draw is its body" },
+  { title: "Condition met", body: "five seconds later, the chain notices, not a server" },
+  { title: "Reactive transaction", body: "Draw is its only instruction" },
   { title: "Draw executed", body: "no keeper, no cron job, no relayer; winners then Claim" },
 ];
 
 /**
- * Three claims, each true of the program on testnet today. The third used to be "Automatic: the
- * draw executes itself the moment the reveal period ends", which is the design and not the fact.
+ * Three claims, each true of the program on testnet today. The third once said the draw "executes
+ * itself the moment the reveal period ends", before anything sent it; it now says what was seen on
+ * testnet: Rialo sends it five seconds after the deadline, and a person can press it sooner.
  */
 const BENEFITS: [string, string, string][] = [
   ["01", "Transparent", "Every ticket, commitment and reveal sits in the raffle's account, where anyone can read it while the raffle is open."],
   ["02", "Verifiable", "Anyone can recompute a drawn raffle from data its account holds, and its page does that in your browser."],
-  ["03", "Open to anyone", "Once every ticket is revealed or the reveal deadline passes, anyone can press Draw. Firing it automatically is the design, not wired yet."],
+  ["03", "Open to anyone", "Anyone can press Draw once every ticket is revealed, and when reveals close, Rialo's Subscriber program sends it by itself."],
 ];
 
 /* -------------------------------------------------------------------------------- the page */
@@ -545,17 +547,18 @@ export default function LandingPage() {
       >
         <div className="grid items-center gap-[clamp(30px,4vw,64px)] min-[900px]:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <div>
-            {/* "Designed", not "Built": the trigger in the diagram beside this is not wired. The
-                paragraph says what happens today first, then what the design adds. */}
+            {/* "Built", no longer "Designed": the trigger in the diagram beside this fired on
+                testnet. The paragraph says what Rialo does, then what a person can still do, then
+                which raffles have no schedule, so nobody reads an old raffle's button as a fault. */}
             <h2 id="rialo-heading" className="m-0 max-w-[18ch] font-serif text-display">
-              Designed for automatic execution.
+              Built for automatic execution.
             </h2>
             <p className="m-0 mt-5 max-w-[52ch] text-lg text-fg-2">
-              Today the draw is a button anyone can press. The program refuses it until every sold
-              ticket is revealed after the sale closes, or the reveal deadline passes, and accepts
-              it from anyone after that. The design is for Rialo&rsquo;s reactive transactions to
-              fire it at the deadline, with no keeper, cron job or relayer. That trigger, a
-              Subscriber predicate, is not wired yet.
+              When a raffle is deployed, the same transaction asks Rialo&rsquo;s Subscriber program
+              to send its draw five seconds after the reveal deadline. Rialo then sends it by
+              itself, with no keeper, cron job or relayer. Anyone can still press Draw sooner, once
+              every sold ticket is revealed. Raffles deployed before Drawbook began scheduling the
+              draw have none; on those, Draw stays a button.
             </p>
 
             {/*
@@ -577,7 +580,7 @@ export default function LandingPage() {
           </div>
 
           <figure className="m-0">
-            <figcaption className="label mb-3.5 text-fg-3">The design, not wired yet</figcaption>
+            <figcaption className="label mb-3.5 text-fg-3">How Rialo sends the draw</figcaption>
             <Flow steps={FLOW} />
           </figure>
         </div>

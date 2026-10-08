@@ -158,11 +158,20 @@ const params = {
 
 const cost = await step("createCost", () => actions.createCost(params.supply, prize));
 const rent = await client.getMinimumBalanceForRentExemption(program.accountLength(params.supply));
-ok("createCost is rent + prize + a small fee allowance", cost > rent + prize && cost - rent - prize < RLO / BigInt(1000), cost.toString());
+const schedulePrice = await actions.scheduleCost();
+const allowance = cost - rent - prize - schedulePrice.deposit - schedulePrice.fee;
+ok(
+  "createCost is rent + prize + the schedule's deposit and firing fee + a small fee allowance",
+  allowance > BigInt(0) && allowance < RLO / BigInt(1000),
+  cost.toString(),
+);
 
 const created = await step("createRaffle", () => actions.createRaffle(alice, params));
 const raffle = created.raffle;
 console.log(`        raffle ${raffle}`);
+// This raffle is drawn by hand below, before its schedule is due; the later trigger is refused as
+// already settled, which is the harmless case scripts/auto-draw-check.ts does not cover.
+ok("createRaffle scheduled the draw", created.schedule !== null && created.scheduleError === null, String(created.scheduleError));
 
 let r = await step("fetchRaffle after create", async () => {
   const got = await actions.fetchRaffle(raffle);

@@ -53,9 +53,11 @@ export const metadata = {
  * last", which is narrower than the truth, and called the result "verifiable". The words this page
  * may use are "randomized and checkable".
  *
- * WIRED VERSUS DESIGNED IS KEPT APART. The program, the account and the five instructions are real
- * on testnet. The Subscriber trigger that would send Draw by itself is the design, not wired, and
- * the page says which is which rather than describing the design in the present tense.
+ * OBSERVED VERSUS DOCUMENTED IS KEPT APART. The program, the account and the five instructions are
+ * real on testnet, and so is the scheduled draw: Create registers a Subscriber subscription and Rialo
+ * sent Draw by itself on testnet on 2026-10-08. But the Subscriber program is closed source, so "The
+ * draw trigger" states its encoding as program/SPEC.md does and its behaviour as observed on one
+ * build, names what has not been observed, and never calls the draw guaranteed.
  *
  * THE SAMPLES KEEP THEIR OWN SECTION. The five fixed raffles under /raffle/1..5 were made with the
  * v1 text formulas and are not on chain. Their exact encoding is given there and only there, so the
@@ -64,14 +66,16 @@ export const metadata = {
  *
  * APOSTROPHES ARE THE CHARACTER ITSELF, NEVER `&rsquo;`. Measured on this Next 16.2.12 build with
  * Turbopack: a JSX text run that directly follows an element's closing tag and contains an HTML
- * entity loses its leading space in the rendered HTML, so "<strong>Wired today:</strong> nothing"
- * rendered as "Wired today:nothing" and "<C>CreateAccount</C> in" as "CreateAccountin". The same
+ * entity loses its leading space in the rendered HTML, so "<strong>Wired today:</strong> nothing",
+ * from an earlier version of this page, rendered as "Wired today:nothing" and "<C>CreateAccount</C> in" as "CreateAccountin". The same
  * text with a literal U+2019 keeps its space, and text after a {expression} is not affected.
  *
- * TESTNET FACTS, PER THE CLAIMS SHEET. The program is upgradeable by its deployer during the
- * testnet period, and every raffle account keeps its rent reserve after the last claim (0.00350784
- * RLO for 2 tickets, the rent-exempt minimum the node quotes for 376 bytes). Both are stated in
- * "What runs on chain", the second again under payouts, rather than left for a reader to discover.
+ * TESTNET FACTS, PER THE CLAIMS SHEET. The program can no longer be upgraded by anyone, because the key of
+ * its upgrade authority was lost on 2026-10-08; this page and the README are the two places that
+ * give that reason, briefly, and nowhere in the headline copy. Every raffle account keeps its rent
+ * reserve after the last claim (0.00350784 RLO for 2 tickets, the rent-exempt minimum the node
+ * quotes for 376 bytes). Both are stated in "What runs on chain", the second again under payouts,
+ * rather than left for a reader to discover.
  *
  * Layout: quiet by design, like /learn. A reading room, lit flat. The only recess on the page is
  * where it quotes the machine (layouts, preimages, the keystream, inline identifiers); every
@@ -103,12 +107,13 @@ export default function DocsPage() {
             live in this browser’s storage, so clearing it loses both.
           </P>
           <P>
-            During the testnet period the program is upgradeable by the key that deployed it,{" "}
-            <C>GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor</C>. Redeploying under the same program
-            id replaces the code in place, so what this page describes is the code as deployed today,
-            not code that can never change. Each raffle account also keeps its rent reserve after
-            every claim is paid: about 0.0035 RLO for a raffle of 2 tickets, more for a longer
-            account.
+            The program can no longer be upgraded by anyone. Its upgrade authority is still recorded as{" "}
+            <C>GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor</C>, but the key for it was lost during
+            development: it was overwritten on the machine that deployed the program, and no copy
+            has been found. Nobody can replace the code, so what this page describes is the code
+            that runs.
+            Each raffle account also keeps its rent reserve after every claim is paid: about 0.0035
+            RLO for a raffle of 2 tickets, more for a longer account.
           </P>
           <P>
             The five raffles numbered 1 to 5 are something else: fixed sample data, not on chain, kept
@@ -124,7 +129,8 @@ export default function DocsPage() {
               ["Tickets per raffle", "2 to 200"],
               ["Sale length", "at most 31 days from Create"],
               ["Reveal window", "1 minute to 7 days after the sale deadline"],
-              ["Upgradeable", "yes, by its deployer, during the testnet period"],
+              ["Draw sent by", "Rialo at reveal deadline + 5 s, or anyone once ready"],
+              ["Upgradeable", "no, not by anyone"],
               ["Integers in the account", "little-endian unless marked"],
             ]}
           />
@@ -200,7 +206,7 @@ export default function DocsPage() {
               ["0", "Create", "the creator, and the new raffle key"],
               ["1", "Buy", "the buyer"],
               ["2", "Reveal", "the ticket's holder"],
-              ["3", "Draw", "anyone"],
+              ["3", "Draw", "anyone; Rialo’s Subscriber sends it as the creator"],
               ["4", "Claim", "nobody needs to: it pays only the recorded owner"],
             ]}
           />
@@ -271,9 +277,11 @@ accounts  0 caller          signer
           1 raffle          writable
           2 instructions    the instructions sysvar`}</Code>
           <P>
-            Anyone may send it. It is ready when the reveal deadline has passed, or when the sale has
-            closed and every sold ticket is revealed; a raffle that sold nothing is ready as soon as its
-            sale closes. With nothing revealed, the raffle becomes void and no money moves. Otherwise
+            Anyone may send it, and on a scheduled raffle Rialo’s Subscriber program sends it in the
+            creator’s name five seconds after the reveal deadline (see{" "}
+            <TextLink href="#trigger">the draw trigger</TextLink>). It is ready when the reveal deadline
+            has passed, or when the sale has closed and every sold ticket is revealed; a raffle that
+            sold nothing is ready as soon as its sale closes. With nothing revealed, the raffle becomes void and no money moves. Otherwise
             the program reads <C>chain_seed</C> from <C>get_random_seed()</C> at that moment, derives
             the seed and the winners as below, and writes the won flags, <C>win_rank</C>,{" "}
             <C>chain_seed</C>, <C>seed</C>, <C>effective_winners</C>, <C>pool</C>, <C>per_winner</C>{" "}
@@ -461,9 +469,10 @@ remainder  = pool - per_winner × effective_winners`}</Code>
               nonce is public. Whoever produces that block may be able to influence what{" "}
               <C>get_random_seed()</C> returns, and if they can, they can try candidate values and keep
               one that suits them, with no ticket and without revealing last. Rialo publishes no proof
-              of where the value comes from, so the program cannot close this. An ordinary caller has
-              no such lever: Draw runs alone in its transaction and at least one block after the
-              latest reveal, so nothing alongside it can read the result and back out.
+              of where the value comes from, so the program cannot close this, whether a person or
+              Rialo’s Subscriber sends the Draw. An ordinary caller has no such lever: Draw runs
+              alone in its transaction and at least one block after the latest reveal, so nothing
+              alongside it can read the result and back out.
             </LI>
             <LI>
               <strong>Withholding a reveal.</strong> A holder who has seen the other revealed nonces can
@@ -477,23 +486,110 @@ remainder  = pool - per_winner × effective_winners`}</Code>
           {/* --------------------------------------------------------- trigger */}
           <H2 id="trigger">The draw trigger</H2>
           <P>
-            <strong>Wired today:</strong> nothing fires by itself. The sale closes through the
-            program’s own checks, at the commit deadline or the moment the last ticket sells,
-            because Buy refuses after either; that needs no trigger. The draw happens when somebody
-            sends Draw, and anyone may once it is ready. The raffle page offers the button to whoever is
-            looking.
+            The sale closes through the program’s own checks, at the commit deadline or the moment
+            the last ticket sells, because Buy refuses after either; that needs no trigger. The draw
+            does, and Rialo sends it. Create goes out with a third instruction, a Subscribe to
+            Rialo’s Subscriber program signed by the creator, which registers a one-shot clock
+            subscription whose only action is this raffle’s Draw. Five seconds after the reveal
+            deadline, Rialo sends that Draw by itself, in the creator’s name, with nobody pressing
+            anything. Anyone can still send Draw sooner, once every sold ticket is revealed.
+          </P>
+          <Code>{`Subscribe, the 3rd instruction of Create
+program   Subscriber111111111111111111111111111111111
+accounts  0 creator        signer, writable; pays
+          1 subscription   writable
+          2 system program
+nonce     first 32 characters of the raffle
+          address, as UTF-8 bytes
+address   PDA ["rialo_subscribe", creator, nonce]
+          of the Subscriber program
+data      u32 0 (Subscribe) ‖ nonce [32]
+          ‖ subscriber = creator
+          ‖ topic "clock", event account
+            SysvarC1ock11111111111111111111111111111111
+          ‖ time from reveal_deadline + 5000 ms
+            to u64::MAX
+          ‖ one action: Draw on this raffle
+            (creator, raffle, instructions
+             sysvar; data 03)
+          ‖ OneShot ‖ commits 0 to u64::MAX
+          = 310 bytes, legacy bincode, LE`}</Code>
+          <P>
+            The byte offsets are in <C>program/SPEC.md</C>. The action carries no Subscriber{" "}
+            <C>Destroy</C>, although the crate’s own helper appends one to every one-shot: with
+            it, the transaction Rialo sends would hold two instructions and Draw would refuse it with{" "}
+            <C>DrawMustRunAlone</C>. Without it, the triggered transaction is byte for byte the Draw
+            anyone could send by hand, so both of Draw’s guards apply to it unchanged and nothing
+            in the program had to change.
           </P>
           <P>
-            <strong>Designed, not wired:</strong> Rialo’s Subscriber program can send a
-            transaction when a predicate fires. The design is one one-shot subscription at the reveal
-            deadline whose action is Draw, so a raffle settles without anyone pressing. Settling early,
-            the moment the last holder reveals, would also need an event topic, which the program does
-            not emit today.
+            Five seconds, not zero, because a triggered transaction reads a clock slightly behind the
+            block that matched it. On a local network a window opening exactly at the deadline was
+            refused as <C>NotReady</C>, and a one-shot is never sent again. On testnet the Draw
+            recorded a <C>drawn_at</C> 23 ms before its window opened, still 4,977 ms after the
+            deadline.
           </P>
           <P>
-            Predicates carry no value comparison. They hold a topic, an optional event account and an
-            optional timestamp range, and nothing else. There is no interval or calendar scheduling
-            either, so a recurring schedule has to re-arm itself with a fresh nonce each time.
+            It has run on testnet. On 8 October 2026 raffle{" "}
+            <C>AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w</C>, with 2 tickets and a one-minute
+            reveal window, was drawn by Rialo 5.1 seconds after its reveal deadline: one transaction,
+            Draw alone, the creator its only signer and fee payer, 4,411 compute units. Nobody pressed
+            Draw, and recomputing the result matched. <C>getTriggeredTransactions</C> on the
+            subscription account lists that one transaction.
+          </P>
+          <Facts
+            rows={[
+              ["Schedule deposit", "2,797,920 kelvin, about 0.0028 RLO"],
+              ["Held as", "rent on a 274-byte account"],
+              ["Given back", "at reclaim, less a 5,000 kelvin fee"],
+              ["Fee when Rialo sends Draw", "5,000 kelvin, from the creator"],
+              ["Sent", "once, at reveal deadline + 5 s"],
+            ]}
+          />
+          <P>
+            The creator pays for it. The deposit is the subscription account’s rent; the raffle
+            page offers it back to the creator once the raffle is settled, as one transaction of{" "}
+            <C>Destroy</C> and <C>Unsubscribe</C>. Rialo charges the firing fee whether Draw succeeds
+            or not.
+          </P>
+          <UL>
+            <LI>
+              <strong>Drawn by hand first.</strong> Rialo’s later Draw is refused as{" "}
+              <C>AlreadySettled</C> and changes nothing; the creator still pays its fee, unless they
+              reclaimed the deposit before it was due, which cancels it.
+            </LI>
+            <LI>
+              <strong>Rialo refuses the schedule.</strong> If a later Rialo build rejects the
+              Subscribe, the browser creates the raffle again without it and says the draw is not
+              scheduled. No deposit is taken, and Draw is a button.
+            </LI>
+            <LI>
+              <strong>It does not arrive.</strong> A one-shot is not sent twice. Thirty seconds after
+              its time, the raffle page brings the Draw button back for anyone to press.
+            </LI>
+            <LI>
+              <strong>Raffles from before the schedule.</strong> Raffles deployed before Drawbook
+              began scheduling the draw have no subscription. Their page says the draw is not
+              scheduled, and it is a button anyone can press once the raffle is ready.
+            </LI>
+            <LI>
+              <strong>Not yet observed.</strong> Whether a subscription survives weeks of waiting
+              across node restarts or upgrades, and what happens if the creator cannot pay the fee
+              when it is sent. The Draw button covers both.
+            </LI>
+          </UL>
+          <P>
+            The page calls a raffle scheduled only after decoding its subscription account and finding
+            exactly this form, and asking the node whether it still holds it; anything else is shown
+            as not counted, and Draw stays a button. The Subscriber program is closed source, so all
+            of this is behaviour observed on Rialo’s 0.21.0-alpha.0 build, not documented.
+          </P>
+          <P>
+            Rialo cannot send the draw the moment the last holder reveals. That would need an event
+            topic, which the program does not emit, so an early draw is somebody pressing Draw.
+            Predicates carry no value comparison either: they hold a topic, an optional event account
+            and an optional timestamp range, and nothing else. There is no interval or calendar
+            scheduling, so a recurring schedule has to re-arm itself with a fresh nonce each time.
           </P>
 
           {/* --------------------------------------------------------- samples */}
@@ -560,13 +656,15 @@ seed_v1 = sha256(
                 </>,
               ],
               [
-                "138",
+                "224",
                 <>
                   <span className="figure block">scripts/verify-chain.ts</span>
                   <span className="text-fg-2">
                     The browser library: transactions byte for byte against @rialo/ts-cdk fixtures, the
                     v2 hashes against node:crypto, account decoding, a draw check that fails on altered
-                    data, and payouts and refusals as the spec states them.
+                    data, payouts and refusals as the spec states them, and the schedule: the Subscribe
+                    bytes against the official Subscriber crate and a CLI transaction, the check that
+                    only the exact form counts as scheduled, and the states the raffle page shows.
                   </span>
                 </>,
               ],
@@ -584,7 +682,12 @@ seed_v1 = sha256(
             (the Draw guards among them) and a 200-ticket worst case, checking balances to the kelvin
             and recomputing every draw in JavaScript.{" "}
             <C>scripts/smoke-chain.ts</C> does the same through the browser library. Both run against a
-            local network; neither will ask a public faucet for funds.
+            local network; neither will ask a public faucet for funds.{" "}
+            <C>scripts/auto-draw-check.ts</C> creates a scheduled raffle, buys and reveals two tickets,
+            presses nothing, and checks that Rialo’s Draw arrives alone, runs, and recomputes to the
+            same winners, then reclaims the deposit. It pays from a funded wallet file, never a public
+            faucet; an adaptation of it that reads the browser’s key form passed all 39 of its checks
+            on testnet on 8 October 2026.
           </P>
 
           {/* --------------------------------------------------------- network */}
@@ -597,7 +700,8 @@ seed_v1 = sha256(
           <Facts
             rows={[
               ["Testnet RPC", "https://testnet.rialo.io:4101"],
-              ["Subscriber program", "Subscriber1111…  deployed, executable"],
+              ["Subscriber program", "Subscriber1111…  sends the scheduled Draw"],
+              ["Schedules", "getSubscription{subscriber, nonce}, getTriggeredTransactions[account, limit]"],
               ["Faucet", "requestAirdrop{pubkey, kelvins}, max 1 RLO per call, rate limited per IP"],
               ["Balance", "getBalance{address}, in kelvin"],
               ["Raffle accounts", "getAccountsByOwner, by program id"],

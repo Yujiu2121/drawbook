@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { motion, useReducedMotion } from "motion/react";
@@ -20,14 +20,16 @@ import {
   formatKelvin,
   parseRLO,
   stampMs,
+  stampSecondsMs,
   storageKeeps,
   useNow,
   useWallet,
   utf8Length,
   type Refusal,
 } from "@/components/chain-ui";
-import { ChainError, createCost, createRaffle } from "@/lib/chain/actions";
+import { ChainError, createCost, createRaffle, scheduleCost } from "@/lib/chain/actions";
 import { createFits, MAX_SUPPLY, MIN_SUPPLY } from "@/lib/chain/program";
+import { DRAW_MARGIN_MS, drawAt } from "@/lib/chain/subscriber";
 import { connect, refreshBalance } from "@/lib/wallet-store";
 
 /**
@@ -40,11 +42,18 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * WHAT CHANGED, AND WHY EACH CHANGE IS A CORRECTION RATHER THAN A RESTYLE
  *
  * 1. THE BUTTON DEPLOYS. The raffle program is on chain now, so the press signs a real transaction
- *    with the wallet in the masthead: a system CreateAccount for a fresh raffle account and the
- *    program's Create, in one transaction, which also moves the prize in. Success is shown only
- *    after the chain reports the transaction executed, and it shows the real signature and the
- *    real account address. The old "print what would be deployed" strip is gone, because printing a
- *    payload next to a working button would be describing a thing instead of doing it.
+ *    with the wallet in the masthead: a system CreateAccount for a fresh raffle account, the
+ *    program's Create, which also moves the prize in, and a Subscribe that asks Rialo's Subscriber
+ *    program to send Draw five seconds after reveals close, all in one transaction. Success is shown
+ *    only after the chain reports the transaction executed, and it shows the real signature, the
+ *    real account address and the schedule's address. The old "print what would be deployed" strip
+ *    is gone, because printing a payload next to a working button would be describing a thing
+ *    instead of doing it.
+ *
+ *    The schedule is said before the press, with its cost, because it spends the creator's money: a
+ *    deposit held until they reclaim it after the draw, and a fee when Rialo sends it. If Rialo
+ *    refuses the schedule, the raffle is created without it (lib/chain/actions.ts) and the receipt
+ *    says so; the draw is then a button, as it always was.
  *
  * 2. THE DEADLINES COME FROM THE REAL CLOCK. The old page added the durations to the pinned NOW in
  *    lib/mock-raffles.ts, which is a July instant, so on any later day it printed deadlines months
@@ -253,6 +262,11 @@ type Stage =
       commitDeadline: number;
       revealDeadline: number;
       cost: bigint;
+      /** The subscription account, or null when Rialo refused the schedule. */
+      schedule: string | null;
+      drawAt: number | null;
+      scheduleError: string | null;
+      scheduleSignature: string | null;
     }
   | { kind: "failed"; refusal: Refusal; maybeAt: string | null };
 
@@ -574,6 +588,22 @@ export default function CreatePage() {
   const [form, setForm] = useState<Form>(DEFAULTS);
   const [tried, setTried] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: "idle" });
+  /* The schedule's deposit and firing fee, asked of the node once: the deposit is account rent. */
+  const [schedulePrice, setSchedulePrice] = useState<{ deposit: bigint; fee: bigint } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    scheduleCost().then(
+      (price) => {
+        if (alive) setSchedulePrice(price);
+      },
+      () => {
+        // Unread, the sentence below says "a small deposit" instead of a figure.
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
   /*
     Set synchronously at the press and cleared when it settles, so a second press that lands before
     React re-renders the button as disabled cannot send a second Create and a second prize.
@@ -646,6 +676,10 @@ export default function CreatePage() {
         commitDeadline,
         revealDeadline,
         cost,
+        schedule: sent.schedule,
+        drawAt: sent.drawAt,
+        scheduleError: sent.scheduleError,
+        scheduleSignature: sent.scheduleSignature,
       });
       void refreshBalance();
     } catch (error) {
@@ -692,7 +726,11 @@ export default function CreatePage() {
 
   const notice =
     stage.kind === "done"
-      ? `Deployed. Raffle account ${stage.raffle}.`
+      ? `Deployed. Raffle account ${stage.raffle}. ${
+          stage.schedule !== null && stage.drawAt !== null
+            ? `Draw scheduled for ${stampSecondsMs(stage.drawAt)}.`
+            : "The draw was not scheduled; Draw stays a button."
+        }`
       : stage.kind === "failed"
         ? stage.maybeAt !== null
           ? `Not confirmed. It may have been deployed at ${stage.maybeAt}. ${stage.refusal.text}`
@@ -717,10 +755,11 @@ export default function CreatePage() {
         <h1 className="font-serif mt-[clamp(16px,2.4vw,28px)] text-display">Deploy a raffle</h1>
         <p className="mt-4 max-w-[58ch] text-lg text-fg-2">
           Put up a prize and set the rules. Once deployed, the raffle program on Rialo holds the
-          money and enforces the terms: it sells tickets until the sale closes, accepts reveals
-          until the reveal deadline, and then anyone can press Draw; nothing draws on its own yet.
-          You cannot change the terms afterwards. The program itself can still be upgraded by its
-          deployer during the testnet period.
+          money and enforces the terms: it sells tickets until the sale closes and accepts reveals
+          until the reveal deadline. Five seconds after that, Rialo sends the draw by itself, because
+          the same transaction schedules it; anyone can also press Draw once every ticket is
+          revealed. You cannot change the terms afterwards, and the program itself can no longer be
+          upgraded by anyone.
         </p>
 
         <form onSubmit={deploy} noValidate className="mt-[clamp(26px,3.4vw,44px)]">
@@ -864,6 +903,45 @@ export default function CreatePage() {
                 </div>
               </Group>
 
+              {/*
+                The schedule, said before the press: it is part of what the button sends, and it
+                spends the creator's money. "Sends it by itself" because that is what Rialo did on
+                testnet on 2026-10-08, never "guaranteed": the Subscriber is Rialo's closed-source
+                program, so the button stays on the raffle page in case it does not arrive.
+              */}
+              <section aria-labelledby="schedule-heading" className="border border-rule bg-panel-2 px-5 py-4">
+                <h2 id="schedule-heading" className="label text-fg-3">
+                  Automatic draw
+                </h2>
+                <p className="mt-2 text-sm text-fg-2">
+                  Deploying also schedules the draw with Rialo&rsquo;s Subscriber program: at{" "}
+                  <span className="figure whitespace-nowrap text-fg">
+                    {revealsAt !== null ? stampSecondsMs(drawAt(revealsAt)) : BLANK}
+                  </span>
+                  , {DRAW_MARGIN_MS / 1000} seconds after reveals close, Rialo sends it by itself, in
+                  your name and with nobody pressing anything. It costs{" "}
+                  {schedulePrice === null ? (
+                    "a small deposit"
+                  ) : (
+                    <>
+                      a <span className="figure text-fg">{formatKelvin(schedulePrice.deposit)}</span> RLO
+                      deposit
+                    </>
+                  )}
+                  , held by that program until you reclaim it on the raffle page after the draw
+                  (reclaiming costs the usual network fee), plus{" "}
+                  {schedulePrice === null ? (
+                    "a network fee"
+                  ) : (
+                    <>
+                      <span className="figure text-fg">{formatKelvin(schedulePrice.fee)}</span> RLO
+                    </>
+                  )}{" "}
+                  when Rialo sends it. If it does not arrive, the raffle page keeps a Draw button anyone
+                  can press.
+                </p>
+              </section>
+
               {/* ---------------------------------------------------- the press */}
               <div className="flex flex-col gap-3">
                 {wallet === null ? (
@@ -948,7 +1026,7 @@ export default function CreatePage() {
                   <RefusalBlock
                     title="Not sent: not enough in this wallet"
                     refusal={{
-                      text: `Deploying this raffle needs ${formatKelvin(stage.cost)} RLO: the rent that keeps the raffle account alive, the prize, and the network fee. This wallet holds ${formatKelvin(stage.balance)} RLO, which is ${formatKelvin(stage.cost - stage.balance)} RLO short. ${
+                      text: `Deploying this raffle needs ${formatKelvin(stage.cost)} RLO: the rent that keeps the raffle account alive, the prize, the automatic draw's deposit and fee, and the network fee. This wallet holds ${formatKelvin(stage.balance)} RLO, which is ${formatKelvin(stage.cost - stage.balance)} RLO short. ${
                         NETWORK === "testnet"
                           ? "The faucet button in the bar at the top, the down arrow beside your balance, asks the testnet faucet for 1 RLO at a time."
                           : `Fund this wallet from the ${NETWORK} faucet and press Deploy again.`
@@ -1016,9 +1094,31 @@ export default function CreatePage() {
                         </span>
                         .
                       </p>
+                      {stage.schedule !== null && stage.drawAt !== null ? (
+                        <p className="mt-3 max-w-[62ch] text-base text-fg-2">
+                          Draw scheduled with Rialo&rsquo;s Subscriber program for{" "}
+                          <span className="figure whitespace-nowrap text-fg">{stampSecondsMs(stage.drawAt)}</span>.
+                          The same transaction made the schedule account below and put its deposit
+                          in; the raffle page shows when Rialo sends the draw, and offers the deposit
+                          back to you once the raffle is settled.
+                        </p>
+                      ) : (
+                        <div className="mt-4 border border-bound px-4 py-3.5">
+                          <p className="label text-fg">Created, but the draw is not scheduled</p>
+                          <p className="mt-2 text-sm text-fg-2">
+                            Rialo refused the schedule: {stage.scheduleError ?? "no reason given"}. The
+                            raffle was created without it, so Draw stays a button: anyone can press it
+                            on the raffle page once the raffle is ready. No deposit was taken.
+                          </p>
+                        </div>
+                      )}
                       <dl className="mt-5 grid gap-4">
                         <Signature label="Raffle account" value={stage.raffle} />
                         <Signature value={stage.signature} />
+                        {stage.schedule !== null && <Signature label="Schedule account" value={stage.schedule} />}
+                        {stage.scheduleSignature !== null && (
+                          <Signature label="Refused attempt with the schedule, fee charged" value={stage.scheduleSignature} />
+                        )}
                       </dl>
                     </div>
                     <div className="flex min-w-0 flex-col gap-3">
@@ -1030,8 +1130,9 @@ export default function CreatePage() {
                         See it on the board
                       </Link>
                       <p className="text-sm text-fg-3">
-                        Estimated cost before sending: {formatKelvin(stage.cost)} RLO, rent and prize
-                        and fee together. The raffle page is its own permanent address; share it and
+                        Estimated cost before sending: {formatKelvin(stage.cost)} RLO: rent, prize,
+                        the schedule deposit and fees together. The raffle page is its own permanent
+                        address; share it and
                         anyone can buy a ticket there.
                       </p>
                     </div>

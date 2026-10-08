@@ -17,6 +17,8 @@ import {
   accountLength,
   auditDraw,
   buyIx,
+  drawIx,
+  INSTRUCTIONS_SYSVAR_ID,
   claimableIndices,
   commitmentV2,
   createFits,
@@ -40,15 +42,42 @@ import {
   type CreateParams,
 } from "../lib/chain/program.ts";
 import {
+  CLOCK_SYSVAR_ID,
+  decodeSubscription,
+  destroyScheduleIx,
+  drawSchedule,
+  DUE_WINDOW_MS,
+  encodeDestroy,
+  encodeSubscribe,
+  encodeSubscription,
+  encodeUnsubscribe,
+  findProgramAddress,
+  isDrawbookSchedule,
+  isOnCurve,
+  readFiring,
+  reclaimScheduleIxs,
+  SCHEDULE_LEN,
+  scheduleAddress,
+  scheduleNonce,
+  scheduleNonceText,
+  scheduleState,
+  subscribeDrawIx,
+  SUBSCRIBER_PROGRAM_ID,
+  type ScheduleRead,
+  type Subscription,
+} from "../lib/chain/subscriber.ts";
+import {
   ChainError,
   compileMessage,
   customErrorCode,
+  failedInstruction,
   failureText,
   INSUFFICIENT_FUNDS,
   refusalText,
   sendAndConfirm,
   signatureOf,
   signTransaction,
+  type Instruction,
   type TxSigner,
 } from "../lib/chain/tx.ts";
 
@@ -860,6 +889,474 @@ section("a transaction that may have landed is never reported as failed (BC-3)")
     cpi.error?.outcome === "failed" && cpi.error.code === null && cpi.error.message === INSUFFICIENT_FUNDS,
     `${cpi.error?.outcome} ${cpi.error?.code} ${cpi.error?.message}`,
   );
+}
+
+/* ------------------------------------------------- the scheduled draw */
+
+/*
+ * Frozen from the official rialo-subscriber-interface 0.21.0-alpha.0 crate (bincode 1.3.3) on
+ * 2026-10-08, by two small Rust programs in the build scratchpad: `enc-test` ran the crate's own
+ * subscribe_to() for a Draw action (subscriber 0x11 x 32, nonce 0x22 x 32, clock window from
+ * 1_700_000_000_000), and `enc-drawbook` serialised SubscriberInstruction::Subscribe directly for the
+ * exact schedule Drawbook sends, with the FIXTURE creator and raffle above and a reveal deadline of
+ * 1_791_341_200_000. The CLI vector is the data of a `rialo client create-subscription` transaction
+ * sent on the local network the same day, whose subscription address the node logged.
+ */
+const SUB = {
+  crate: {
+    persistent:
+      "000000002222222222222222222222222222222222222222222222222222222222222222111111111111111111111111" +
+      "11111111111111111111111111111111111111110500000000000000636c6f636b0106a7d51718c774c928566398691d" +
+      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff01000000000000005a00c372ce" +
+      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b030000000000000011111111111111111111111111" +
+      "111111111111111111111111111111111111110101222222222222222222222222222222222222222222222222222222" +
+      "2222222222000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
+      "0003000000000000000000000000ffffffffffffffff",
+    oneShotWithDestroy:
+      "000000002222222222222222222222222222222222222222222222222222222222222222111111111111111111111111" +
+      "11111111111111111111111111111111111111110500000000000000636c6f636b0106a7d51718c774c928566398691d" +
+      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff02000000000000005a00c372ce" +
+      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b030000000000000011111111111111111111111111" +
+      "111111111111111111111111111111111111110101222222222222222222222222222222222222222222222222222222" +
+      "2222222222000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
+      "000306a2ff24bca701c080b02a3db2f28da829f3187804e7e3a67f0d1e8e000000000200000000000000111111111111" +
+      "1111111111111111111111111111111111111111111111111111010189d9a774281b1c4c0190bfc57bcab4eab0cfeeff" +
+      "a475107ac30c39f0d76c675e000124000000000000000300000022222222222222222222222222222222222222222222" +
+      "22222222222222222222010000000000000000000000ffffffffffffffff",
+  },
+  drawbook: {
+    nonceText: "Bow1CGKGDB9mNxeWdw85E2aCthQ1oZX4",
+    nonce:
+      "426f773143474b474442396d4e7865576477383545326143746851316f5a5834",
+    address: "3MuNPUJTgC35h8FVuuFozDpSaHdzkXF2jytEzyaCQS6z",
+    subscription:
+      "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c97787370500000000000000636c6f636b0106a7" +
+      "d51718c774c928566398691d5eb68b5eb8a39b4b6d5c73555b21000000000108964114a1010000ffffffffffffffff01" +
+      "000000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b0300000000000000d0" +
+      "4ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c97787370100a09aa5f47a6759802ff955f8dc2d2a" +
+      "14a5c99d23be97f864127ff9383455a4f0000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08" +
+      "0000000000010000000000000003010000000000000000000000ffffffffffffffff",
+    subscribe:
+      "00000000426f773143474b474442396d4e7865576477383545326143746851316f5a5834d04ab232742bb4ab3a1368bd" +
+      "4615e4e6d0224ab71a016baf8520a332c97787370500000000000000636c6f636b0106a7d51718c774c928566398691d" +
+      "5eb68b5eb8a39b4b6d5c73555b21000000000108964114a1010000ffffffffffffffff01000000000000005a00c372ce" +
+      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b0300000000000000d04ab232742bb4ab3a1368bd46" +
+      "15e4e6d0224ab71a016baf8520a332c97787370100a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9" +
+      "383455a4f0000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
+      "0003010000000000000000000000ffffffffffffffff",
+    destroy:
+      "03000000426f773143474b474442396d4e7865576477383545326143746851316f5a5834",
+  },
+  cli: {
+    subscriber: "5fzWmikt4gxDzmgDzrpGyEVA5cAHwuJTURyHvAvHEejp",
+    nonceText: "xcheck",
+    address: "4U2NCPKrQmWUXNC6WoBwL8zEqbrRRvsUAzKk3JFKotmU",
+    probe: "3areKYqk5cMDhRttLw7UngvgapHwGASerFCuTa4hpRZo",
+    data:
+      "0000000078636865636b0000000000000000000000000000000000000000000000000000456bd9540cb66e41b5447246" +
+      "0bc81735b41d038d9a5a236dab3f2c5de1cacbcf11000000000000006e657665722d66697265732d746f706963000001" +
+      "000000000000002663ac2dd5d9032d5c3e7efcdf2e920d4ecdd43bff38db3f95771d48807f5cc6010000000000000006" +
+      "a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000000000000000a311" +
+      "0000000000008b15000000000000",
+  },
+  /** Bumps below 255 from the crate's find_program_address, creator F25s… and nonce "n<i>". */
+  bumps: [
+    ["n0", "8LFfDBG4gb7XFJHaxLN9fCcb88Q6Xiqz4KeE6DsyDVCB", 253],
+    ["n1", "2Xx8cpvKbsnAA6JUwuYZkeat3vvTcxyZCM96q7yFvBSy", 255],
+    ["n99", "2zNLXnm6ZtnVXs5tjpAoajMBjK6uuCkQgakovMEimyc2", 247],
+    ["n191", "CZJAw28MnJ6ejspob8anF6hGae1ML8Jnj57cRnNsPnpS", 245],
+    ["n284", "BsCf2L8oBL4cvyfk5q4wqh21KHSEM3vobg6vpHnsi8zM", 243],
+  ] as [string, string, number][],
+  revealDeadline: 1791341200000,
+};
+
+/** A string nonce as `Nonce::from(&str)` makes it: raw UTF-8, zero padded to 32 bytes. */
+const nonceOf = (text: string) => {
+  const out = new Uint8Array(32);
+  out.set(Buffer.from(text, "utf8"));
+  return out;
+};
+const subscriberKey = decodeBase58(SUBSCRIBER_PROGRAM_ID);
+
+section("the Subscribe encoding against the official crate and the CLI");
+{
+  const seed11 = new Uint8Array(32).fill(0x11);
+  const nonce22 = new Uint8Array(32).fill(0x22);
+  const [pda, bump] = findProgramAddress([Buffer.from("rialo_subscribe"), seed11, nonce22], subscriberKey);
+  ok("the crate's subscription address, bump 255", encodeBase58(pda) === "AH7MF2W6F69dDyVRLqCdJUVBSZNkub6GapckfyDWVuZX" && bump === 255, `${encodeBase58(pda)} ${bump}`);
+  const creator = decodeBase58(FIXTURE.pubkeys.creator);
+  for (const [text, address, expected] of SUB.bumps) {
+    const [found, b] = findProgramAddress([Buffer.from("rialo_subscribe"), creator, nonceOf(text)], subscriberKey);
+    ok(`the crate's address for nonce "${text}", bump ${expected}`, encodeBase58(found) === address && b === expected, `${encodeBase58(found)} ${b}`);
+  }
+  const [cliAddress] = findProgramAddress([Buffer.from("rialo_subscribe"), decodeBase58(SUB.cli.subscriber), nonceOf(SUB.cli.nonceText)], subscriberKey);
+  ok("the subscription address the CLI's transaction used", encodeBase58(cliAddress) === SUB.cli.address);
+
+  // Web Crypto's own Ed25519 public keys are curve points by construction; a PDA never is.
+  let allOn = true;
+  for (let i = 0; i < 16; i += 1) {
+    const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"])) as CryptoKeyPair;
+    allOn &&= isOnCurve(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)));
+  }
+  ok("isOnCurve accepts sixteen fresh Ed25519 public keys", allOn);
+  ok("isOnCurve rejects the PDAs found above", !isOnCurve(pda) && !isOnCurve(cliAddress));
+
+  const probeIx = {
+    programId: decodeBase58(SUB.cli.probe),
+    accounts: [{ pubkey: decodeBase58(INSTRUCTIONS_SYSVAR_ID), isSigner: false, isWritable: false }],
+    data: new Uint8Array([0]),
+  };
+  const cliData = encodeSubscribe(nonceOf(SUB.cli.nonceText), {
+    subscriber: decodeBase58(SUB.cli.subscriber),
+    topic: "never-fires-topic",
+    eventAccount: null,
+    timestampRange: null,
+    instructions: [probeIx],
+    kind: "Persistent",
+    activeCommits: [big("4515"), big("5515")],
+  });
+  ok("a Persistent topic subscription is byte-identical to the CLI's (206 bytes)", hexOf(cliData) === SUB.cli.data, hexOf(cliData));
+
+  // The crate's vectors used a Draw whose subscriber meta is signer AND writable, so this one does too.
+  const crateDraw = {
+    programId: decodeBase58(PROGRAM_ID),
+    accounts: [
+      { pubkey: seed11, isSigner: true, isWritable: true },
+      { pubkey: nonce22, isSigner: false, isWritable: true },
+      { pubkey: decodeBase58(INSTRUCTIONS_SYSVAR_ID), isSigner: false, isWritable: false },
+    ],
+    data: new Uint8Array([3]),
+  };
+  const crateSub = (kind: "Persistent" | "OneShot", instructions: Instruction[]): Subscription => ({
+    subscriber: seed11,
+    topic: "clock",
+    eventAccount: decodeBase58(CLOCK_SYSVAR_ID),
+    timestampRange: [big("1700000000000"), U64_MAX],
+    instructions,
+    kind,
+    activeCommits: [big("0"), U64_MAX],
+  });
+  const persistent = encodeSubscribe(nonce22, crateSub("Persistent", [crateDraw]));
+  ok("a Persistent clock subscription is byte-identical to the crate's (310 bytes)", hexOf(persistent) === SUB.crate.persistent && persistent.length === 310);
+  const destroy = {
+    programId: subscriberKey,
+    accounts: [
+      { pubkey: seed11, isSigner: true, isWritable: true },
+      { pubkey: pda, isSigner: false, isWritable: true },
+    ],
+    data: encodeDestroy(nonce22),
+  };
+  ok("Unsubscribe and Destroy data equal the crate's", hexOf(encodeUnsubscribe(nonce22)) === "01000000" + "22".repeat(32) && hexOf(encodeDestroy(nonce22)) === "03000000" + "22".repeat(32));
+  const withDestroy = encodeSubscribe(nonce22, crateSub("OneShot", [crateDraw, destroy]));
+  ok("subscribe_to's OneShot, Destroy appended, is reproduced byte for byte (462 bytes)", hexOf(withDestroy) === SUB.crate.oneShotWithDestroy && withDestroy.length === 462);
+}
+
+section("Drawbook's schedule is exactly the bytes the crate makes for it");
+{
+  const creator = decodeBase58(FIXTURE.pubkeys.creator);
+  const raffle = FIXTURE.pubkeys.raffle;
+  ok("the nonce is the raffle address's first 32 characters", scheduleNonceText(raffle) === SUB.drawbook.nonceText);
+  ok("as raw UTF-8 bytes, as the crate's Nonce::from(&str) has them", hexOf(scheduleNonce(raffle)) === SUB.drawbook.nonce);
+  ok("the subscription address equals the crate's", scheduleAddress(FIXTURE.pubkeys.creator, raffle) === SUB.drawbook.address);
+
+  const ix = subscribeDrawIx(creator, raffle, SUB.revealDeadline);
+  ok("Subscribe data is byte-identical to the crate's SubscriberInstruction::Subscribe (310 bytes)", hexOf(ix.data) === SUB.drawbook.subscribe && ix.data.length === 310, hexOf(ix.data));
+  ok("Subscribe goes to the Subscriber program", encodeBase58(ix.programId) === SUBSCRIBER_PROGRAM_ID);
+  ok(
+    "its accounts: creator signer+writable, subscription writable, System readonly",
+    ix.accounts.length === 3 &&
+      encodeBase58(ix.accounts[0].pubkey) === FIXTURE.pubkeys.creator && ix.accounts[0].isSigner && ix.accounts[0].isWritable &&
+      encodeBase58(ix.accounts[1].pubkey) === SUB.drawbook.address && !ix.accounts[1].isSigner && ix.accounts[1].isWritable &&
+      encodeBase58(ix.accounts[2].pubkey) === "11111111111111111111111111111111" && !ix.accounts[2].isSigner && !ix.accounts[2].isWritable,
+  );
+  const stored = encodeSubscription(drawSchedule(creator, decodeBase58(raffle), SUB.revealDeadline));
+  ok("the account the Subscriber stores is the crate's 274 bytes", hexOf(stored) === SUB.drawbook.subscription && stored.length === 274);
+  ok("SCHEDULE_LEN, computed from the encoding, is 274", SCHEDULE_LEN === 274);
+
+  const decoded = decodeSubscription(stored);
+  ok("one action, and no Destroy after it", decoded.instructions.length === 1);
+  const draw = drawIx(creator, decodeBase58(raffle));
+  ok(
+    "the action is byte for byte the Draw a person sends (caller signer, read-only)",
+    encodeBase58(decoded.instructions[0].programId) === PROGRAM_ID &&
+      hexOf(decoded.instructions[0].data) === "03" &&
+      decoded.instructions[0].accounts.every(
+        (m, i) => hexOf(m.pubkey) === hexOf(draw.accounts[i].pubkey) && m.isSigner === draw.accounts[i].isSigner && m.isWritable === draw.accounts[i].isWritable,
+      ),
+  );
+  ok("OneShot, topic clock on the clock sysvar", decoded.kind === "OneShot" && decoded.topic === "clock" && decoded.eventAccount !== null && encodeBase58(decoded.eventAccount) === CLOCK_SYSVAR_ID);
+  ok(
+    "the window opens at the reveal deadline + 5 s and never closes",
+    decoded.timestampRange !== null && decoded.timestampRange[0] === BigInt(SUB.revealDeadline + 5000) && decoded.timestampRange[1] === U64_MAX,
+  );
+  ok("active for every commit", decoded.activeCommits[0] === big("0") && decoded.activeCommits[1] === U64_MAX);
+
+  const d = destroyScheduleIx(creator, raffle);
+  ok("Destroy data equals the crate's", hexOf(d.data) === SUB.drawbook.destroy);
+  ok(
+    "Destroy accounts: creator signer+writable, subscription writable",
+    d.accounts.length === 2 && d.accounts[0].isSigner && d.accounts[0].isWritable && encodeBase58(d.accounts[1].pubkey) === SUB.drawbook.address && d.accounts[1].isWritable && !d.accounts[1].isSigner,
+  );
+
+  const reclaim = reclaimScheduleIxs(creator, raffle);
+  ok(
+    "reclaiming is Destroy then Unsubscribe, both on the schedule account, creator signing",
+    reclaim.length === 2 &&
+      hexOf(reclaim[0].data) === SUB.drawbook.destroy &&
+      hexOf(reclaim[1].data) === "01" + SUB.drawbook.destroy.slice(2) &&
+      reclaim.every((ix) => encodeBase58(ix.programId) === SUBSCRIBER_PROGRAM_ID && ix.accounts.length === 2 && ix.accounts[0].isSigner && ix.accounts[0].isWritable && encodeBase58(ix.accounts[1].pubkey) === SUB.drawbook.address && ix.accounts[1].isWritable),
+  );
+
+  const twoActions = decodeSubscription(bytesOf(SUB.crate.oneShotWithDestroy).subarray(36));
+  ok("the crate's subscribe_to OneShot decodes to two actions", twoActions.instructions.length === 2 && twoActions.kind === "OneShot");
+  const refuses = (bytes: Uint8Array) => {
+    try {
+      decodeSubscription(bytes);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  ok("a trailing byte is refused", refuses(concatBytes(stored, new Uint8Array([0]))));
+  ok("a truncated account is refused", refuses(stored.subarray(0, 273)));
+  const badKind = stored.slice();
+  badKind[274 - 20] = 2;
+  ok("a kind other than 0 or 1 is refused", refuses(badKind));
+  const hugeTopic = stored.slice();
+  hugeTopic[32 + 7] = 0xff;
+  ok("a topic length past the cap is refused before allocating", refuses(hugeTopic));
+}
+
+function concatBytes(a: Uint8Array, b: Uint8Array) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a);
+  out.set(b, a.length);
+  return out;
+}
+
+section("only the exact schedule counts as scheduled");
+{
+  const creator = decodeBase58(FIXTURE.pubkeys.creator);
+  const raffleKey = decodeBase58(FIXTURE.pubkeys.raffle);
+  const r = { address: FIXTURE.pubkeys.raffle, creator: FIXTURE.pubkeys.creator, revealDeadline: SUB.revealDeadline };
+  const base = () => drawSchedule(creator, raffleKey, SUB.revealDeadline);
+  ok("Drawbook's own schedule is accepted", isDrawbookSchedule(base(), r));
+  const variants: [string, (s: Subscription) => void][] = [
+    ["an extra instruction (the Destroy subscribe_to appends)", (s) => s.instructions.push(destroyScheduleIx(creator, FIXTURE.pubkeys.raffle))],
+    ["Persistent", (s) => { s.kind = "Persistent"; }],
+    ["another raffle's Draw", (s) => { s.instructions = [drawIx(creator, decodeBase58(FIXTURE.pubkeys.buyer))]; }],
+    ["a window opening before the reveal deadline", (s) => { s.timestampRange = [BigInt(SUB.revealDeadline - 1), U64_MAX]; }],
+    ["a window that closes", (s) => { s.timestampRange = [BigInt(SUB.revealDeadline + 5000), BigInt(SUB.revealDeadline + 60_000)]; }],
+    ["a commit window that ends", (s) => { s.activeCommits = [big("0"), big("1000")]; }],
+    ["another subscriber", (s) => { s.subscriber = decodeBase58(FIXTURE.pubkeys.buyer); }],
+    ["a Draw whose caller is writable", (s) => { s.instructions[0].accounts[0].isWritable = true; }],
+    ["another topic", (s) => { s.topic = "clocks"; }],
+    ["no event account", (s) => { s.eventAccount = null; }],
+  ];
+  for (const [what, edit] of variants) {
+    const s = base();
+    edit(s);
+    ok(`refused: ${what}`, !isDrawbookSchedule(s, r));
+  }
+}
+
+section("scheduleState reads the schedule the way the raffle page shows it");
+{
+  const r = { address: FIXTURE.pubkeys.raffle, creator: FIXTURE.pubkeys.creator, revealDeadline: SUB.revealDeadline };
+  const at = SUB.revealDeadline + 5000;
+  const deposit = big("2797920");
+  const account = { owner: SUBSCRIBER_PROGRAM_ID, kelvins: deposit, data: bytesOf(SUB.drawbook.subscription) };
+  const read = (over: Partial<ScheduleRead>): ScheduleRead => ({ address: SUB.drawbook.address, account: null, history: false, held: null, firing: null, ...over });
+  const fired = { signature: "SIG", at: at + 400, isDraw: true, ok: true, code: null, reason: null };
+
+  ok("no account, no history: none", scheduleState(r, read({}), at).kind === "none");
+  ok("no account but a Subscribe/Destroy behind it: withdrawn", scheduleState(r, read({ history: true }), at).kind === "withdrawn");
+  const waiting = scheduleState(r, read({ account, history: true }), at - 1);
+  ok("before the time: scheduled, at reveal deadline + 5 s, with its deposit", waiting.kind === "scheduled" && waiting.at === at && waiting.deposit === deposit);
+  ok("from the time: due", scheduleState(r, read({ account, history: true }), at).kind === "due");
+  ok("due until the window passes", scheduleState(r, read({ account, history: true }), at + DUE_WINDOW_MS - 1).kind === "due");
+  ok("then late", scheduleState(r, read({ account, history: true }), at + DUE_WINDOW_MS).kind === "late");
+  const sent = scheduleState(r, read({ account, history: true, firing: fired }), at + 1000);
+  ok("a triggered Draw: sent, with the deposit still held", sent.kind === "sent" && sent.firing.ok && sent.deposit === deposit && sent.at === at);
+  const reclaimed = scheduleState(r, read({ history: true, firing: fired }), at + 1000);
+  ok("sent and reclaimed: still sent, nothing left to reclaim", reclaimed.kind === "sent" && reclaimed.deposit === null);
+  const refused = scheduleState(r, read({ account, history: true, firing: { ...fired, ok: false, code: 14, reason: errorMessage(14) } }), at + 1000);
+  ok("a triggered Draw the program refused is still sent, with its code", refused.kind === "sent" && !refused.firing.ok && refused.firing.code === 14);
+  ok(
+    "a triggered transaction that is not a Draw is not the draw",
+    scheduleState(r, read({ account, history: true, firing: { ...fired, isDraw: false } }), at - 1).kind === "scheduled",
+  );
+  const updated = encodeSubscription({ ...drawSchedule(decodeBase58(r.creator), decodeBase58(r.address), r.revealDeadline), kind: "Persistent" });
+  ok("an account Updated into something else: unrecognised", scheduleState(r, read({ account: { ...account, data: updated } }), at).kind === "unrecognised");
+  ok("garbage in the account: unrecognised", scheduleState(r, read({ account: { ...account, data: new Uint8Array(9) } }), at).kind === "unrecognised");
+  ok("an account another program owns is not a schedule", scheduleState(r, read({ account: { ...account, owner: PROGRAM_ID } }), at).kind === "none");
+  // The node's word on whether it still holds the subscription (getSubscription).
+  const heldAt = scheduleState(r, read({ account, history: true, held: true }), at - 1);
+  ok("held by the node, before the time: scheduled", heldAt.kind === "scheduled" && heldAt.at === at);
+  const dropped = scheduleState(r, read({ account, history: true, held: false }), at - 1);
+  ok("the node says it no longer holds it, before the time: dropped, never scheduled", dropped.kind === "dropped" && dropped.deposit === deposit);
+  ok("not held from the time on reads as due: a firing not listed yet looks the same", scheduleState(r, read({ account, history: true, held: false }), at).kind === "due");
+  ok("an unanswered getSubscription changes nothing", scheduleState(r, read({ account, history: true, held: null }), at - 1).kind === "scheduled");
+  ok("not held, but a Draw was sent: sent", scheduleState(r, read({ account, history: true, held: false, firing: fired }), at - 1).kind === "sent");
+}
+
+section("a triggered transaction, as the node returns it, is read for what it did");
+{
+  const raffle = { address: FIXTURE.pubkeys.raffle, creator: FIXTURE.pubkeys.creator };
+  // The shape of triggered Draw 3kiz7e7r… on the local network, 2026-10-08, with this fixture's keys.
+  const tx = (err: unknown, logs: string[], instructions: unknown[]) => ({
+    transaction: {
+      signatures: ["SIG"],
+      message: {
+        accountKeys: [FIXTURE.pubkeys.creator, FIXTURE.pubkeys.raffle, INSTRUCTIONS_SYSVAR_ID, PROGRAM_ID],
+        header: { numRequiredSignatures: 1, numReadonlySignedAccounts: 0, numReadonlyUnsignedAccounts: 2 },
+        instructions,
+      },
+      validFrom: 1791414750645,
+    },
+    meta: { err, fee: 5000, logMessages: logs },
+  });
+  const draw = { accounts: [0, 1, 2], data: "4", programIdIndex: 3 };
+  const good = readFiring("SIG", tx(null, [`Program ${PROGRAM_ID} success`], [draw]), raffle);
+  ok("a lone Draw that ran: a Draw, ok, at its block time", good !== null && good.isDraw && good.ok && good.at === 1791414750645 && good.code === null);
+  const early = readFiring(
+    "SIG",
+    tx({ InstructionError: [0, { Custom: 13 }] }, [`Program ${PROGRAM_ID} failed: custom program error: 0xd`], [draw]),
+    raffle,
+  );
+  ok("a Draw refused as NotReady carries code 13 and the program's sentence", early !== null && early.isDraw && !early.ok && early.code === 13 && early.reason === errorMessage(13));
+  const pair = readFiring("SIG", tx(null, [], [draw, draw]), raffle);
+  ok("two instructions are not the draw", pair !== null && !pair.isDraw);
+  const other = readFiring("SIG", tx(null, [], [{ ...draw, accounts: [0, 2, 1] }]), raffle);
+  ok("a Draw on another account is not this raffle's draw", other !== null && !other.isDraw);
+  ok("no transaction: nothing to read", readFiring("SIG", null, raffle) === null);
+}
+
+section("the failing instruction is named, so Create can tell a refused schedule from a refused raffle");
+{
+  ok("object form", failedInstruction({ InstructionError: [2, "InvalidArgument"] }) === 2);
+  ok("object form with a custom code", failedInstruction({ InstructionError: [2, { Custom: 1 }] }) === 2);
+  ok("Debug form", failedInstruction("InstructionError(2, Custom(1))") === 2);
+  ok("a whole-transaction failure names none", failedInstruction("InsufficientFundsForFee") === null);
+  ok("no error, no index", failedInstruction(null) === null);
+}
+
+section("Subscriber RPC shapes (fetch stubbed)");
+{
+  const realFetch = globalThis.fetch;
+  const requests: { method: string; params: unknown }[] = [];
+  let respond: (method: string) => { status: number; text: string } = () => ({ status: 200, text: "{}" });
+  globalThis.fetch = (async (_url: unknown, init?: { body?: unknown }) => {
+    const body = JSON.parse(String(init?.body)) as { method: string; params: unknown };
+    requests.push(body);
+    const r = respond(body.method);
+    return new Response(r.text, { status: r.status });
+  }) as typeof fetch;
+  try {
+    const client = new RialoClient("http://stub.invalid");
+    respond = () => ({ status: 200, text: '{"jsonrpc":"2.0","id":1,"result":{"version":0,"transactions":[{"signature":"S1","blockNumber":7065}]}}' });
+    const t = await client.getTriggeredTransactions(SUB.drawbook.address, 5);
+    ok("getTriggeredTransactions sends [address, limit as a string]", JSON.stringify(requests.at(-1)?.params) === `["${SUB.drawbook.address}","5"]`);
+    ok("and reads {signature, blockNumber}", t.length === 1 && t[0].signature === "S1" && t[0].blockNumber === 7065);
+    respond = () => ({ status: 200, text: '{"jsonrpc":"2.0","id":1,"result":{"version":0,"transactions":[]}}' });
+    ok("an empty list is empty", (await client.getTriggeredTransactions(SUB.drawbook.address)).length === 0);
+
+    respond = () => ({
+      status: 200,
+      text: `{"jsonrpc":"2.0","id":1,"result":{"version":0,"context":{"slot":1,"api_version":"0.21.0-alpha.0"},"subscription":{"kind":"OneShot","topic":"clock","instructions":[],"subscriber":"${FIXTURE.pubkeys.creator}","event_account":"${CLOCK_SYSVAR_ID}","timestamp_range":[1791341205000,18446744073709551615]}}}`,
+    });
+    const s = await client.getSubscription(FIXTURE.pubkeys.creator, SUB.drawbook.nonceText);
+    ok("getSubscription sends {subscriber, nonce} as a struct", JSON.stringify(requests.at(-1)?.params) === `[{"subscriber":"${FIXTURE.pubkeys.creator}","nonce":"${SUB.drawbook.nonceText}"}]`);
+    ok("and reads the subscription", s !== null && s.kind === "OneShot" && s.topic === "clock");
+    respond = () => ({ status: 404, text: '{"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"Subscription not found: Subscription not found"}}' });
+    ok("not found is null, not an error", (await client.getSubscription(FIXTURE.pubkeys.creator, "nothing")) === null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+section("Create falls back to an unscheduled raffle only when Rialo refused the schedule (node stubbed)");
+{
+  const { createRaffle } = await import("../lib/chain/actions.ts");
+  const creatorSigner = await signerFromSeed(0x11);
+  const wallet = { address: encodeBase58(creatorSigner.publicKey), canSign: true, privateKey: creatorSigner.privateKey };
+  const params = { ...FIXTURE_PARAMS, commitDeadline: Date.now() + 60_000, revealDeadline: Date.now() + 120_000 };
+
+  /** A node stand-in: `failWith(n)` decides how the n-th sent transaction ends (null: it executes). */
+  const stubNode = (failWith: (n: number) => { err: unknown; logs: string[] } | null) => {
+    const sent: Uint8Array[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: unknown, init?: { body?: unknown }) => {
+      const body = JSON.parse(String(init?.body)) as { method: string; params: unknown[] };
+      const reply = (result: unknown) => new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result }), { status: 200 });
+      switch (body.method) {
+        case "getMinimumBalanceForRentExemption":
+          return reply("3507840");
+        case "getRecentValidatorConfigHash":
+          return new Response('{"jsonrpc":"2.0","id":1,"result":{"version":0,"configHashPrefix":11774740490753875893}}');
+        case "sendTransaction":
+          sent.push(new Uint8Array(Buffer.from(String(body.params[0]), "base64")));
+          return reply(`SIG${sent.length}`);
+        case "getSignatureStatuses": {
+          const n = Number(String((body.params[0] as { signatures: string[] }).signatures[0]).slice(3));
+          const f = failWith(n);
+          return reply({ value: [{ slot: 1, err: f ? f.err : null, executed: true }] });
+        }
+        case "getTransaction": {
+          const n = Number(String((body.params[0] as { signature: string }).signature).slice(3));
+          const f = failWith(n);
+          return reply({ meta: { err: f ? f.err : null, logMessages: f ? f.logs : [] } });
+        }
+        default:
+          return reply(null);
+      }
+    }) as typeof fetch;
+    return { sent, restore: () => (globalThis.fetch = realFetch) };
+  };
+  /** The message's instruction count and its second key (the raffle, the only other signer). */
+  const shape = (tx: Uint8Array) => {
+    const message = tx.subarray(1 + 64 * tx[0]);
+    const keyCount = message[3];
+    const raffle = encodeBase58(message.subarray(4 + 32, 4 + 64));
+    const instructions = message[4 + 32 * keyCount + 8 + 8 + 1];
+    return { instructions, raffle };
+  };
+
+  const subscriberLogs = [
+    `Program ${PROGRAM_ID} invoke [1]`,
+    `Program ${PROGRAM_ID} success`,
+    `Program ${SUBSCRIBER_PROGRAM_ID} invoke [1]`,
+    "only the creator of the subscription (payer) can be a signer",
+    `Program ${SUBSCRIBER_PROGRAM_ID} failed: invalid program argument`,
+  ];
+  let node = stubNode((n) => (n === 1 ? { err: { InstructionError: [2, "InvalidArgument"] }, logs: subscriberLogs } : null));
+  try {
+    const made = await createRaffle(wallet, params);
+    const [first, second] = node.sent.map(shape);
+    ok("the first attempt carries three instructions, the second two", node.sent.length === 2 && first.instructions === 3 && second.instructions === 2, JSON.stringify([first, second]));
+    ok("both attempts are the same raffle account, so a second prize cannot move", first.raffle === second.raffle && made.raffle === first.raffle);
+    ok("the raffle is reported created by the second transaction", made.signature === "SIG2");
+    ok("with no schedule, and Rialo's own reason", made.schedule === null && made.drawAt === null && made.scheduleError === "only the creator of the subscription (payer) can be a signer (invalid program argument)", String(made.scheduleError));
+    ok("the refused attempt is kept as a receipt for its fee", made.scheduleSignature === "SIG1");
+  } finally {
+    node.restore();
+  }
+
+  node = stubNode(() => null);
+  try {
+    const made = await createRaffle(wallet, params);
+    ok("when Rialo accepts: one transaction, scheduled at the reveal deadline + 5 s", node.sent.length === 1 && made.schedule === scheduleAddress(wallet.address, made.raffle) && made.drawAt === params.revealDeadline + 5000 && made.scheduleError === null);
+  } finally {
+    node.restore();
+  }
+
+  node = stubNode((n) => (n === 1 ? { err: { InstructionError: [1, { Custom: 5 }] }, logs: [`Program ${PROGRAM_ID} failed: custom program error: 0x5`] } : null));
+  try {
+    const refused = await createRaffle(wallet, params).then(() => null, (error: ChainError) => error);
+    ok("a raffle the program refuses is not sent again", node.sent.length === 1 && refused instanceof ChainError && refused.code === 5 && refused.instruction === 1);
+  } finally {
+    node.restore();
+  }
 }
 
 console.log(
