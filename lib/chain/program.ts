@@ -14,7 +14,16 @@ import { deriveWinners } from "../raffle.ts";
 import { concat, fromHex, sha256, toHex, utf8 } from "../sha256.ts";
 import type { Instruction } from "./tx.ts";
 
-export const PROGRAM_ID = "74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6";
+export const PROGRAM_ID = "EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR";
+
+/**
+ * Drawbook's first program, retired on 8 Oct 2026 when the same code moved to `PROGRAM_ID` so the
+ * raffle list could start empty. It and its raffles are still on chain; the site no longer lists or
+ * opens them, and /r/<address> uses this only to say so plainly instead of "no raffle here".
+ */
+export const RETIRED_PROGRAM_ID = "74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6";
+export const RETIRED_ON = "8 Oct 2026";
+
 export const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 
 export const HEADER_LEN = 208;

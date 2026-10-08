@@ -27,6 +27,7 @@ import {
   MIN_SUPPLY,
   payoutOf,
   PROGRAM_ID,
+  RETIRED_PROGRAM_ID,
   revealIx,
   systemCreateAccountIx,
   type ChainRaffle,
@@ -102,15 +103,27 @@ function send(payer: TxSigner, instructions: Instruction[], extraSigners: TxSign
 
 /* ------------------------------------------------------------------ reads */
 
+/**
+ * What is at `raffle`: a raffle of this program, an account of the retired first program (which the
+ * site no longer opens), or neither.
+ */
+export type RaffleLookup = { kind: "raffle"; raffle: ChainRaffle } | { kind: "retired" } | { kind: "none" };
+
+export async function lookupRaffle(raffle: string): Promise<RaffleLookup> {
+  const account = await rialo.getAccountInfo(raffle);
+  if (account?.owner === RETIRED_PROGRAM_ID) return { kind: "retired" };
+  if (!account || account.owner !== PROGRAM_ID) return { kind: "none" };
+  try {
+    return { kind: "raffle", raffle: decodeRaffle(raffle, account.data, account.kelvins) };
+  } catch {
+    return { kind: "none" };
+  }
+}
+
 /** The raffle at `raffle`, or null when there is no account there or it is not a raffle. */
 export async function fetchRaffle(raffle: string): Promise<ChainRaffle | null> {
-  const account = await rialo.getAccountInfo(raffle);
-  if (!account || account.owner !== PROGRAM_ID) return null;
-  try {
-    return decodeRaffle(raffle, account.data, account.kelvins);
-  } catch {
-    return null;
-  }
+  const found = await lookupRaffle(raffle);
+  return found.kind === "raffle" ? found.raffle : null;
 }
 
 /** Every raffle the program holds, newest first. Accounts that are not raffles are skipped. */

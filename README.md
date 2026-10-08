@@ -11,12 +11,13 @@ Live at **https://drawbook-rialo.vercel.app**
 
 | | |
 |---|---|
-| The raffle program | **deployed on Rialo testnet**, program id `74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6` |
+| The raffle program | **deployed on Rialo testnet**, program id `EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR` |
 | Deploy, buy, reveal, draw, claim | **real signed transactions** from a burner wallet held in the browser |
 | The draw check on a live raffle | **recomputed from chain data**; it can fail |
-| The draw trigger | **sent by Rialo**: Create schedules Draw with Rialo's Subscriber program, and Rialo sends it by itself 5 s after the reveal deadline (seen on testnet, below); anyone can also send Draw once every ticket is revealed. Raffles created before the schedule have none and are drawn by pressing Draw |
+| The draw trigger | **sent by Rialo**: Create schedules Draw with Rialo's Subscriber program, and Rialo sends it by itself 5 s after the reveal deadline (seen on testnet, below); anyone can also send Draw once every ticket is revealed. A raffle whose schedule Rialo refused has none and is drawn by pressing Draw |
 | Raffles 1 to 5 (`/raffle/1`..`/raffle/5`) | fixed sample data, not on chain, clock starting 30 Jul 2026 |
-| Upgrades | the program **can no longer be upgraded by anyone**: the key of its upgrade authority (`GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor`) was lost during development on 2026-10-08, overwritten on the machine that deployed it, and no copy has been found |
+| Upgrades | **the deployer can still upgrade it during the testnet period**; its upgrade authority is `8oM9XHmeYniw7T4vNFm8br9BfVvL6EfV2ryM81Dgs4M9` |
+| The first program | `74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6` ran the same code until it was **retired** on 2026-10-08 so the raffle list could start empty (its upgrade key had been lost); its raffles stay on chain, unlisted, and their `/r` links say so |
 | Rent | each raffle account **keeps its rent reserve** after every claim, about 0.0035 RLO for 2 tickets; no instruction closes it |
 
 Testnet only. The coins have no value and testnet can be reset. Live raffles open at
@@ -86,13 +87,13 @@ solitary Draw, so errors 17 and 18 apply to it as they do to anyone.
 - **When it does not fire.** A OneShot is not retried. If the raffle was drawn by hand first, Rialo's
   Draw is refused with 14 and changes nothing. If it has not arrived 30 s after its time, the raffle
   page brings the Draw button back. If Rialo refuses the `Subscribe`, the browser creates the raffle
-  without it and says so. Raffles created before the schedule have no subscription at all.
+  without it and says so.
 - **Not yet observed:** a subscription that waits weeks across node restarts or upgrades, and a
   creator who cannot pay the firing fee. The Draw button covers both.
 
-**Seen on testnet on 2026-10-08.** Raffle `AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w` (2 tickets,
-one-minute reveal window) was drawn by Rialo 5,123 ms after its reveal deadline, with nobody
-pressing Draw: transaction
+**Seen on testnet on 2026-10-08,** on the first program (same code). Raffle
+`AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w` (2 tickets, one-minute reveal window) was drawn by
+Rialo 5,123 ms after its reveal deadline, with nobody pressing Draw: transaction
 `3uHik9GzcRC844SV78DrQg1GJ8GP4sEbQkLFEshQWzoJS7cZwJNymgcN1ThRLNVZN4RZ55NxwFovSptDQsY3v3qH`, one
 instruction, the creator its only signer and fee payer, 4,411 compute units. `auditDraw` recomputed
 the same winner, and `getTriggeredTransactions` on the subscription account lists exactly that one
@@ -121,14 +122,14 @@ The port is 3333, not 3000, set in `package.json` as `${PORT:-3333}`. The RPC en
 ## Verification
 
 ```bash
-pnpm verify    # offline: three suites, 319 checks
+pnpm verify    # offline: three suites, 325 checks
 ```
 
 | Suite | Checks | What it asserts |
 |---|---:|---|
 | `scripts/verify-sha256.ts` | 20 | SHA-256 against FIPS 180-4 vectors, plus 400 random cross-checks against `node:crypto` |
 | `scripts/verify-raffle.ts` | 75 | the draw in `lib/raffle.ts`: determinism, distinct winners, independence from reveal order, the winner cap, payout conservation, a tamper-rejecting audit, chi-square uniformity, the sample data |
-| `scripts/verify-chain.ts` | 224 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals, and the schedule (the `Subscribe` bytes against the official crate and a CLI transaction, the exact-form check, the states the raffle page shows, the fallback when Rialo refuses it) |
+| `scripts/verify-chain.ts` | 230 | the browser library in `lib/chain/`: transactions against `@rialo/ts-cdk` fixtures, the v2 hashes against `node:crypto`, account decoding, the draw check, payouts and refusals, and the schedule (the `Subscribe` bytes against the official crate and a CLI transaction, the exact-form check, the states the raffle page shows, the fallback when Rialo refuses it), and that an account of the retired first program is named rather than decoded |
 
 Count the `PASS` lines rather than trusting this table. The chi-square statistic is computed from
 fresh random seeds on every run, so it changes each time; the test passes while it stays under the
@@ -178,9 +179,9 @@ rialo -u <rpc url> -a <deployer> client program deploy \
 - Pass the RPC URL with `-u https://testnet.rialo.io:4101`. The `-n testnet` preset points at a host
   that does not resolve.
 - The program id is the program keypair's address, so the same keypair gives the same id on a local
-  network and on testnet, and the browser hardcodes it once. On testnet it no longer upgrades in
-  place: the upgrade authority's key is gone, so the deployed program is fixed, and a changed
-  program would need a new program id.
+  network and on testnet, and the browser hardcodes it once. Deploying again with the same
+  `--keypair`, paid by the upgrade authority's key, upgrades the program in place; the deployer can
+  still upgrade it during the testnet period.
 - Keep the program keypair, and every other keypair, out of the repo. `program/.gitignore` ignores
   `*.keypair`, `target/` and `artifacts/` as a backstop, not as permission.
 
@@ -242,5 +243,5 @@ disagrees with itself in places.
 ## Still to do
 
 - Settle the moment the last holder reveals without anyone pressing Draw. Rialo can match a clock or
-  an event topic, and the program emits no event; since this program can no longer be upgraded, that would
-  mean a new program id.
+  an event topic, and the program emits no event; emitting one would take an upgrade of the
+  program.

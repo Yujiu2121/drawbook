@@ -70,9 +70,10 @@ export const metadata = {
  * from an earlier version of this page, rendered as "Wired today:nothing" and "<C>CreateAccount</C> in" as "CreateAccountin". The same
  * text with a literal U+2019 keeps its space, and text after a {expression} is not affected.
  *
- * TESTNET FACTS, PER THE CLAIMS SHEET. The program can no longer be upgraded by anyone, because the key of
- * its upgrade authority was lost on 2026-10-08; this page and the README are the two places that
- * give that reason, briefly, and nowhere in the headline copy. Every raffle account keeps its rent
+ * TESTNET FACTS, PER THE CLAIMS SHEET. The deployer can still upgrade the program during the testnet
+ * period, and its upgrade authority is named. Drawbook's first program, which ran the same code, was
+ * retired on 8 Oct 2026 so the raffle list could start empty; this page names its id once, with that
+ * note, and nowhere in the headline copy. Every raffle account keeps its rent
  * reserve after the last claim (0.00350784 RLO for 2 tickets, the rent-exempt minimum the node
  * quotes for 376 bytes). Both are stated in "What runs on chain", the second again under payouts,
  * rather than left for a reader to discover.
@@ -96,7 +97,7 @@ export default function DocsPage() {
           <H2 id="live">What runs on chain</H2>
           <P>
             Drawbook’s raffle program runs on Rialo testnet at{" "}
-            <C>74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6</C>.{" "}
+            <C>EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR</C>.{" "}
             <TextLink href="/create">Deploying a raffle</TextLink> creates a real raffle account.
             Buying, revealing, drawing and claiming are real transactions, signed by a burner wallet
             that this browser generates and keeps.
@@ -107,13 +108,18 @@ export default function DocsPage() {
             live in this browser’s storage, so clearing it loses both.
           </P>
           <P>
-            The program can no longer be upgraded by anyone. Its upgrade authority is still recorded as{" "}
-            <C>GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor</C>, but the key for it was lost during
-            development: it was overwritten on the machine that deployed the program, and no copy
-            has been found. Nobody can replace the code, so what this page describes is the code
-            that runs.
+            The program’s deployer can still upgrade it during the testnet period. Its upgrade
+            authority is{" "}
+            <C>8oM9XHmeYniw7T4vNFm8br9BfVvL6EfV2ryM81Dgs4M9</C>, and an upgrade would replace the
+            code at the same id, so what this page describes is the code deployed there now.
             Each raffle account also keeps its rent reserve after every claim is paid: about 0.0035
             RLO for a raffle of 2 tickets, more for a longer account.
+          </P>
+          <P>
+            Drawbook’s first program, <C>74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6</C>, ran the
+            same code and was retired on 8 October 2026, so that the raffle list could start empty.
+            Its raffles are still on chain at their own addresses, but Drawbook no longer lists them,
+            and a link to one says it is retired.
           </P>
           <P>
             The five raffles numbered 1 to 5 are something else: fixed sample data, not on chain, kept
@@ -122,7 +128,7 @@ export default function DocsPage() {
           </P>
           <Facts
             rows={[
-              ["Program id", "74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6"],
+              ["Program id", "EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR"],
               ["Network", "Rialo testnet"],
               ["Units", "u64 kelvin, 1 RLO = 1,000,000,000 kelvin"],
               ["Times", "u64 milliseconds, from the chain clock"],
@@ -130,7 +136,7 @@ export default function DocsPage() {
               ["Sale length", "at most 31 days from Create"],
               ["Reveal window", "1 minute to 7 days after the sale deadline"],
               ["Draw sent by", "Rialo at reveal deadline + 5 s, or anyone once ready"],
-              ["Upgradeable", "no, not by anyone"],
+              ["Upgradeable", "yes, by its deployer, during the testnet period"],
               ["Integers in the account", "little-endian unless marked"],
             ]}
           />
@@ -531,10 +537,10 @@ data      u32 0 (Subscribe) ‖ nonce [32]
           </P>
           <P>
             It has run on testnet. On 8 October 2026 raffle{" "}
-            <C>AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w</C>, with 2 tickets and a one-minute
-            reveal window, was drawn by Rialo 5.1 seconds after its reveal deadline: one transaction,
-            Draw alone, the creator its only signer and fee payer, 4,411 compute units. Nobody pressed
-            Draw, and recomputing the result matched. <C>getTriggeredTransactions</C> on the
+            <C>AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w</C>, on the first program, with 2 tickets
+            and a one-minute reveal window, was drawn by Rialo 5.1 seconds after its reveal deadline:
+            one transaction, Draw alone, the creator its only signer and fee payer, 4,411 compute
+            units. Nobody pressed Draw, and recomputing the result matched. <C>getTriggeredTransactions</C> on the
             subscription account lists that one transaction.
           </P>
           <Facts
@@ -568,9 +574,10 @@ data      u32 0 (Subscribe) ‖ nonce [32]
               its time, the raffle page brings the Draw button back for anyone to press.
             </LI>
             <LI>
-              <strong>Raffles from before the schedule.</strong> Raffles deployed before Drawbook
-              began scheduling the draw have no subscription. Their page says the draw is not
-              scheduled, and it is a button anyone can press once the raffle is ready.
+              <strong>A raffle without a schedule.</strong> If Rialo refuses the{" "}
+              <C>Subscribe</C>, the raffle is deployed without it and has no subscription. Its page
+              says the draw is not scheduled, and it is a button anyone can press once the raffle is
+              ready.
             </LI>
             <LI>
               <strong>Not yet observed.</strong> Whether a subscription survives weeks of waiting

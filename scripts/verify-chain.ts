@@ -35,7 +35,9 @@ import {
   payoutOf,
   phaseOf,
   PROGRAM_ID,
+  RETIRED_PROGRAM_ID,
   seedV2,
+  SYSTEM_PROGRAM_ID,
   systemCreateAccountIx,
   TICKET_LEN,
   U64_MAX,
@@ -105,6 +107,9 @@ const nodeSha = (...parts: Uint8Array[]) => {
  * Frozen from @rialo/ts-cdk 0.18.1 on 2026-10-07 (TransactionBuilder, createAccount, signAll),
  * with Ed25519 secret keys of 32 repeated bytes 0x11, 0x22 and 0x33. Ed25519 signatures are
  * deterministic, so a Web Crypto signature over the same message must equal the SDK's byte for byte.
+ * Regenerated on 2026-10-08 for the current PROGRAM_ID by the same SDK calls, from a generator that
+ * builds the Drawbook instruction data from program/SPEC.md rather than lib/, and that first
+ * reproduced the previous program's fixtures byte for byte.
  */
 const FIXTURE = {
   seeds: { creator: 0x11, raffle: 0x22, buyer: 0x33 },
@@ -119,11 +124,11 @@ const FIXTURE = {
   nonce: "00112233445566778899aabbccddeeff",
   commitment: "1d2c31de01a785736fd5af1fea471146e37d57480e6ef9d127c770a0dbd091ac",
   createAccountData:
-    "00000000005e47000000000020020000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b",
+    "00000000005e4700000000002002000000000000c71de9e8078b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba2",
   createTx:
-    "022753d6ba4c1dbef1550fc0ab9d38d34f5d212673b84629357ef6897565b9f94890a842c7ec89b7eb5e60dadcd9fab2147894639b04ca0fbc0a8f2985deb1af0a84966a39c24be6832d7d94b77596ac04aebc422afc0757dd5a7a1dfab26c0fdaf119eec46230663b05da3ffcef4e3081ca767c0111ff2954698a681f59b9d00702000204d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f000000000000000000000000000000000000000000000000000000000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b00332f14a1010000b51fcb51174868a30002020200013400000000005e47000000000020020000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b03030001024d0000e1f505000000008096980000000000404b4c000000000004000200c05a3814a101000080824114a10100004669787475726520726166666c65000000000000000000000000000000000000",
+    "02ef7b20079a89d885f3f77735c87aa200d28c4ffa9b5915f6406664fe2a70e52e0d580e4ecc91ce5ba83d63c9774c945d483c1372909ddb4f62411b55331a6d02c9640521e841cfbd5c1caf5139dfc1a1d0e1189d6c036399c2cbc61a2ad9d6a08b3a67b5c9e41b29492606bbca6b02f29dbe373ec0e19bd55e839dfc3412da0d02000204d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f00000000000000000000000000000000000000000000000000000000000000000c71de9e8078b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba200332f14a1010000b51fcb51174868a30002020200013400000000005e4700000000002002000000000000c71de9e8078b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba203030001024d0000e1f505000000008096980000000000404b4c000000000004000200c05a3814a101000080824114a10100004669787475726520726166666c65000000000000000000000000000000000000",
   buyTx:
-    "01aef35f4676c384773e916d0e8a723773761d0ba9aa4ff13bd61344cf6d1d68a310d38dfe825cdd031adc506b8a10f51127c5757efc02ec9d697dc87e2dbef10a0100020417cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080cea09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f000000000000000000000000000000000000000000000000000000000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b00332f14a1010000b51fcb51174868a300010303000102230101001d2c31de01a785736fd5af1fea471146e37d57480e6ef9d127c770a0dbd091ac",
+    "01257a33057092349577393143b96ca2c8dd73633d7342f9110e33c9c2d679e9f203759748080601c2b0eab0534e14a0ef7cb497b5462d42d70d25cbcdfee448000100020417cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080cea09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f00000000000000000000000000000000000000000000000000000000000000000c71de9e8078b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba200332f14a1010000b51fcb51174868a300010303000102230101001d2c31de01a785736fd5af1fea471146e37d57480e6ef9d127c770a0dbd091ac",
 };
 
 const FIXTURE_PARAMS: CreateParams = {
@@ -225,7 +230,7 @@ section("RPC client shapes (fetch stubbed, nothing leaves this machine)");
 
     respond = () => ({
       status: 200,
-      text: '{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":1},"value":{"kelvin":9007199254740993,"owner":"74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6","data":["AQID","base64"],"executable":false,"rentEpoch":18446744073709551615,"space":3}}}',
+      text: '{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":1},"value":{"kelvin":9007199254740993,"owner":"EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR","data":["AQID","base64"],"executable":false,"rentEpoch":18446744073709551615,"space":3}}}',
     });
     const account = await client.getAccountInfo("F25s3DdjXdCxYBhh2z8FBusVEMT4b9bGNFVKJi3wFoF4");
     ok("getAccountInfo keeps kelvins above 2^53 exact", account?.kelvins === big("9007199254740993"), String(account?.kelvins));
@@ -900,23 +905,26 @@ section("a transaction that may have landed is never reported as failed (BC-3)")
  * 1_700_000_000_000), and `enc-drawbook` serialised SubscriberInstruction::Subscribe directly for the
  * exact schedule Drawbook sends, with the FIXTURE creator and raffle above and a reveal deadline of
  * 1_791_341_200_000. The CLI vector is the data of a `rialo client create-subscription` transaction
- * sent on the local network the same day, whose subscription address the node logged.
+ * sent on the local network the same day, whose subscription address the node logged. When the
+ * program moved to its current id the same day, both Rust programs were rebuilt to take the id as an
+ * argument; given the previous id they reproduced every vector here byte for byte, and these are
+ * their output for the current one. The CLI vector names no raffle program and did not change.
  */
 const SUB = {
   crate: {
     persistent:
       "000000002222222222222222222222222222222222222222222222222222222222222222111111111111111111111111" +
       "11111111111111111111111111111111111111110500000000000000636c6f636b0106a7d51718c774c928566398691d" +
-      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff01000000000000005a00c372ce" +
-      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b030000000000000011111111111111111111111111" +
+      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff0100000000000000c71de9e807" +
+      "8b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba2030000000000000011111111111111111111111111" +
       "111111111111111111111111111111111111110101222222222222222222222222222222222222222222222222222222" +
       "2222222222000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
       "0003000000000000000000000000ffffffffffffffff",
     oneShotWithDestroy:
       "000000002222222222222222222222222222222222222222222222222222222222222222111111111111111111111111" +
       "11111111111111111111111111111111111111110500000000000000636c6f636b0106a7d51718c774c928566398691d" +
-      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff02000000000000005a00c372ce" +
-      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b030000000000000011111111111111111111111111" +
+      "5eb68b5eb8a39b4b6d5c73555b2100000000010068e5cf8b010000ffffffffffffffff0200000000000000c71de9e807" +
+      "8b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba2030000000000000011111111111111111111111111" +
       "111111111111111111111111111111111111110101222222222222222222222222222222222222222222222222222222" +
       "2222222222000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
       "000306a2ff24bca701c080b02a3db2f28da829f3187804e7e3a67f0d1e8e000000000200000000000000111111111111" +
@@ -932,15 +940,15 @@ const SUB = {
     subscription:
       "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c97787370500000000000000636c6f636b0106a7" +
       "d51718c774c928566398691d5eb68b5eb8a39b4b6d5c73555b21000000000108964114a1010000ffffffffffffffff01" +
-      "000000000000005a00c372ce98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b0300000000000000d0" +
+      "00000000000000c71de9e8078b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba20300000000000000d0" +
       "4ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c97787370100a09aa5f47a6759802ff955f8dc2d2a" +
       "14a5c99d23be97f864127ff9383455a4f0000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08" +
       "0000000000010000000000000003010000000000000000000000ffffffffffffffff",
     subscribe:
       "00000000426f773143474b474442396d4e7865576477383545326143746851316f5a5834d04ab232742bb4ab3a1368bd" +
       "4615e4e6d0224ab71a016baf8520a332c97787370500000000000000636c6f636b0106a7d51718c774c928566398691d" +
-      "5eb68b5eb8a39b4b6d5c73555b21000000000108964114a1010000ffffffffffffffff01000000000000005a00c372ce" +
-      "98b29a88b7e3926a4987fc274b97a608f2d272ef2bddf0c8d7281b0300000000000000d04ab232742bb4ab3a1368bd46" +
+      "5eb68b5eb8a39b4b6d5c73555b21000000000108964114a1010000ffffffffffffffff0100000000000000c71de9e807" +
+      "8b0ba2072c8583dc1ed3b1966b28b08144b4fbde46ca333cbfeba20300000000000000d04ab232742bb4ab3a1368bd46" +
       "15e4e6d0224ab71a016baf8520a332c97787370100a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9" +
       "383455a4f0000106a7d517187bd16635dad40455fdc2c0c124c68f215675a5dbbacb5f08000000000001000000000000" +
       "0003010000000000000000000000ffffffffffffffff",
@@ -1356,6 +1364,37 @@ section("Create falls back to an unscheduled raffle only when Rialo refused the 
     ok("a raffle the program refuses is not sent again", node.sent.length === 1 && refused instanceof ChainError && refused.code === 5 && refused.instruction === 1);
   } finally {
     node.restore();
+  }
+}
+
+section("an account of the retired first program is named, never decoded (fetch stubbed)");
+{
+  const { fetchRaffle, lookupRaffle } = await import("../lib/chain/actions.ts");
+  let owner: string | null = RETIRED_PROGRAM_ID;
+  let data = buildAccount(drawnFixture().header);
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    const value =
+      owner === null
+        ? null
+        : { kelvin: 123456789, owner, data: [Buffer.from(data).toString("base64"), "base64"], executable: false, rentEpoch: 0, space: data.length };
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { context: { slot: 1 }, value } }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    ok("a raffle account the retired program owns is reported as retired", (await lookupRaffle(RAFFLE)).kind === "retired");
+    ok("and fetchRaffle does not decode it", (await fetchRaffle(RAFFLE)) === null);
+    owner = PROGRAM_ID;
+    const live = await lookupRaffle(RAFFLE);
+    ok("the same bytes under the current program are a raffle", live.kind === "raffle" && live.raffle.title === "Audit fixture");
+    owner = SYSTEM_PROGRAM_ID;
+    ok("an account another program owns is nothing", (await lookupRaffle(RAFFLE)).kind === "none");
+    owner = PROGRAM_ID;
+    data = new Uint8Array(712);
+    ok("an uninitialised account of the current program is nothing", (await lookupRaffle(RAFFLE)).kind === "none");
+    owner = null;
+    ok("no account at all is nothing", (await lookupRaffle(RAFFLE)).kind === "none");
+  } finally {
+    globalThis.fetch = realFetch;
   }
 }
 

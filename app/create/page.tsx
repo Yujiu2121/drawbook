@@ -758,8 +758,8 @@ export default function CreatePage() {
           money and enforces the terms: it sells tickets until the sale closes and accepts reveals
           until the reveal deadline. Five seconds after that, Rialo sends the draw by itself, because
           the same transaction schedules it; anyone can also press Draw once every ticket is
-          revealed. You cannot change the terms afterwards, and the program itself can no longer be
-          upgraded by anyone.
+          revealed. You cannot change the terms afterwards. The program itself is not frozen: its
+          deployer can still upgrade it during the testnet period.
         </p>
 
         <form onSubmit={deploy} noValidate className="mt-[clamp(26px,3.4vw,44px)]">

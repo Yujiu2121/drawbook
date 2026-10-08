@@ -37,8 +37,8 @@ import {
   canReveal,
   claimAll,
   drawRaffle,
-  fetchRaffle,
   fetchSchedule,
+  lookupRaffle,
   raffleActivity,
   reclaimSchedule,
   revealTicket,
@@ -49,6 +49,7 @@ import {
 import { loadNonces } from "@/lib/chain/nonces";
 import {
   PROGRAM_ID,
+  RETIRED_ON,
   auditDraw,
   payoutOf,
   phaseOf,
@@ -84,7 +85,7 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * is due, and comes back if it does not arrive, if it was refused, or if there is no schedule. A
  * person drawing first is fine: the later trigger is refused as already settled and changes nothing.
  * It fired on testnet on 2026-10-08 with nobody pressing anything, which is why the copy may say
- * Rialo sends it "by itself"; raffles made before the schedule have none, and the page says so.
+ * Rialo sends it "by itself"; a raffle deployed without a schedule says so.
  *
  * THE AUDIT IS A REAL CHECK. "Recompute in this tab" runs auditDraw from lib/chain/program over the
  * account's own bytes: the revealed nonces, the chain value the program read at the draw, and the
@@ -488,10 +489,15 @@ function RunResult({ run }: { run: Run }) {
 
 /* ------------------------------------------------------------------------ view */
 
+/*
+  "retired" is an account of Drawbook's first program (RETIRED_PROGRAM_ID). Its raffles are still on
+  chain but no longer listed or read, so an old link says that plainly instead of "No raffle here".
+*/
 type Load =
   | { kind: "invalid" }
   | { kind: "loading" }
   | { kind: "missing" }
+  | { kind: "retired" }
   | { kind: "error"; message: string }
   | { kind: "ready" };
 
@@ -531,9 +537,10 @@ export function ChainRaffleView({ address }: { address: string }) {
       reading.current = true;
       let r: ChainRaffle | null = null;
       try {
-        r = await fetchRaffle(address);
+        const found = await lookupRaffle(address);
+        r = found.kind === "raffle" ? found.raffle : null;
         setRaffle(r);
-        setLoad(r ? { kind: "ready" } : { kind: "missing" });
+        setLoad(r ? { kind: "ready" } : { kind: found.kind === "retired" ? "retired" : "missing" });
         setStale(null);
       } catch (error) {
         const message = describeError(error).text;
@@ -629,18 +636,22 @@ export function ChainRaffleView({ address }: { address: string }) {
               ? "Not an address"
               : load.kind === "missing"
                 ? "No raffle here"
-                : load.kind === "error"
-                  ? "Could not read the chain"
-                  : "Reading the raffle"}
+                : load.kind === "retired"
+                  ? "A retired raffle"
+                  : load.kind === "error"
+                    ? "Could not read the chain"
+                    : "Reading the raffle"}
           </h1>
           <p className="mt-4 max-w-[58ch] text-lg text-fg-2">
             {load.kind === "invalid"
               ? "That is not a Rialo address. A raffle address is 32 bytes written in base58, like the one the deploy page prints after a raffle is created."
               : load.kind === "missing"
                 ? `Nothing on ${NETWORK} at this address is a Drawbook raffle. Either no account exists here, or it is not owned by the raffle program, or it does not carry a raffle header.`
-                : load.kind === "error"
-                  ? `The ${NETWORK} node did not answer: ${load.message}. This page keeps trying every few seconds.`
-                  : `Reading the account from ${NETWORK}.`}
+                : load.kind === "retired"
+                  ? `This account belongs to Drawbook's first raffle program, which was retired on ${RETIRED_ON}. The account is still on ${NETWORK} at this address, but Drawbook no longer lists it or reads it as a raffle. Raffles deployed since then run on the current program.`
+                  : load.kind === "error"
+                    ? `The ${NETWORK} node did not answer: ${load.message}. This page keeps trying every few seconds.`
+                    : `Reading the account from ${NETWORK}.`}
           </p>
           {load.kind !== "loading" && (
             <p className="digest mt-4 max-w-[58ch] text-sm text-fg-3">{address}</p>
@@ -1176,13 +1187,12 @@ export function ChainRaffleView({ address }: { address: string }) {
                 no longer holds the Draw. Once the raffle is ready to draw, anyone can press Draw.
               </Note>
             )}
-            {/* Said where it matters: on a raffle older than the schedule, a missing automatic draw is
-                its age, not a fault, and the reader is owed that before the deadline passes. */}
+            {/* Said where it matters: a raffle with no schedule needs a person to draw it, and the
+                reader is owed that before the deadline passes. */}
             {live && sched !== null && sched.kind === "none" && (
               <Note className="mt-3">
-                This raffle has no automatic draw. It was deployed before Drawbook began scheduling the
-                draw with Rialo, or Rialo refused its schedule, so once it is ready, someone has to
-                press Draw.
+                This raffle has no automatic draw. Rialo refused its schedule, or it was deployed
+                without one, so once it is ready, someone has to press Draw.
               </Note>
             )}
 

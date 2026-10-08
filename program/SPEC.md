@@ -13,19 +13,21 @@ program should not format base58 and decimal strings to hash them.
 
 | What | Value |
 | --- | --- |
-| Program id | `74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6` |
+| Program id | `EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR` |
 | Program keypair | held outside the repository; never commit it |
-| Upgrade authority | `GGZaSfv9RY7uNLVTdMhdb1yJgoAsARaBsmpRp1T7Sjor`, still recorded in the program account. The program **can no longer be upgraded by anyone** (the README says why); a changed program would need a new program id. |
+| Upgrade authority | `8oM9XHmeYniw7T4vNFm8br9BfVvL6EfV2ryM81Dgs4M9`, recorded in the program account. The program is upgradeable: **the deployer can still upgrade it during the testnet period.** |
+| Retired program | `74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6` ran this same blob until 2026-10-08. Its accounts stay on chain; the browser no longer lists or decodes them (`RETIRED_PROGRAM_ID`). |
 | Testnet RPC | `https://testnet.rialo.io:4101` (never `-n testnet`; that preset does not resolve) |
 | System program | `11111111111111111111111111111111` |
 | Units | 1 RLO = 1e9 kelvin. All amounts are u64 kelvin. |
 | Clock | `Clock::get()?.unix_timestamp` is **milliseconds** on Rialo. All times are u64 ms. |
 
 The same program keypair is used on the local network and on testnet, so the id is identical
-on both and the browser library hardcodes it once. The program-id keypair survived, so after a
-testnet reset the same blob can be deployed to the same id again from any funded key, which then
-becomes the new upgrade authority. Short of a reset, everything below is fixed as deployed, which is
-why the scheduled draw (below) was built with no change to the program.
+on both and the browser library hardcodes it once. Deploying again with that keypair, paid by the
+upgrade authority's key, replaces the blob at the same id; after a testnet reset the same blob can
+be deployed to the same id again from any funded key, which then becomes the upgrade authority.
+The deployed blob (sha256 `9c927dd4…bffc9cd2`) is the one this file describes, and the scheduled
+draw (below) was built with no change to it.
 
 ## Raffle account layout
 
@@ -235,10 +237,11 @@ transaction.
 
 Since 2026-10-08 the browser asks Rialo to send Draw by itself. Nothing in the program changed:
 the Subscriber program sends the same solitary Draw the creator could send by hand, so codes 17
-and 18, the signer rule and the time bounds all apply to it unchanged. Raffles created before the
-schedule was added have no subscription and are drawn only by someone sending Draw.
+and 18, the signer rule and the time bounds all apply to it unchanged. A raffle created without
+the Subscribe (Rialo refused it, or another client left it out) has no subscription and is drawn
+only by someone sending Draw.
 
-**Seen on testnet, 2026-10-08.** Raffle `AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w` (2 tickets,
+**Seen on testnet, 2026-10-08,** on the retired program (same blob). Raffle `AtVDa7C3qhFpjivN7vaqgsXP8p2UzKbSd6Z1zfqZmE9w` (2 tickets,
 one-minute reveal window, both revealed) was drawn by the triggered transaction
 `3uHik9GzcRC844SV78DrQg1GJ8GP4sEbQkLFEshQWzoJS7cZwJNymgcN1ThRLNVZN4RZ55NxwFovSptDQsY3v3qH` in block
 29220468, 123 ms after the window opened and 5,123 ms after the reveal deadline, with nobody
@@ -295,8 +298,8 @@ the Rialo CLI.
 **No Destroy in the action, on purpose.** The crate's `subscribe_to` appends a Subscriber `Destroy`
 to every OneShot, so the triggered transaction would be `[Draw, Destroy]` and Draw would refuse
 with 17. That was run on a local network: refused, rolled back, spent, never retried, its rent
-stranded. Allowing one trailing Destroy in the program was rejected: it is not needed, the program
-can no longer be upgraded, and it would reopen the retry the rule closes (an earlier transaction
+stranded. Allowing one trailing Destroy in the program was rejected: it is not needed, it would
+take an upgrade of the deployed program, and it would reopen the retry the rule closes (an earlier transaction
 from the creator in the trigger's block could compute the outcome, every transaction in a block
 reading the same `get_random_seed()`, and destroy the subscription only when it dislikes it,
 failing the triggered `[Draw, Destroy]`).
@@ -358,7 +361,8 @@ Pages import only these names, so the library and the pages can be written in pa
 
 ```ts
 // lib/chain/program.ts
-export const PROGRAM_ID: string;                 // "74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6"
+export const PROGRAM_ID: string;                 // "EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR"
+export const RETIRED_PROGRAM_ID: string;         // the first program; its accounts are not decoded
 export const HEADER_LEN = 208, TICKET_LEN = 84, MIN_SUPPLY = 2, MAX_SUPPLY = 200;
 export type ChainStatus = "open" | "drawn" | "void";
 export type ChainPhase = "selling" | "revealing" | "ready" | "drawn" | "void";
@@ -400,6 +404,7 @@ export function revealTicket(wallet: Wallet, raffle: string, ticketIndex: number
 export function drawRaffle(wallet: Wallet, raffle: string): Promise<Sent>;
 export function claimAll(wallet: Wallet, raffle: string): Promise<Sent[]>;   // every unpaid entitlement
 export function fetchRaffle(raffle: string): Promise<ChainRaffle | null>;
+export function lookupRaffle(raffle: string): Promise<{ kind: "raffle"; raffle: ChainRaffle } | { kind: "retired" } | { kind: "none" }>;
 export function listRaffles(): Promise<ChainRaffle[]>;                      // getAccountsByOwner(PROGRAM_ID)
 export function raffleActivity(raffle: string): Promise<{ signature: string; at: number | null }[]>;
 export function createCost(supply: number, prize: bigint): Promise<bigint>; // rent + prize + schedule deposit + firing fee + fees

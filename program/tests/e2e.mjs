@@ -34,7 +34,8 @@ if (PAYER === "faucet" && !LOCAL) {
   process.exit(2);
 }
 
-const PROGRAM_ID = decodeBase58("74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6");
+const PROGRAM_ADDRESS = "EQGb5xL2bgRuEFxY2FN25eFrgKDhTpZjRUbEQtYmoLLR";
+const PROGRAM_ID = decodeBase58(PROGRAM_ADDRESS);
 const SYSTEM_ID = new Uint8Array(32);
 const IX_SYSVAR = decodeBase58("Sysvar1nstructions1111111111111111111111111");
 // Optional: a local-only helper program whose instruction 1 calls Draw through CPI, to confirm the
@@ -232,7 +233,7 @@ async function send(instructions, signers = []) {
   }
   const err = status?.err ?? meta?.err ?? null;
   const logs = meta?.logMessages ?? [];
-  const cu = logs.map((l) => l.match(/74LNM1Hn6BCQpHyzHYkqrQP4H6N1At3CsiZ6CH4UsMG6 consumed (\d+)/)).filter(Boolean).map((m) => Number(m[1]));
+  const cu = logs.map((l) => l.match(new RegExp(`${PROGRAM_ADDRESS} consumed (\\d+)`))).filter(Boolean).map((m) => Number(m[1]));
   if (!status?.executed && !err) return { ok: false, code: null, detail: `not confirmed: ${JSON.stringify(status)}`, logs, signature };
   return { ok: !err, code: err ? customCode(JSON.stringify(err) + logs.join("\n")) : null, detail: err ? JSON.stringify(err) : "", logs, signature, cu };
 }
@@ -413,7 +414,7 @@ function payoutFor(r, index) {
 
 console.log(`RPC ${RPC}`);
 const program = await accountInfo(encodeBase58(PROGRAM_ID));
-check("program 74LNM1…UsMG6 is deployed and executable", !!program && program.owner === "RiscVLoader11111111111111111111111111111111", program ? `owner ${program.owner}, ${program.data.length} bytes` : "no account");
+check(`program ${PROGRAM_ADDRESS.slice(0, 6)}…${PROGRAM_ADDRESS.slice(-5)} is deployed and executable`, !!program && program.owner === "RiscVLoader11111111111111111111111111111111", program ? `owner ${program.owner}, ${program.data.length} bytes` : "no account");
 
 if (PAYER === "faucet") {
   sponsor = await newWallet("sponsor");
