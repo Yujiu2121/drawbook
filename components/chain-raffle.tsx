@@ -241,13 +241,25 @@ function leadOf(r: ChainRaffle, phase: ChainPhase, rialoSends = false): string {
  * by hand before Rialo's draw was due is said calmly: the later Draw is turned away and changes
  * nothing, which is the design working, not a fault.
  */
+/**
+ * How far before the scheduled second a settlement still counts as "at the due time". The program's
+ * clock trails the block time by about 40-100 ms (six firings, local and testnet, 2026-10-08); two
+ * seconds is generous, and a hand-pressed Draw that close to the deadline is indistinguishable anyway.
+ */
+const DUE_CLOCK_MARGIN_MS = 2_000;
+
 function scheduleWord(s: ScheduleState | null, r: ChainRaffle, settled: boolean): string {
   if (s === null) return "reading";
   if (settled && (s.kind === "scheduled" || s.kind === "due" || s.kind === "late" || s.kind === "dropped")) {
-    // "Before it was due" only when the chain says so: a raffle drawn by hand after Rialo's Draw
-    // failed to arrive was not settled early, and one settled at the due time may be Rialo's own
-    // Draw that the node has not listed yet.
-    return r.drawnAt < s.at ? "Not needed, settled before it was due" : "Settled; no Draw from Rialo seen";
+    // "Before it was due" only when the chain says so, and with room for the clock: Rialo's own Draw
+    // reads a clock 40-100 ms behind the block that fired it, so its drawn_at lands just before the
+    // scheduled second, and for a moment after it lands the node has not listed the firing yet.
+    // Measured on the live site 2026-10-08: that window showed "settled before it was due" for half
+    // a second on a raffle Rialo drew itself. Within the margin it is said as what it most likely is.
+    if (r.drawnAt >= s.at - DUE_CLOCK_MARGIN_MS) {
+      return s.kind === "late" ? "Settled; no Draw from Rialo seen" : "Settled at its due time; confirming it was Rialo";
+    }
+    return "Not needed, settled before it was due";
   }
   if (s.kind === "sent" && !s.firing.ok && s.firing.code === 14) {
     return "Sent by Rialo after the raffle was settled; changed nothing";
