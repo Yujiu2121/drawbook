@@ -2,9 +2,9 @@
 
 import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 
+import { useRenderedPath } from "@/components/nav-links";
 import { PendingMark } from "@/components/row-link";
 import { recall } from "@/lib/nav-memory";
 
@@ -104,7 +104,10 @@ function boardTopFor(rid: number): number {
 }
 
 export function BackLink({ className = "" }: { className?: string }) {
-  const pathname = usePathname();
+  // The rendered page's path, not the address bar's: a miss such as /raffle/99 is the prerendered
+  // not-found page, which has no way back, and must hydrate as the server drew it. The reason is
+  // on `useRenderedPath` in components/nav-links.tsx.
+  const pathname = useRenderedPath();
 
   /**
    * The trip this link is responsible for placing, taken at click and spent on arrival.
@@ -156,8 +159,10 @@ export function BackLink({ className = "" }: { className?: string }) {
         leading edge. Everything else here is the chip: a hairline box, the label face, and the
         surface it takes under the pointer. The minimum height is the wallet chip's, one label line
         plus padding and border, so the arrow-only form below 640 stays as tall as its neighbours.
+        `tap` gives that 29px arrow a 44px square to be touched by on a touch screen or below 1024,
+        without drawing the chip any bigger (app/globals.css, block 7).
       */
-      className={`label relative inline-flex min-h-[calc(1.4em+0.75rem+2px)] items-center gap-1.5 border border-bound px-2 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-panel-2 ${className}`}
+      className={`label tap relative inline-flex min-h-[calc(1.4em+0.75rem+2px)] items-center gap-1.5 border border-bound px-2 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-panel-2 ${className}`}
     >
       {/*
         The way back is prerendered and prefetched like the way in, so this paints on a slow

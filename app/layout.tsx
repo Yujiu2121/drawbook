@@ -137,8 +137,8 @@ export const metadata: Metadata = {
  * The masthead and the footer mount here rather than inside each route, so they are laid out once
  * and survive every navigation instead of being torn down and rebuilt. That matters for three
  * things at once: the wallet chip keeps its store and its live block height across a route change,
- * `aria-current` moves with `usePathname` rather than with a remount, and the view transition has a
- * stable frame around the part of the page that is actually morphing.
+ * `aria-current` moves with the router's state rather than with a remount, and the view transition
+ * has a stable frame around the part of the page that is actually morphing.
  *
  * Two things this wrapper deliberately does not do.
  *

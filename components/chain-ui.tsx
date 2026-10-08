@@ -29,7 +29,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import { countdownLadder, utcShort, utcStamp } from "@/lib/cell";
 import { ChainError, type Outcome } from "@/lib/chain/actions";
 import { storagePersists } from "@/lib/chain/nonces";
-import { errorMessage, type ChainPhase } from "@/lib/chain/program";
+import { cleanTitle, errorMessage, type ChainPhase } from "@/lib/chain/program";
 import { RIALO_RPC } from "@/lib/rialo-rpc";
 import { WALLET_STORAGE_KEY } from "@/lib/wallet";
 import {
@@ -126,18 +126,12 @@ export function parseRLO(text: string): Parsed {
 }
 
 /**
- * A title from the chain, safe to print. Anyone can create a raffle and write any 32 bytes into
- * its title, so control characters and the bidirectional overrides that can make text read
- * backwards or disguise what follows are removed before display. React already prints it as text,
- * so this is about what a visitor sees, not about markup.
+ * `cleanTitle` lives in lib/chain/program.ts, beside the decoder that reads the title bytes, because
+ * the server needs it too: /r/[address] prints the same cleaned title in the tab. A function
+ * imported from this module into a Server Component would arrive as a client reference, not as the
+ * function. It is re-exported here so the pages keep one import for the kit.
  */
-export function cleanTitle(title: string): string {
-  // Joiners (U+200C, U+200D) stay: scripts and emoji sequences need them.
-  return title
-    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u2028-\u202e\u2060-\u2069\ufeff\ufff9-\ufffb]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { cleanTitle };
 
 /** UTF-8 length, which is what the 32-byte title field on chain actually counts. */
 export function utf8Length(text: string): number {

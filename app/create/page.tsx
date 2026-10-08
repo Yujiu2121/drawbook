@@ -63,7 +63,7 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * 5. THE TOKENS ARE THE LIVE ONES. This page was the last route on the Counterfoil names, every one
  *    of which compiles to nothing since the Sweep / Cell reset cleared those namespaces. Everything
  *    below is a role utility from app/globals.css blocks 3 and 4, and the specimen no longer borrows
- *    components/ticket.tsx, which is on the dead names too.
+ *    the Counterfoil ticket component, which was on the dead names too and has since been deleted.
  *
  * Errors appear under the field they belong to, in plain text, told apart from the hint by weight
  * and a rule rather than by colour: the system has no error colour on purpose, and the signal hue
@@ -432,10 +432,11 @@ function printKelvin(text: string): string {
  * half keeps the terms and, once bought, the commitment; the hand half is the buyer's, with the
  * number and the nonce that never leaves their browser until they reveal it.
  *
- * Rebuilt on the cell system rather than borrowed from components/ticket.tsx, whose classes are on
- * the dead Counterfoil names. The card is --panel-2 on the page; the stub is --recess, the same
- * well the payloads sit in, because the hand half is the secret half. The perforation is a dashed
- * --bound rule and nothing more: the old punched notches were discs, and this system has no radius.
+ * Rebuilt on the cell system rather than borrowed from the old Counterfoil ticket component (since
+ * deleted), whose classes were on the dead names. The card is --panel-2 on the page; the stub is
+ * --recess, the same well the payloads sit in, because the hand half is the secret half. The
+ * perforation is a dashed --bound rule and nothing more: the old punched notches were discs, and
+ * this system has no radius.
  */
 function Specimen({
   title,

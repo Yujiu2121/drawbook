@@ -134,12 +134,14 @@ async function call<T>(
   method: string,
   params: unknown[] = [],
   exactIntegers: string[] = [],
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: nextId++, method, params }),
     cache: "no-store",
+    signal,
   });
 
   /*
@@ -330,13 +332,17 @@ export class RialoClient {
     return res.value;
   }
 
-  /** The account with its data decoded and its kelvins exact, or null when it does not exist. */
-  async getAccountInfo(address: string): Promise<RawAccount | null> {
+  /**
+   * The account with its data decoded and its kelvins exact, or null when it does not exist.
+   * `signal` lets a caller that must not wait on a slow node, such as a page's metadata, give up.
+   */
+  async getAccountInfo(address: string, signal?: AbortSignal): Promise<RawAccount | null> {
     const res = await call<{ value: WireAccount | null }>(
       this.endpoint,
       "getAccountInfo",
       [{ address }],
       ["kelvin"],
+      signal,
     );
     return res.value ? toRawAccount(res.value) : null;
   }
@@ -426,11 +432,6 @@ export const rialo = new RialoClient(RIALO_RPC);
  * chain the raffle library writes to, rather than mixing two chains on one screen.
  */
 export const testnet = rialo;
-
-/** Kelvin as RLO, for display. */
-export function toRLO(kelvin: number): number {
-  return kelvin / KELVIN;
-}
 
 export function formatKelvinAsRLO(kelvin: number, digits = 3): string {
   return (kelvin / KELVIN).toLocaleString("en-US", {

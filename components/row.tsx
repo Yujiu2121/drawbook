@@ -1,5 +1,4 @@
 import type { CSSProperties, ReactNode } from "react";
-import Link from "next/link";
 
 import { PHASE_WORD, Strip } from "./cell";
 import { COUNTDOWN_RESERVE, isLive, serialOf, utcShort } from "@/lib/cell";
@@ -42,15 +41,8 @@ function rowMoney(raffle: Raffle): { amount: number; word: "pool" | "returned" }
  * `cell-4` does not error: React silently applies the name to one of them and the morph then
  * anchors by tree order rather than by design.
  *
- * TWO COMPOSITIONS, ONE ROW
- *
- *   The landing miniboard, and any list that just links:
- *
- *     <div className="rows">
- *       <RaffleRow raffle={r} mini countdown={<Countdown raffle={r} />} />
- *     </div>
- *
- *   The board, where the row is the navigation and its strip is the source of the morph:
+ * ONE COMPOSITION. The board, where the row is the navigation and its strip is the source of the
+ * morph:
  *
  *     <RowLink id={id} {...rowContainerProps(r)} aria-label={rowLabel(r)}>
  *       <RaffleRowCells
@@ -59,6 +51,10 @@ function rowMoney(raffle: Raffle): { amount: number; word: "pool" | "returned" }
  *         countdown={<Countdown raffle={r} />}
  *       />
  *     </RowLink>
+ *
+ * A second one, `RaffleRow`, a plain `<Link>` for the landing's miniboard, was deleted once the
+ * miniboard became cards and nothing imported it. The `mini` prop below is what is left of it, and
+ * nothing passes it today.
  *
  * `.rows` AROUND THE LIST IS NOT OPTIONAL. The row opens by translating 4px to the right, a
  * transform's overflow propagates to the document, and a full bleed row without `.rows`
@@ -234,35 +230,5 @@ export function RaffleRowCells({ raffle, mini = false, countdown, strip }: Raffl
           ))}
       </span>
     </>
-  );
-}
-
-/**
- * The whole row, as a link to the raffle. This is the landing miniboard's row and the shape any
- * plain list of raffles wants.
- *
- * It is a link and not a div because the row's open gesture is real: `.row:hover` translates it
- * and magnifies its strip, and a surface that moves under the pointer and then does nothing is a
- * lie about the affordance.
- *
- * It is a plain `<Link>` rather than `<RowLink>` on purpose, and the reason is not the view
- * transition name (`<RowLink>` only names one when its strip is wrapped in `<NamedStrip>`). It is
- * the scroll. `<RowLink>` takes `scroll={false}` and writes the current `scrollY` into
- * lib/nav-memory so that the back link can put the board back where it was. A landing row writing
- * the landing's own offset into that store would hand /raffles a scroll position from a different
- * document. Leaving the board's navigation to the board keeps one owner for that, which is the
- * only way the return trip can be reasoned about.
- */
-export function RaffleRow(props: RaffleRowProps) {
-  const { raffle, mini = false } = props;
-
-  return (
-    <Link
-      href={`/raffle/${raffle.config.id}`}
-      aria-label={rowLabel(raffle)}
-      {...rowContainerProps(raffle, mini)}
-    >
-      <RaffleRowCells {...props} />
-    </Link>
   );
 }

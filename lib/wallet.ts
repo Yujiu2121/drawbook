@@ -8,8 +8,10 @@
  * Phantom, Solflare and `@solana/wallet-adapter` are not discovered as Rialo wallets at all. An
  * extension has to speak `rialo:*` specifically.
  *
- * So `connectInjectedWallet()` below looks for such a wallet and reports honestly when none is
- * there, and the working path is a keypair generated here. That is a real Ed25519 keypair, it
+ * One such extension exists for testnet: "Rialo Wallet" on the Chrome Web Store (item
+ * dbmgekigjgnahdnfgfpdognodiegpmcg). Drawbook does not connect to it yet; see
+ * `connectInjectedWallet()` below for why the lookup there finds nothing. The working path is a
+ * keypair generated here. That is a real Ed25519 keypair, it
  * produces a real address, the faucet really funds it and the balance really comes back from the
  * chain. It is a burner: the key never leaves this browser and it holds testnet value only.
  *
@@ -158,9 +160,12 @@ function read(): StoredWallet | null {
 /**
  * Look for a browser extension that speaks Rialo's Wallet Standard namespace.
  *
- * Returns null when none is present, which today is the expected outcome: no public Rialo wallet
- * extension has shipped, and Solana wallets do not qualify because they register under `solana:*`.
- * Kept so the moment one exists this becomes the preferred path without a redesign.
+ * It returns null today, even with the "Rialo Wallet" testnet extension installed. Wallet Standard
+ * wallets announce themselves through window events (`wallet-standard:register-wallet` and
+ * `wallet-standard:app-ready`), not through a `navigator.wallets.get()`, so this lookup never sees
+ * one; Solana wallets would not qualify anyway, because they register under `solana:*`. And a
+ * match would still not sign: the store marks it `canSign` with no private key, which `signerOf`
+ * in lib/chain/actions.ts refuses. Connecting that extension is future work, not a switch.
  */
 export function connectInjectedWallet(): { name: string; address: string } | null {
   const registry = (

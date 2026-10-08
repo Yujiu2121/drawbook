@@ -147,7 +147,9 @@ export function Masthead() {
         The right-hand group. A tighter gap than the bar's own, because these are bordered chips
         that read as one cluster, and at 1280 that difference is what makes room for the faucet's
         word. 8px at a phone is still clear of the 24px target spacing SC 2.5.8 asks for, since
-        every chip is at least 25px tall and 29px wide.
+        every chip is at least 29px square, and on a touch screen or below 1024 each control chip
+        is touched through a 44px target (`tap`, app/globals.css block 7) that this gap keeps clear
+        of its neighbours'.
       */}
       <div className="ml-auto flex shrink-0 items-center gap-[clamp(8px,1.2vw,16px)]">
         <BackLink />

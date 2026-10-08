@@ -157,6 +157,21 @@ export function decodeRaffle(address: string, data: Uint8Array, kelvins: bigint)
   };
 }
 
+/**
+ * A title from the chain, safe to print. Anyone can create a raffle and write any 32 bytes into
+ * its title, so control characters and the bidirectional overrides that can make text read
+ * backwards or disguise what follows are removed before display. React already prints it as text,
+ * so this is about what a visitor sees, not about markup. The raffle page's heading and its tab
+ * title both go through here, so the two cannot disagree.
+ */
+export function cleanTitle(title: string): string {
+  // Joiners (U+200C, U+200D) stay: scripts and emoji sequences need them.
+  return title
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b\u200e\u200f\u2028-\u202e\u2060-\u2069\ufeff\ufff9-\ufffb]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /* ------------------------------------------------------------------ phase */
 
 /** Whether tickets can no longer be bought: past the commit deadline, or sold out. */

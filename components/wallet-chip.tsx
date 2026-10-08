@@ -95,6 +95,11 @@ import { announceOpen, useCloseWhenOtherOpens } from "./mobile-nav";
  * The minimum height is one label line (1.4em of 11px) plus the padding and the border, which is
  * the height a chip with a word in it already has. Without it a chip holding only an 11px icon,
  * the faucet below 1024, came out 25px tall beside 29px neighbours, and 4px smaller to hit.
+ *
+ * 29px is the drawn box, not the target. The controls below add `tap` (app/globals.css, block 7),
+ * which on a touch screen or below 1024 hangs an invisible 44px square, or a 44px-tall band on a
+ * wider chip, around each of them. It is added per control rather than here because `NetChip`
+ * shares this shell and is not a control.
  */
 const CHIP =
   "label inline-flex min-h-[calc(1.4em+0.75rem+2px)] shrink-0 items-center gap-1.5 border border-bound px-2 py-1.5 transition-colors duration-[var(--t-open)] ease-settle";
@@ -425,7 +430,7 @@ export function WalletChip() {
           disabled={connecting}
           aria-busy={connecting}
           title={failed && error ? error : undefined}
-          className={`${CHIP} text-fg disabled:cursor-not-allowed ${
+          className={`${CHIP} tap text-fg disabled:cursor-not-allowed ${
             connecting ? "bg-panel-2" : "hover:bg-panel-2"
           }`}
         >
@@ -457,7 +462,7 @@ export function WalletChip() {
       group so that a press inside the panel counts as a press inside the group, and so that Tab
       from the account button walks straight into it.
     */
-    <span ref={groupRef} className="flex shrink-0 items-center gap-1.5">
+    <span ref={groupRef} className="flex shrink-0 items-center gap-1.5 max-lg:gap-2">
       <button
         type="button"
         onClick={() => {
@@ -468,13 +473,15 @@ export function WalletChip() {
         aria-busy={funding}
         aria-label={funding ? `Requesting 1 RLO from the ${NETWORK.faucet} faucet` : FAUCET_LABEL}
         title={FAUCET_LABEL}
-        className={`${CHIP} text-fg disabled:cursor-not-allowed ${
+        className={`${CHIP} tap text-fg disabled:cursor-not-allowed ${
           funding ? "bg-panel-2" : "hover:bg-panel-2"
         }`}
       >
         <ArrowDown size={11} weight="bold" aria-hidden="true" />
         {/* The word joins at 1024, which is the narrowest laptop this is demonstrated on; below it
-            the arrow carries the accessible name alone. */}
+            the arrow carries the accessible name alone, in a 29px chip that `tap` makes a 44px
+            target. That is also why the group's gap is 8px rather than 6 below 1024: the target
+            reaches 7.5px past the chip, and the account button beside it must not cover that. */}
         <span className="hidden lg:inline">{funding ? "Requesting" : "Faucet"}</span>
       </button>
 
@@ -485,7 +492,7 @@ export function WalletChip() {
         aria-expanded={panelOpen}
         aria-controls={panelId}
         title={wallet.address}
-        className={`${CHIP} text-fg ${panelOpen ? "bg-panel-2" : "hover:bg-panel-2"}`}
+        className={`${CHIP} tap text-fg ${panelOpen ? "bg-panel-2" : "hover:bg-panel-2"}`}
       >
         <span className="sr-only">Wallet</span>
         {/* An address is base58 and case carries meaning, so the label voice is undone here:

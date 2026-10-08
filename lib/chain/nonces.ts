@@ -112,15 +112,6 @@ export function findNonce(raffle: string, ticketIndex: number, holder: string, c
 }
 
 /**
- * Some candidate for this ticket number, or null. Kept for the interface in program/SPEC.md; a
- * reveal must use findNonce, because a ticket number can have several candidates and only one of
- * them is the ticket's.
- */
-export function loadNonce(raffle: string, ticketIndex: number, holder: string): string | null {
-  return loadNonces(raffle, ticketIndex, holder)[0] ?? null;
-}
-
-/**
  * Whether localStorage takes a write and gives it back. False in a browser set to block site data,
  * where a ticket's secret and the wallet's key would be gone at the next reload.
  */

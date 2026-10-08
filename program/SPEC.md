@@ -276,8 +276,9 @@ export function createCost(supply: number, prize: bigint): Promise<bigint>; // r
 export class ChainError extends Error { code: number | null; logs: string[] }
 
 // lib/chain/nonces.ts  (localStorage, every access in try/catch)
-export function saveNonce(raffle: string, ticketIndex: number, holder: string, nonceHex: string): void;
-export function loadNonce(raffle: string, ticketIndex: number, holder: string): string | null;
+export function saveNonce(raffle: string, ticketIndex: number, holder: string, nonceHex: string): boolean; // true when it reads back
+export function loadNonces(raffle: string, ticketIndex: number, holder: string): string[];  // every candidate for that number
+export function findNonce(raffle: string, ticketIndex: number, holder: string, commitmentHex: string): string | null; // the one a reveal sends
 ```
 
 `buyTicket` generates the nonce with `newNonce()` from `lib/raffle.ts`, reads `sold` to pick

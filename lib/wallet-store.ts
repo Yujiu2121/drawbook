@@ -233,8 +233,10 @@ async function pollOnce() {
 /**
  * Prefer a real Rialo wallet extension, fall back to a burner key held in this browser.
  *
- * The fallback is the expected path today: Rialo registers the Wallet Standard namespace
- * `rialo:*`, so Solana wallets are not discovered, and no public Rialo extension has shipped.
+ * The fallback is the path every connect takes today. Rialo registers the Wallet Standard namespace
+ * `rialo:*`, so Solana wallets are not discovered, and the one Rialo extension there is, the "Rialo
+ * Wallet" testnet extension on the Chrome Web Store, is not connected yet: `connectInjectedWallet`
+ * in lib/wallet.ts says why its lookup finds nothing, and why the branch below could not sign.
  */
 export async function connect() {
   set({ status: "loading", error: null });

@@ -507,3 +507,34 @@ body::after {
   line-height: 1.02;
   letter-spacing: -0.005em;
 }
+
+/*
+  ------------------------------------------------------------------------- 7. TOUCH TARGETS
+
+  `tap`: a hit area at least 44px square around a control that is drawn smaller, on a touch screen
+  or below 1024px, and nothing at all anywhere else.
+
+  The masthead's chips are 29px tall and, where they carry only an icon, 29px wide: the faucet
+  below 1024 and the back arrow below 640. That is a 29px target for the thumb that presses FAUCET
+  on stage. The chips cannot simply grow, because the bar is one 56px line whose every width is
+  budgeted (components/masthead.tsx), so the box stays as drawn and an invisible `::before` takes
+  the touch: 44px tall, and 44px wide or the control's own width, whichever is more, centred on it.
+  Each side reaches (44 - 29) / 2 = 7.5px past a 29px chip, which is why the gap beside the faucet
+  is 8px below 1024: two targets must not overlap, or the later one takes the shared strip.
+
+  The media query is the whole contract with the desktop masthead. A fine pointer at 1024 and up
+  matches neither condition, so the control is not even positioned there, and the bar the demo is
+  shown on at 1366 and 1600 has the same boxes, the same pixels and the same hit areas as before.
+*/
+@utility tap {
+  @media (pointer: coarse), (width < 64rem) {
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset-block: min(0px, calc((100% - 44px) / 2));
+      inset-inline: min(0px, calc((100% - 44px) / 2));
+    }
+  }
+}

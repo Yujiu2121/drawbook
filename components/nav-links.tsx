@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useSelectedLayoutSegments } from "next/navigation";
 
 /**
  * THE DESTINATIONS, in the masthead and in the drawer, in the label voice.
@@ -17,9 +17,9 @@ import { usePathname } from "next/navigation";
  * it works" points at rather than at the landing's own anchor: a nav item that scrolls on one page
  * and navigates on every other is two different controls wearing one label.
  *
- * THIS IS A CLIENT ISLAND FOR EXACTLY ONE REASON: `usePathname()`. Nothing else here has state,
- * nothing fetches, nothing measures. The masthead around it stays a Server Component and hands
- * this in as one child, which is the repo's own pattern.
+ * THIS IS A CLIENT ISLAND FOR EXACTLY ONE REASON: knowing which page it is on (`useRenderedPath`
+ * below). Nothing else here has state, nothing fetches, nothing measures. The masthead around it
+ * stays a Server Component and hands this in as one child, which is the repo's own pattern.
  *
  * WHY THE CURRENT ITEM CARRIES A RULE AND NOT JUST A SURFACE. Card on ground computes to 1.09:1.
  * That is a real surface in the material model and the right material, but it is nowhere near the
@@ -52,9 +52,29 @@ export const NAV: Destination[] = [
 /** Reachable everywhere, and never at the same weight as the three above. */
 export const SECONDARY: Destination = { href: "/create", label: "Deploy a raffle" };
 
+/**
+ * THE PATH OF THE PAGE THAT WAS RENDERED, WHICH ON A 404 IS NOT THE ADDRESS IN THE BAR.
+ *
+ * Every miss, `/nope` and `/raffle/99` alike, is answered with one document: the not-found page,
+ * prerendered once at build time for the path "/_not-found" (`dynamicParams = false` on
+ * /raffle/[id] sends unknown ids there too). In the browser `usePathname()` reads the address bar,
+ * so on `/raffle/99` it said "/raffle/99" over a shell the server had rendered for "/_not-found".
+ * The Raffles item came out current on the client and plain in the HTML, the back arrow came out
+ * present on the client and absent in the HTML, and React threw hydration error #418 on every miss
+ * under /raffle/ and /r/. A miss such as `/nope` names no section, which is why it stayed clean.
+ *
+ * The selected segments are read from the route tree the server rendered with, so the server and
+ * the first client render agree by construction. On the not-found page they are ["/_not-found"],
+ * which names no section and no raffle, as the server decided. Everywhere else they spell the
+ * pathname, because this app has no route groups and no parallel routes to make them differ.
+ */
+export function useRenderedPath(): string {
+  return `/${useSelectedLayoutSegments().join("/")}`;
+}
+
 export function useCurrent(): (d: Destination) => boolean {
-  const pathname = usePathname();
-  return (d) => pathname === d.href || (d.also?.test(pathname) ?? false);
+  const path = useRenderedPath();
+  return (d) => path === d.href || (d.also?.test(path) ?? false);
 }
 
 export function NavLinks({ className = "" }: { className?: string }) {

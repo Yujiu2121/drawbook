@@ -1,7 +1,9 @@
 /**
  * The raffle: a commit-reveal draw.
  *
- * Pure, React-free, and the executable specification for the Rialo program that replaces it.
+ * Pure and React-free. It is the engine of the five sample raffles, and the deployed program runs
+ * the same winner derivation over its own v2 hashes (program/SPEC.md), which is why
+ * lib/chain/program.ts checks an on-chain draw with `deriveWinners` from this file.
  *
  * WHY COMMIT-REVEAL AND NOT THE CHAIN'S RANDOMNESS
  * ------------------------------------------------
@@ -25,13 +27,19 @@
  *
  * WHAT THIS DOES AND DOES NOT GUARANTEE
  * -------------------------------------
- * Withholding a reveal does change the seed, which is the classic last-revealer bias. Two things
- * blunt it. First, `chainSeed` is only known at the draw, so a griefer cannot work out whether
- * aborting helps them. Second, failing to reveal forfeits the reveal bond. Biasing the draw
- * therefore requires a party who BOTH controls block production AND reveals last. That is a real
- * and stateable limit, not a claim of perfection: this is unbiasable against any ordinary
- * participant, and it is honest to call the result verifiable, which a bare `get_random_seed()`
- * would not be.
+ * The limit is whoever produces the draw block, and that party needs nothing else. `chainSeed` is
+ * read at the draw, after every nonce is public, so a producer who can influence that value may
+ * try candidates and keep one that suits them, with no ticket and without revealing last. Nothing
+ * in this scheme closes that, and program/SPEC.md (### 3 Draw) states it rather than hiding it.
+ * What the deployed program does close is the cheap version, an ordinary caller retrying the draw
+ * until it likes the result: Draw must run alone in its transaction (error 17) and not in the
+ * block of the latest reveal (error 18).
+ *
+ * Withholding a reveal is the smaller, separate lever, the classic last-revealer bias. It does
+ * change the seed, but it is blind, because `chainSeed` is not known until the draw, and it
+ * forfeits the reveal bond. So the result is randomized and checkable: anyone can recompute it
+ * from public data. It is not unbiasable and not provably fair, and nothing built on this module
+ * should say it is.
  */
 
 // Explicit extension so scripts/ can run this file directly under node's type stripping,
@@ -274,10 +282,6 @@ export function payouts(raffle: Raffle): Map<number, number> {
   return out;
 }
 
-export function ticketsOf(raffle: Raffle, holder: Address): Ticket[] {
-  return raffle.tickets.filter((t) => t.holder === holder);
-}
-
 /* ------------------------------------------------------------ transitions */
 
 /**
@@ -304,12 +308,6 @@ export function buyTicket(
   // topic that a subscription is watching, not a poll.
   const soldOut = tickets.every((t) => t.holder !== null);
   return { ...raffle, tickets, phase: soldOut ? "revealing" : "selling" };
-}
-
-/** Close the sale because the commit deadline passed. Absolute-timestamp predicate. */
-export function closeSale(raffle: Raffle): Raffle {
-  if (raffle.phase !== "selling") return raffle;
-  return { ...raffle, phase: "revealing" };
 }
 
 /** Reveal a nonce. Rejected unless it hashes to the commitment already on chain. */
@@ -489,28 +487,4 @@ export function formatRLO(kelvin: number): string {
 export function shortAddress(address: Address, lead = 4, tail = 4): string {
   if (address.length <= lead + tail + 1) return address;
   return `${address.slice(0, lead)}…${address.slice(-tail)}`;
-}
-
-/** First 8 hex characters of a digest, for showing a commitment in a table. */
-export function shortDigest(hex: string): string {
-  return hex.slice(0, 8);
-}
-
-/** Whole seconds between two instants, never negative. */
-export function secondsBetween(fromISO: string | Date, toISO: string): number {
-  const from = typeof fromISO === "string" ? Date.parse(fromISO) : fromISO.getTime();
-  return Math.max(0, Math.round((Date.parse(toISO) - from) / 1000));
-}
-
-/** Coarse "2d 4h" / "3h 12m" / "45s" countdown. */
-export function formatCountdown(seconds: number): string {
-  if (seconds <= 0) return "closed";
-  const d = Math.floor(seconds / 86_400);
-  const h = Math.floor((seconds % 86_400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
 }
