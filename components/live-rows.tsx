@@ -34,19 +34,32 @@
  * rows are simply in their new order on the next frame. A 320ms version of a movement somebody
  * asked not to see is still the movement.
  *
+ * THE ROWS ARRIVE ONCE, AND ONLY ON A COLD LOAD. The list's wrapper is server-rendered with
+ * data-enter="cold", which app/cell.css turns into the rows rising in one after another from the
+ * very first paint, with no script needed. A client render (every soft navigation, and above all
+ * the return trip from a raffle page) renders no attribute, so a row the reader is coming back to
+ * is at rest in the first frame. The attribute is removed once the entry has finished, by DOM
+ * rather than by React, because a reorder moves the row elements and a moved element whose rule
+ * still matched would play its entry again. The reasons are written out beside the rule in
+ * app/cell.css.
+ *
+ * THE LIGHT UNDER THE POINTER is one delegated listener per list, here, on a fine pointer only:
+ * it writes --mx and --my on the row under the pointer and app/cell.css paints the pool.
+ *
  * CONTRAST, COMPUTED (WCAG 2.x relative luminance, 0.03928 knee,
  * L = 0.2126R + 0.7152G + 0.0722B, sanity-checked at #ffffff on #000000 = 21.00):
  *
- *   resting button   --fg / --panel        15.01    text
- *   resting boundary --bound / --panel      5.18    boundary, needs 3:1
- *   pressed button   --panel / --fg        15.01    text, the pair inverted
- *   group label      --fg-3 / --panel       5.73    text
+ *   resting button   --fg / --panel        16.38    text
+ *   resting boundary --bound / --panel      3.97    boundary, needs 3:1
+ *   hovered button   --fg / --panel-2      15.06    text
+ *   pressed button   wine on the paper ramp 15.80 at the top stop, 12.29 at the bottom
+ *   group label      --fg-3 / --panel       5.58    text
  *
- * Nothing here is under 5.18, and the pressed state is a fill rather than a tint, so which button
- * is active survives a greyscale print and does not depend on the hue at all.
+ * The pressed state is a fill rather than a tint, the paper `cta` against an empty pill, so which
+ * order the board is in survives a greyscale print and does not depend on the hue at all.
  */
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 /** The three orders the board offers, and the labels printed on their buttons. */
@@ -114,6 +127,98 @@ const SETTLE = { duration: 0.32, ease: [0.2, 0.8, 0.2, 1] } as const;
 /** The furthest-travelling row starts at 0 and the shortest at 40ms. */
 const STAGGER_MS = 40;
 
+/*
+  THE COLD-LOAD MARK, rendered on the server and on no client render.
+
+  It is the one place in the board where the server and the first client render disagree, and it
+  is deliberate: the HTML has to carry the mark so the entry can run from the first paint, and the
+  browser's own render must not, so a soft navigation never plays it. `suppressHydrationWarning`
+  on the wrapper covers exactly that one attribute; React leaves a hydrated attribute it was not
+  told about where it is, and since its prop is undefined on every client render it never touches
+  it again. useEnterCleanup below removes it.
+*/
+function coldMark(): "cold" | undefined {
+  return typeof window === "undefined" ? "cold" : undefined;
+}
+
+/**
+ * Take the cold-load mark off once every entry animation inside the list has finished, so a later
+ * reorder, which moves row elements, cannot replay the entry on the rows it moves.
+ */
+function useEnterCleanup(ref: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !el.hasAttribute("data-enter")) return;
+    let alive = true;
+    const running = el.getAnimations({ subtree: true }).map((a) => a.finished);
+    void Promise.allSettled(running).then(() => {
+      if (alive) el.removeAttribute("data-enter");
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ref]);
+}
+
+/**
+ * THE LIGHT UNDER THE POINTER: one delegated listener for a whole list of rows.
+ *
+ * It writes --mx and --my, in the hovered row's own pixels, on that row; app/cell.css paints a soft
+ * apricot pool there under the text. A mouse or a pen on a fine pointer only, at most once a frame,
+ * and nothing else: no state, no re-render, and no listener per row. The row is measured as it is
+ * drawn, translated 4px and all, which is the box the pool is painted in.
+ *
+ * Exported for components/chain-list.tsx, whose rows are the same object.
+ */
+export function useRowLight(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
+    let frame = 0;
+    let last: PointerEvent | null = null;
+
+    const paint = () => {
+      frame = 0;
+      const e = last;
+      if (e === null || !(e.target instanceof Element)) return;
+      const row = e.target.closest<HTMLElement>(".row");
+      if (row === null || !el.contains(row)) return;
+      const box = row.getBoundingClientRect();
+      row.style.setProperty("--mx", `${Math.round(e.clientX - box.left)}px`);
+      row.style.setProperty("--my", `${Math.round(e.clientY - box.top)}px`);
+    };
+
+    const move = (e: PointerEvent) => {
+      if ((e.pointerType !== "mouse" && e.pointerType !== "pen") || !fine.matches) return;
+      last = e;
+      if (frame === 0) frame = window.requestAnimationFrame(paint);
+    };
+
+    el.addEventListener("pointermove", move, { passive: true });
+    return () => {
+      el.removeEventListener("pointermove", move);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
+  }, [ref]);
+}
+
+/**
+ * A list of rows that is not sorted: the record. The same wrapper the floor uses, so it carries the
+ * cold-load entry and the light under the pointer, and nothing else.
+ */
+export function Rows({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEnterCleanup(ref);
+  useRowLight(ref);
+
+  return (
+    <div ref={ref} className="rows" data-enter={coldMark()} suppressHydrationWarning>
+      {children}
+    </div>
+  );
+}
+
 function order(rows: readonly LiveRow[], by: SortKey): LiveRow[] {
   const sorted = rows.slice();
   if (by === "pool") return sorted.sort((a, b) => b.pool - a.pool || a.deadline - b.deadline);
@@ -129,6 +234,9 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
     () => "deadline" as SortKey,
   );
   const [delays, setDelays] = useState<Record<number, number>>({});
+  const list = useRef<HTMLDivElement>(null);
+  useEnterCleanup(list);
+  useRowLight(list);
 
   const shown = order(rows, by);
 
@@ -140,6 +248,10 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
   */
   function pick(next: SortKey) {
     if (next === by) return;
+
+    // A reader who sorts before the rows have finished arriving gets them at rest at once: the
+    // reorder is about to move the elements, and a moved row must not start its entry again.
+    list.current?.removeAttribute("data-enter");
 
     const before = order(rows, by).map((row) => row.id);
     const after = order(rows, next);
@@ -175,7 +287,7 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
               type="button"
               aria-pressed={by === key}
               onClick={() => pick(key)}
-              className="label border border-bound bg-panel px-3.5 py-2.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:border-fg hover:bg-fg hover:text-panel aria-pressed:border-fg aria-pressed:bg-fg aria-pressed:text-panel"
+              className="label rounded-pill border border-bound bg-panel px-3.5 py-2.5 text-fg transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--t-open)] ease-settle hover:bg-panel-2 aria-pressed:cta"
             >
               {label}
             </button>
@@ -190,8 +302,10 @@ export function LiveRows({ rows, head }: { rows: readonly LiveRow[]; head?: Reac
       {head}
 
       {/* `.rows` is not optional around any list of rows: an opened row translates 4px to the
-          right, and a transform's overflow reaches the document. See app/cell.css. */}
-      <div className="rows">
+          right, and a transform's overflow reaches the document. See app/cell.css. The entry
+          and the light are this wrapper's, never the motion.div's: the reorder below writes that
+          element's transform, and the entry's lives on the row inside it. */}
+      <div ref={list} className="rows" data-enter={coldMark()} suppressHydrationWarning>
         {shown.map((row) => (
           <motion.div
             key={row.id}

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { motion, useReducedMotion } from "motion/react";
 
+import { Tilt } from "@/components/fx";
+
 import {
   Cap,
   NETWORK,
@@ -69,17 +71,29 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  *    parseRLO in components/chain-ui.tsx). A float parse of "0.1" is not 0.1, and the program would
  *    record whatever the float said.
  *
- * 5. THE TOKENS ARE THE LIVE ONES. This page was the last route on the Counterfoil names, every one
- *    of which compiles to nothing since the Sweep / Cell reset cleared those namespaces. Everything
- *    below is a role utility from app/globals.css blocks 3 and 4, and the specimen no longer borrows
- *    the Counterfoil ticket component, which was on the dead names too and has since been deleted.
+ * 5. THE TOKENS ARE THE LIVE ONES. Everything below is a role utility, a named radius or shadow
+ *    step, or a material (`card`, `cta`) from app/globals.css; a cleared namespace compiles any
+ *    other name to nothing with a green build. The groups are cards on the dusk floor, the fields
+ *    are wells cut into them, and the one filled control on the page is the deploy button.
+ *
+ * 6. THE DEMO READS THIS PAGE IN ONE SCREEN. With the clock group at the top of a 1366x768 or
+ *    1600x900 window at 80% zoom, both Minutes boxes, the Automatic draw card and the deploy button
+ *    are on screen together, and the receipt lands directly under the button. Every padding here
+ *    is inside that budget; adding to one means taking from another.
  *
  * Errors appear under the field they belong to, in plain text, told apart from the hint by weight
- * and a rule rather than by colour: the system has no error colour on purpose, and the signal hue
- * means a winner.
+ * and a rule rather than by colour: the system has no error colour on purpose, coral means a
+ * winner and apricot is the signal.
  */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
+
+/**
+ * The receipt's one ring: apricot (#ffcfa8) hard at its edge with a soft light around it, then the
+ * same two shadows grown out and gone. Same shape at both ends so the two interpolate.
+ */
+const RING_FROM = "0 0 0 1px rgba(255, 207, 168, 0.9), 0 0 24px 0px rgba(255, 207, 168, 0.45)";
+const RING_TO = "0 0 0 12px rgba(255, 207, 168, 0), 0 0 24px 0px rgba(255, 207, 168, 0)";
 
 /** An unfilled line on the specimen. A blank field prints as a blank line, never as a zero. */
 const BLANK = "·····";
@@ -273,12 +287,14 @@ type Stage =
 /* ------------------------------------------------------------------ small pieces */
 
 /**
- * The input well. Cut into its group rather than raised off it: the group is --panel-2 and the
- * field is the page's own --panel, with a --bound edge (4.77 against --panel-2, 5.18 against
- * --panel) because an input boundary is a control boundary and has to clear 3:1.
+ * The input well. Cut into its card rather than raised off it: the card is the faint card ramp and
+ * the field is the pit, --recess, rounded as a well. Its edge is --bound, 4.13 against the pit,
+ * because an input boundary is a control boundary and has to clear 3:1; under the pointer it goes
+ * to --fg. Focus is the page-wide apricot ring, 2px at a 2px offset, so it lands on the card (12.25)
+ * and never on the field. The value is --fg on the pit, 17.03.
  */
 const FIELD =
-  "figure mt-2 w-full min-w-0 border border-bound bg-panel px-3 py-2.5 text-lg text-fg transition-colors duration-[var(--t-open)] ease-settle hover:border-fg";
+  "figure mt-2 w-full min-w-0 rounded-well border border-bound bg-recess px-3 py-2.5 text-lg text-fg transition-colors duration-[var(--t-open)] ease-settle hover:border-fg";
 
 /** A refused value: full --fg and a rule, against the hint's --fg-3. Weight, not hue. */
 function FieldError({ id, children }: { id?: string; children: string }) {
@@ -290,15 +306,16 @@ function FieldError({ id, children }: { id?: string; children: string }) {
 }
 
 /**
- * A group of fields on one raised surface. The surface change is what separates the groups, the
- * same device the board uses for its key: a hairline between groups would be the same line that
- * already divides the fields inside them, and the page would read as one long list.
+ * A group of fields on one card. The card is what separates the groups: a hairline between groups
+ * would be the same line that already divides the fields inside them, and the page would read as
+ * one long list. Its head is an apricot label (12.25 on the card), the signal that says where a
+ * group starts.
  */
 function Group({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <section className="border border-rule bg-panel-2">
+    <section className="card overflow-hidden rounded-card">
       <div className="border-b border-rule px-5 py-3">
-        <h2 className="label text-fg-3">{label}</h2>
+        <h2 className="label text-event">{label}</h2>
       </div>
       <div className="divide-y divide-rule">{children}</div>
     </section>
@@ -412,10 +429,14 @@ function ClockBox({
  * A value struck onto the specimen. Re-keyed on its own text, so a changed figure remounts and
  * lands again with the weight of a stamp coming down. Not NumberFlow: a rolling figure in this
  * product means a number that just came off a node, and these move because somebody is typing.
+ *
+ * Under reduced motion it is the same element with a zero-length transition, never a plain span.
+ * The server cannot know the preference, so it always prints the stamp's first frame (opacity .3,
+ * scale 1.06) inline; a plain span on the client hydrates over that markup without removing the
+ * style, and every figure on the specimen stayed at 30% (2.4:1) for a reduced-motion reader.
  */
 function Stamp({ children, className = "" }: { children: string; className?: string }) {
   const reduce = useReducedMotion();
-  if (reduce) return <span className={className}>{children}</span>;
 
   return (
     <motion.span
@@ -424,7 +445,7 @@ function Stamp({ children, className = "" }: { children: string; className?: str
       style={{ transformOrigin: "left center" }}
       initial={{ opacity: 0.3, scale: 1.06 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.22, ease: EASE }}
+      transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
     >
       {children}
     </motion.span>
@@ -446,11 +467,13 @@ function printKelvin(text: string): string {
  * half keeps the terms and, once bought, the commitment; the hand half is the buyer's, with the
  * number and the nonce that never leaves their browser until they reveal it.
  *
- * Rebuilt on the cell system rather than borrowed from the old Counterfoil ticket component (since
- * deleted), whose classes were on the dead names. The card is --panel-2 on the page; the stub is
- * --recess, the same well the payloads sit in, because the hand half is the secret half. The
- * perforation is a dashed --bound rule and nothing more: the old punched notches were discs, and
- * this system has no radius.
+ * The ticket is a card on the page; the stub is --recess, the same pit the fields are cut into,
+ * because the hand half is the secret half. The perforation is a dashed --bound rule (4.13 on the
+ * pit) and nothing more.
+ *
+ * It leans toward a fine pointer, and the lean is on this card, not on the column around it: that
+ * column is `lg:sticky`, and a transform there would move the sticky box itself and every card in
+ * it. The values on the card are struck by <Stamp> as before.
  */
 function Specimen({
   title,
@@ -472,8 +495,10 @@ function Specimen({
   revealsCloseAt: string;
 }) {
   return (
-    <div
-      className="grid border border-bound bg-panel-2"
+    <Tilt
+      max={6}
+      glare
+      className="card grid overflow-hidden rounded-card"
       style={{ gridTemplateColumns: "minmax(0,1fr) 1px minmax(0,40%)" }}
     >
       <div className="min-w-0 px-4 py-4 sm:px-5">
@@ -531,7 +556,7 @@ function Specimen({
       {/* The perforation: a one-pixel column whose dashed edge is the tear line. */}
       <div aria-hidden="true" className="border-l border-dashed border-bound" />
 
-      <div className="recess min-w-0 bg-recess px-4 py-4 sm:px-5">
+      <div className="min-w-0 bg-recess px-4 py-4 sm:px-5">
         <Cap>Stub</Cap>
 
         {/* The first serial is not stamped: it is the one number on the card no field can change. */}
@@ -555,7 +580,7 @@ function Specimen({
           nonce is the one secret in the draw.
         </p>
       </div>
-    </div>
+    </Tilt>
   );
 }
 
@@ -752,7 +777,7 @@ export default function CreatePage() {
           All raffles
         </Link>
 
-        <h1 className="font-serif mt-[clamp(16px,2.4vw,28px)] text-display">Deploy a raffle</h1>
+        <h1 className="headline headline-ramp mt-[clamp(16px,2.4vw,28px)] text-display">Deploy a raffle</h1>
         <p className="mt-4 max-w-[58ch] text-lg text-fg-2">
           Put up a prize and set the rules. Once deployed, the raffle program on Rialo holds the
           money and enforces the terms: it sells tickets until the sale closes and accepts reveals
@@ -909,8 +934,8 @@ export default function CreatePage() {
                 testnet on 2026-10-08, never "guaranteed": the Subscriber is Rialo's closed-source
                 program, so the button stays on the raffle page in case it does not arrive.
               */}
-              <section aria-labelledby="schedule-heading" className="border border-rule bg-panel-2 px-5 py-4">
-                <h2 id="schedule-heading" className="label text-fg-3">
+              <section aria-labelledby="schedule-heading" className="card rounded-card px-5 py-4">
+                <h2 id="schedule-heading" className="label text-event">
                   Automatic draw
                 </h2>
                 <p className="mt-2 text-sm text-fg-2">
@@ -950,7 +975,7 @@ export default function CreatePage() {
                       type="button"
                       onClick={() => void connect()}
                       disabled={status === "loading"}
-                      className={`${PRIMARY} w-full py-4`}
+                      className={`${PRIMARY} min-h-14 w-full`}
                     >
                       {status === "loading" ? "Connecting" : "Connect a wallet to deploy"}
                     </button>
@@ -966,7 +991,7 @@ export default function CreatePage() {
                       type="submit"
                       disabled={!canSign || busy}
                       aria-busy={busy}
-                      className={`${PRIMARY} w-full py-4`}
+                      className={`${PRIMARY} min-h-14 w-full`}
                     >
                       {stage.kind === "checking"
                         ? "Checking the cost"
@@ -1044,7 +1069,7 @@ export default function CreatePage() {
                       refusal={stage.refusal}
                     />
                     {stage.maybeAt !== null && (
-                      <div className="border border-bound px-4 py-3.5">
+                      <div className="card rounded-card px-4 py-3.5">
                         <p className="text-sm text-fg">
                           If it landed, the raffle is at this address with the prize in it. Open it
                           before pressing Deploy again, or a second raffle takes a second prize.
@@ -1067,21 +1092,32 @@ export default function CreatePage() {
                 worked looked like a deploy that did nothing.
               */}
               {stage.kind === "done" && (
+                /*
+                  The entrance is the one it always had (10px down to rest at 350ms on this page's
+                  EASE), and the card rings once in apricot as it lands: a ring that leaves its edge
+                  and fades, so the eye finds the receipt and the light is gone before it is read.
+                  The receipt is a fact, not a winner, so the ring is the signal's colour, never
+                  coral. Under reduced motion it is simply there, with no ring.
+                */
                 <motion.section
                   aria-labelledby="deployed-heading"
-                  className="border border-bound"
-                  initial={reduce ? false : { opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: EASE }}
+                  className="card overflow-hidden rounded-card"
+                  initial={reduce ? false : { opacity: 0, y: -10, boxShadow: RING_FROM }}
+                  animate={{ opacity: 1, y: 0, boxShadow: RING_TO }}
+                  transition={{
+                    duration: 0.35,
+                    ease: EASE,
+                    boxShadow: { duration: 1.4, delay: 0.2, ease: EASE },
+                  }}
                 >
                   <div className="border-b border-rule px-5 py-3">
-                    <h2 id="deployed-heading" className="label text-fg">
+                    <h2 id="deployed-heading" className="label text-event">
                       Deployed on {NETWORK}
                     </h2>
                   </div>
                   <div className="grid gap-6 px-5 py-5">
                     <div className="min-w-0">
-                      <p className="font-serif text-title [overflow-wrap:anywhere]">{stage.title}</p>
+                      <p className="headline-sub text-title [overflow-wrap:anywhere]">{stage.title}</p>
                       <p className="mt-3 max-w-[62ch] text-base text-fg-2">
                         The chain executed the transaction below. It created the raffle account, wrote
                         the terms into it and moved the prize in. The sale closes{" "}
@@ -1103,7 +1139,7 @@ export default function CreatePage() {
                           back to you once the raffle is settled.
                         </p>
                       ) : (
-                        <div className="mt-4 border border-bound px-4 py-3.5">
+                        <div className="mt-4 rounded-well border border-bound px-4 py-3.5">
                           <p className="label text-fg">Created, but the draw is not scheduled</p>
                           <p className="mt-2 text-sm text-fg-2">
                             Rialo refused the schedule: {stage.scheduleError ?? "no reason given"}. The
@@ -1122,7 +1158,7 @@ export default function CreatePage() {
                       </dl>
                     </div>
                     <div className="flex min-w-0 flex-col gap-3">
-                      <Link href={`/r/${stage.raffle}`} className={`${PRIMARY} w-full py-4`}>
+                      <Link href={`/r/${stage.raffle}`} className={`${PRIMARY} min-h-14 w-full`}>
                         Open the raffle
                         <ArrowRight size={12} weight="bold" aria-hidden="true" />
                       </Link>
@@ -1180,7 +1216,7 @@ export default function CreatePage() {
                 </div>
               )}
 
-              <section className="border border-rule bg-panel-2 px-5 py-5">
+              <section className="card rounded-card px-5 py-5">
                 <Cap>If it sells out</Cap>
                 <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
                   <span className="monument text-fg" style={{ fontSize: "var(--text-title)" }}>

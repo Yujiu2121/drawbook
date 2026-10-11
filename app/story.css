@@ -1,35 +1,65 @@
 /* ==========================================================================================
-   THE STORY: the landing's eight sections.
+   THE STORY: the landing's furniture, and the ceremony's few rules of its own.
 
-   WHY THIS FILE EXISTS. app/cell.css owns the cell at its four scales and the row that carries
-   it. Everything here is the landing's own furniture: the opening, the stepper, the raffle card,
-   the draw chain, the verification panel and the reactive-transaction diagram. None of it is a
-   cell and none of it belongs in a file whose header promises one.
+   WHY THIS FILE EXISTS. app/cell.css owns the cell at its scales and the row that carries it.
+   Everything here is the landing's own furniture: the opening, the How cards, the raffle cards,
+   the draw chain, the verification panel and the Rialo timeline, plus the winner cards the
+   ceremony (components/ceremony.tsx) shares with /raffle/4. None of it is a cell and none of it
+   belongs in a file whose header promises one.
 
-   IT IS THE SAME SYSTEM, WITH NO EXCEPTIONS TAKEN. Every colour below is a role token, so one
-   `.inv` on a section flips the lot. There is no radius anywhere: `--radius-*` is cleared in
-   globals.css block 1, so a `rounded` class here would compile to nothing and a hand-written
-   `border-radius` would be the one place in the product that has one. There is no shadow, no
-   blur, no backdrop filter and no gradient, because the ground is the light source and ink is
-   where light is blocked. There is no `@keyframes` and no `infinite`: the one thing on this page
-   that moves without being touched is the opening, and it runs once.
+   IT IS THE SAME SYSTEM, WITH NO EXCEPTIONS TAKEN. Every colour below is a role token or one of
+   the raw rgb twins in globals.css block 2, so one `.inv` on a section moves the lot into the
+   record tone. A corner is a `--radius-*` step, a glow is a `--shadow-*` step, and a gradient is
+   one of the `--ramp-*` values. Nothing in this file invents a value of its own for any of them.
 
-   HOVER IS A SURFACE CHANGE OR A RULE, NEVER A LIFT. A card that rises off the page needs a
-   light behind it to cast the shadow that sells the rise, and there is no second light in this
-   room. A card that changes material under the pointer says the same thing and costs nothing.
+   THE KEYFRAMES THAT ARE THIS FILE'S OWN, and why each may exist:
+     how-fill, how-band, how-lift   the three wordless pictures in the How cards. Loops, and among
+                                    the few the product allows: held still until their card has
+                                    risen into view, skipped while off screen, and never run under
+                                    reduced motion.
+     tl-fill, tl-lit                the timeline's fill and its nodes, driven by scroll, not time.
+     tl-travel                      the timeline's pulse. The shared `travel` moves by `top`, a
+                                    layout a frame; this one moves by transform. Skipped off screen.
+     cwin-in                        a winner card's coral glow arriving, once.
+   Every other animation here is one of the seven declared in globals.css block 4. Every loop in
+   this file sits inside a content-visibility: auto box, so none of them ticks off screen.
+
+   HOVER MAY LIFT, BECAUSE THERE IS NOW A LIGHT TO CAST THE SHADOW. A card leans toward the
+   pointer (components/fx.tsx) and its tickets rise 3px, and the haze over the page is the light
+   that makes the rise read. A board row still never lifts: it is the source rectangle of the route
+   morph, and a row that moved under the pointer would morph from somewhere it no longer is. No
+   hover here is coral and none is an apricot fill.
 
    CONTRAST, COMPUTED (WCAG 2.x, 0.03928 knee, L = 0.2126R + 0.7152G + 0.0722B, sanity-checked
-   at #ffffff on #000000 = 21.00), each pair against the surface it actually sits on:
+   at #ffffff on #000000 = 21.00), each pair against the surface it actually sits on. "card" is
+   the card ramp's top stop (its lighter end) composited over the opaque floor every card here
+   carries (THE CARD FLOOR, below): dusk on the floor, wine at 85% over dusk in the record tone,
+   and --phase at 50% over dusk for a raffle in its reveal window. The floor is opaque, so the haze
+   behind a card no longer reaches its labels; before it, the haze peak put --fg-3 at 4.73.
 
-     card title      --fg / --panel-2      13.82 light,  15.01 inverted
-     card facts      --fg-3 / --panel-2     5.27 light,   5.65 inverted
-     card on hover   --fg-3 / --phase       4.79          (a hovered live card sits on --phase)
-     chain label     --fg-3 / --recess      4.53 light,   5.57 inverted (.inv .recess lifts fg-3)
-     chain figure    --event / --recess     5.57 light,   5.95 inverted
-     card boundary   --bound / --panel      5.18 light,   5.65 inverted   (needs 3:1)
+                                         floor  record  reveal
+     card label    --fg-3 / card          5.10    4.94    4.95
+     card body     --fg-2 / card          8.86    8.58    8.60
+     card title    --fg / card           14.96   14.50   14.53
+     chip selling  apricot-2 / card      10.09
+     chip reveal   --event / card                         11.92
+     chip drawn    --fg on rose-sold 45%           9.43
+     chip void     --fg-3 / card                   4.94
+     chain value   --event / card        12.29
+     chain dimmed  --fg-3 / card          5.10
+     How digest    --fg-3 / the picture's well (dusk at 55% over card)  5.38
+     winner index  --cell-won / card      6.19    5.99
+     seed          --fg / --recess       17.03 (the glow is behind the glyphs)
+     boundary      --bound / card         3.63    3.52    3.52  (needs 3:1)
 
-   The floor is 4.53 on an 11px label, which clears AA for small text. Nothing on this page is
-   --rule as text: --rule is decorative and --bound is the control boundary.
+   Measured on real pixels at 390 and 1280 (film included, the lightest pixel under each label):
+   the lowest card label is 4.99, "Sample 0003" on the reveal-window card.
+
+   ONE PAIR SITS UNDER THE 4.93 THIS FILE AIMS AT, AND ONLY WHILE A POINTER IS ON IT: a How label
+   under the centre of the 4% glare (app/fx.css, the foundation's value) is 4.69 on the dusk floor.
+   It clears AA for small text, it is gone the moment the pointer moves off the label, and it
+   cannot happen on a touch screen, where the glare is never drawn. --rule is decorative and is
+   never text; --bound is the control boundary.
    ========================================================================================== */
 
 /* ------------------------------------------------------------------------------- THE OPENING
@@ -40,7 +70,11 @@
    one sits inside a panel beside the sentence.
 
    --field is read by .muster in cell.css. Overriding the custom property rather than `height`
-   keeps the one declaration of how tall a field is in the file that draws it. */
+   keeps the one declaration of how tall a field is in the file that draws it.
+
+   This rule belongs to components/landing/hero.tsx and goes when it stops rendering a hero-scale
+   muster. The draw line and the word boxes that used to sit here went with the old opening: the
+   hero no longer renders .muster-stage, .draw-line or .riser. */
 .muster[data-scale="hero"] {
   --field: clamp(188px, 30vw, 320px);
   background: var(--panel-2);
@@ -51,153 +85,202 @@
   border-width: 1px;
 }
 
-/*
-   THE DRAW LINE, AND WHY IT IS ALLOWED TO EXIST.
+/* ----------------------------------------------------------------------------- THE CARD FLOOR
 
-   One rule, 2px wide, crossing the field once at the end of the opening and then gone. It is not
-   decoration and it is not a scanner: it is the moment the winner is fixed, which is the one
-   event this product is about, and the two cells it leaves lit are raffle 0004's real winners,
-   already in the HTML as `data-s="3"` before the line ever moves.
+   The `card` material is a translucent ramp, so its labels are only as legible as whatever shows
+   through it. Over the haze at its brightest the ramp's top stop puts --fg-3 at 4.73, under the
+   4.93 this landing holds its card labels to. So every card this file draws gets an opaque floor
+   under the ramp: --panel, which is dusk on the floor (5.10) and wine in the record tone.
 
-   It is a transition on `left`, driven by a data attribute the island sets, rather than a
-   keyframe animation. The distinction is not stylistic: `@keyframes` is the thing this codebase
-   has none of, because a named animation invites `infinite`, and a transition cannot loop.
-*/
-.draw-line {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-  background: var(--event);
-  opacity: 0;
-  pointer-events: none;
+   Two floors are mixed rather than taken whole, both for the same reason. Wine under the ramp is
+   4.91 and the reveal window's --phase is 4.79, so the record takes wine at 85% over dusk (4.94)
+   and a card in its reveal window takes --phase at 50% over --panel (4.95). Both still read as
+   their tone beside a floor card; the chip and its edge carry the phase in words as well. The
+   reveal rule comes first so that inside `.inv`, where --phase is wine, the record floor wins. */
+.how-card,
+.rcard,
+.chain,
+.vpanel,
+.cwin {
+  background: var(--ramp-card), var(--panel);
 }
 
-.muster-stage[data-draw="run"] .draw-line {
-  opacity: 1;
-  left: calc(100% - 2px);
-  transition:
-    left 900ms var(--ease-blade),
-    opacity var(--t-punch) linear;
+.rcard[data-phase="revealing"] {
+  background: var(--ramp-card), color-mix(in srgb, var(--phase) 50%, var(--panel));
 }
 
-.muster-stage[data-draw="done"] .draw-line {
-  opacity: 0;
-  left: calc(100% - 2px);
-  transition: opacity var(--t-settle) linear;
+.inv :is(.how-card, .rcard, .chain, .vpanel, .cwin) {
+  background: var(--ramp-card), color-mix(in srgb, var(--panel) 85%, var(--dusk));
 }
 
-/* The word boxes the opening raises the headline out of. `overflow: hidden` on the box is the
-   whole of the effect: the glyphs travel from below their own line and there is nothing to see
-   until they clear it. Visible and in place with no script. */
-.riser {
-  display: inline-block;
-  overflow: hidden;
-  vertical-align: bottom;
-}
+/* ------------------------------------------------------------------------------ THE HOW CARDS
 
-.riser > i {
-  display: inline-block;
-  font-style: normal;
-}
+   Commit, reveal, draw: three cards side by side from 980px, stacked under it. The card itself is
+   the `card` material on the panel radius (components/landing/sections.tsx); this file lays out
+   the list and draws the wordless picture at the foot of each card.
 
-/* ------------------------------------------------------------------------------- THE STEPPER
-
-   Commit, reveal, draw. Three columns and a connecting rule on a wide screen; a vertical
-   timeline on a narrow one, which is a different composition rather than the same one squeezed.
-
-   THE RULE IS POSITIONED OFF THE TYPE RAMP, NOT OFF A GUESS. The step numeral is
-   --text-monument's own clamp at the step's size with line-height 0.82, so the dot's centre is
-   `(size * 0.82) + margin + half the dot`. Writing that arithmetic out is what keeps the rule
-   on the dots when the clamp resolves differently at 900px and at 1600px. */
-.stepper {
-  --step-n: clamp(2.75rem, 5vw, 4.25rem);
-  --dot: 11px;
-
-  position: relative;
+   THE PICTURE. A well (the well radius, a --rule edge, dusk at 55% over the card) 132px tall. The
+   first holds a ticket that is bought: an empty cell that fills with the sold colour. The second
+   holds a ticket whose secret is published: a sold cell whose apricot foot rises into it, the same
+   36% band app/cell.css draws for a revealed ticket. The third holds a draw: a short strip whose
+   coral ticket lifts out of the row. At rest (no script, reduced motion, or between loops) each
+   shows its last frame, which is the true end state: sold, revealed, drawn. */
+.how {
   display: grid;
-  gap: clamp(30px, 3.4vw, 44px);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
 }
 
-.step {
-  position: relative;
-}
-
-.step-dot {
-  display: block;
-  width: var(--dot);
-  height: var(--dot);
-  background: var(--event);
-  position: relative;
-  z-index: 1;
-  transition: width var(--t-settle) var(--ease-settle);
-}
-
-/* The one hover in this section, and it is a measurement rather than a flourish: the dot grows
-   along the rule it sits on, in the direction the sequence runs. */
-.step:hover .step-dot,
-.step:focus-within .step-dot {
-  width: calc(var(--dot) * 4);
-}
-
-@media (min-width: 900px) {
-  .stepper {
+@media (min-width: 980px) {
+  .how {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: clamp(24px, 3vw, 48px);
-  }
-
-  .stepper-rule {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: calc(var(--step-n) * 0.82 + 22px + (var(--dot) / 2));
-    height: 1px;
-    background: var(--rule);
-  }
-
-  .step-dot {
-    margin: 22px 0 20px;
   }
 }
 
-/* The vertical timeline. The numeral moves off the rail and the dot takes its place on it, so
-   the eye runs down one line instead of down three stacked cards. */
-@media (max-width: 899px) {
-  .stepper-rule {
-    display: none;
+.how-card {
+  transition: border-color var(--t-settle) var(--ease-settle);
+}
+
+.how-card:hover {
+  border-color: rgba(var(--line-rgb), 0.5);
+}
+
+.how-vis {
+  margin-top: auto;
+  height: 132px;
+  border-radius: var(--radius-well);
+  border: 1px solid var(--rule);
+  background: rgba(var(--dusk-rgb), 0.55);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0 16px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 132px;
+}
+
+/* Below 980px the card has no minimum height for the well to sit at the foot of, so it keeps a
+   gap of its own from the paragraph above it. */
+@media (max-width: 979px) {
+  .how-vis {
+    margin-top: 22px;
+  }
+}
+
+/* The picture's cell is drawn at 58px, nearly three times a sheet cell, so it takes the chip step
+   (8px) rather than --radius-cell: at 3px a 58px square reads as sharp-cornered, not as a ticket.
+   It is a picture of a cell, never a .c, so the cell's own cap does not bind it. */
+.how-cell {
+  position: relative;
+  flex: none;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: var(--radius-chip);
+  border: 1.5px solid rgba(var(--line-rgb), 0.6);
+  background: var(--cell-sold);
+}
+
+.how-cell[data-kind="band"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 36%;
+  background: var(--event);
+}
+
+.how-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.how-strip > i {
+  width: 16px;
+  height: 22px;
+  border-radius: var(--radius-cell);
+  border: 1px solid rgba(var(--line-rgb), 0.45);
+  background: var(--cell-sold);
+}
+
+.how-strip > i[data-k] {
+  border-color: var(--cell-won-edge);
+  background: var(--cell-won);
+  box-shadow: var(--shadow-win);
+  transform: translateY(-34px) scale(1.35);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .how-cell[data-kind="fill"] {
+    animation: how-fill 3.6s ease-in-out infinite;
   }
 
-  .step {
-    padding-left: 34px;
+  .how-cell[data-kind="band"]::after {
+    animation: how-band 3.6s ease-in-out infinite;
   }
 
-  .step::before {
-    content: "";
-    position: absolute;
-    left: 5px;
-    top: 12px;
-    bottom: calc(clamp(30px, 3.4vw, 44px) * -1);
-    width: 1px;
-    background: var(--rule);
+  .how-strip > i[data-k] {
+    animation: how-lift 3.2s cubic-bezier(0.5, 0, 0.2, 1) infinite;
   }
 
-  .step:last-child::before {
-    display: none;
+  /* Held while the card is armed below the fold and has not been seen (<Reveal>, app/fx.css), so
+     the first one a reader sees starts from its first frame as the card rises.
+
+     OFF SCREEN THEY STOP, THROUGH content-visibility ON .how-vis, NOT THROUGH A PLAY STATE. The
+     well is skipped while it is away from the viewport, and a skipped subtree's animations do not
+     tick (measured: style recalcs from these loops 0 with the How section off screen). A view
+     timeline animating a registered `--loop` read by `animation-play-state` was tried first and
+     does nothing: the animation properties are resolved before animations apply, so an animated
+     custom property can never pause an animation (`--loop` read `paused`, the play state stayed
+     `running`). The well has a fixed height and already clips, so neither the size nor the paint
+     containment that comes with skipping changes how it looks. */
+  [data-reveal="armed"]:not([data-seen]) .how-vis *,
+  [data-reveal="armed"]:not([data-seen]) .how-vis *::after {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes how-fill {
+  0%,
+  15% {
+    background-color: var(--cell);
   }
 
-  .step-dot {
-    position: absolute;
-    left: 0;
-    top: 7px;
-    margin: 0;
+  45%,
+  100% {
+    background-color: var(--cell-sold);
+  }
+}
+
+@keyframes how-band {
+  0%,
+  25% {
+    transform: translateY(100%);
   }
 
-  /* No pointer here to grow it with, and a dot that is 44px wide on a 1px rail reads as a
-     mistake rather than as a measurement. */
-  .step:hover .step-dot,
-  .step:focus-within .step-dot {
-    width: var(--dot);
+  55%,
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes how-lift {
+  0%,
+  20% {
+    transform: none;
+  }
+
+  45%,
+  70% {
+    transform: translateY(-34px) scale(1.35);
+  }
+
+  100% {
+    transform: none;
   }
 }
 
@@ -207,86 +290,190 @@
    makes from /raffles, and it is deliberate: the board is a list you scan, and this is an
    invitation you accept. The row stays the object on /raffles, unchanged.
 
-   REAL GUTTERS, NOT A HAIRLINE GRID. A grid with a 1px gap over a --rule background draws the
-   separators for free and leaves a filled rectangle wherever a row is short of cards, which is
-   exactly what happens on a five-raffle book: the record row has two cards in a three-column
-   grid. Each card carries its own boundary instead. */
-/* The one-column track is declared, not left implicit. An implicit column sizes to the card's
-   min-content, which at 320px was 303px inside 280px of measure, and the page scrolled sideways
-   by 3px. `minmax(0, 1fr)` lets the card shrink to the measure the way the wider tracks do. */
-.rcards {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: clamp(14px, 1.5vw, 20px);
+   The grid the cards sit in is the page's own (`.lgrid` in app/drum.css): six tracks from 980px,
+   the live cards two tracks each and the record's three. This file draws the card.
+
+   The cards in one list rise one after another, a stagger step apart. <Reveal> reads
+   --reveal-delay only once it is armed and seen (app/fx.css), so in the server render this is
+   inert. */
+li:nth-child(2):has(> .tilt > .rcard) {
+  --reveal-delay: 50ms;
 }
 
-@media (min-width: 720px) {
-  .rcards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1100px) {
-  .rcards {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+li:nth-child(3):has(> .tilt > .rcard) {
+  --reveal-delay: 100ms;
 }
 
 /*
    `color` IS DECLARED HERE AND THAT IS NOT BELT AND BRACES.
 
-   `.inv` in globals.css redefines custom properties and nothing else. Every other inverted surface
-   in the product is a section written as `className="inv bg-panel text-fg"`, so the utility paints
-   the ink and the tokens do the rest. A card carries `.inv` on its own list item, and a card whose
-   ink came from a utility at the call site is a card that goes invisible the first time someone
-   renders one without it: measured, the settled and void cards printed their labels (which carry
-   `text-fg-3`) and lost the prize, the title, every fact value and the date, because inherited text
-   kept the light palette's ink on an ink background. The card paints its own foreground instead, so
-   the class on the list item is the whole of what a caller has to get right.
+   `.inv` in globals.css redefines custom properties and nothing else. A card carries `.inv` on its
+   own list item, and a card whose ink came from a utility at the call site is a card that goes
+   invisible the first time someone renders one without it. The card paints its own foreground
+   instead, so the class on the list item is the whole of what a caller has to get right.
+
+   The surface is the `card` utility (the card ramp under a --rule edge) and the card radius, both
+   on the element. The ramp is translucent, so what lies under it is the fact: dusk for a raffle on
+   the floor, --phase for one inside its reveal window (the same surface a board row takes, the
+   same fact told the same way, at half strength for contrast), and wine for one in the record.
+   The floors themselves are THE CARD FLOOR, above.
 */
 .rcard {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid var(--bound);
-  background: var(--panel-2);
   color: var(--fg);
-  padding: clamp(20px, 2.2vw, 28px);
-  transition: background var(--t-open) var(--ease-settle);
+  transition: border-color var(--t-settle) var(--ease-settle);
 }
 
-/* A raffle inside its reveal window sits on a different surface, exactly as it does in a board
-   row. The same fact, told the same way, at a different scale. */
-.rcard[data-phase="revealing"] {
-  background: var(--phase);
+/* The settled sample whose draw the page replays. The one wine glow a card may carry. */
+.rcard[data-feat] {
+  border-color: rgba(var(--line-rgb), 0.5);
+  box-shadow: var(--shadow-feat);
 }
 
 .rcard:hover,
 .rcard:focus-visible {
-  background: var(--phase);
+  border-color: rgba(var(--line-rgb), 0.5);
 }
 
-.rcard[data-phase="revealing"]:hover,
-.rcard[data-phase="revealing"]:focus-visible {
-  background: var(--recess);
+/* THE PHASE CHIP. A pill whose colour is the phase: the second apricot while tickets sell, the
+   signal itself inside the reveal window, chalk on a rose wash once drawn, and drained to --fg-3
+   on a dashed edge when void, because a void raffle is drained, never given a colour of its own. */
+.rcard-chip {
+  border-color: var(--bound);
+  color: var(--fg-2);
 }
 
-/* An inverted card is a raffle that has left the floor. Its hover is a well rather than a wash,
-   because --phase inside .inv is --ink, which is the surface it is already on. */
-.inv .rcard:hover,
-.inv .rcard:focus-visible {
-  background: var(--recess);
+.rcard[data-phase="selling"] .rcard-chip {
+  color: rgb(var(--apricot-2-rgb));
+  border-color: rgba(var(--apricot-2-rgb), 0.35);
 }
 
-/* The strip on a card is a meter rather than a mark, so it takes the board's own 10px and opens
-   a little under the pointer, on the same transform and the same origin the row uses. */
-.rcard .strip {
-  --strip-h: 12px;
+.rcard[data-phase="revealing"] .rcard-chip {
+  color: var(--event);
+  border-color: rgba(var(--apricot-rgb), 0.4);
 }
 
-.rcard:hover .strip,
-.rcard:focus-visible .strip {
-  transform: scaleY(1.5);
+.rcard[data-phase="drawn"] .rcard-chip {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--cell-sold) 45%, transparent);
+  border-color: rgba(var(--line-rgb), 0.6);
+}
+
+.rcard[data-phase="void"] .rcard-chip {
+  color: var(--fg-3);
+  border-style: dashed;
+}
+
+/* THE CARD STRIP. Geometry and colours are app/cell.css's (`.strip[data-scale="card"]`); this
+   file only moves it. Each ticket gets its position as --i, for the stagger. A strip is a row of
+   at most 40 tickets in the sample book; a raffle longer than this list simply staggers its tail
+   together, which is harmless. */
+.rcard .strip .c:nth-child(1) { --i: 1; }
+.rcard .strip .c:nth-child(2) { --i: 2; }
+.rcard .strip .c:nth-child(3) { --i: 3; }
+.rcard .strip .c:nth-child(4) { --i: 4; }
+.rcard .strip .c:nth-child(5) { --i: 5; }
+.rcard .strip .c:nth-child(6) { --i: 6; }
+.rcard .strip .c:nth-child(7) { --i: 7; }
+.rcard .strip .c:nth-child(8) { --i: 8; }
+.rcard .strip .c:nth-child(9) { --i: 9; }
+.rcard .strip .c:nth-child(10) { --i: 10; }
+.rcard .strip .c:nth-child(11) { --i: 11; }
+.rcard .strip .c:nth-child(12) { --i: 12; }
+.rcard .strip .c:nth-child(13) { --i: 13; }
+.rcard .strip .c:nth-child(14) { --i: 14; }
+.rcard .strip .c:nth-child(15) { --i: 15; }
+.rcard .strip .c:nth-child(16) { --i: 16; }
+.rcard .strip .c:nth-child(17) { --i: 17; }
+.rcard .strip .c:nth-child(18) { --i: 18; }
+.rcard .strip .c:nth-child(19) { --i: 19; }
+.rcard .strip .c:nth-child(20) { --i: 20; }
+.rcard .strip .c:nth-child(21) { --i: 21; }
+.rcard .strip .c:nth-child(22) { --i: 22; }
+.rcard .strip .c:nth-child(23) { --i: 23; }
+.rcard .strip .c:nth-child(24) { --i: 24; }
+.rcard .strip .c:nth-child(25) { --i: 25; }
+.rcard .strip .c:nth-child(26) { --i: 26; }
+.rcard .strip .c:nth-child(27) { --i: 27; }
+.rcard .strip .c:nth-child(28) { --i: 28; }
+.rcard .strip .c:nth-child(29) { --i: 29; }
+.rcard .strip .c:nth-child(30) { --i: 30; }
+.rcard .strip .c:nth-child(31) { --i: 31; }
+.rcard .strip .c:nth-child(32) { --i: 32; }
+.rcard .strip .c:nth-child(33) { --i: 33; }
+.rcard .strip .c:nth-child(34) { --i: 34; }
+.rcard .strip .c:nth-child(35) { --i: 35; }
+.rcard .strip .c:nth-child(36) { --i: 36; }
+.rcard .strip .c:nth-child(37) { --i: 37; }
+.rcard .strip .c:nth-child(38) { --i: 38; }
+.rcard .strip .c:nth-child(39) { --i: 39; }
+.rcard .strip .c:nth-child(40) { --i: 40; }
+
+/* OFF SCREEN, THE STRIP IS NOT RENDERED, SO ITS LOOP DOES NOT TICK. The drawn winners breathe on
+   box-shadow, a main-thread property: running forever, the two of them cost the whole landing a
+   style pass every frame (measured: 120 recalcs in 2s anywhere on the page, 0 to 12 without).
+   content-visibility: auto skips the strip's rendering, animations included, while it is away
+   from the viewport, and Chromium resumes it as it nears. Paint containment comes with it and
+   would clip the glow at the strip's edge, so the wrapper carries 24px of room on every side (the
+   breathing glow's 22px blur and its 1px ring) and takes it back with the same negative margin:
+   the strip lands where it always did. Its intrinsic block size is the strip's own 22px, so a
+   skipped strip holds its place and nothing below it moves when it comes back. */
+.rcard-strip {
+  padding: 24px;
+  margin: -24px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 22px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Under the pointer the tickets rise 3px, one after another, left to right. The cell keeps the
+     background transition app/cell.css gives it, so a ticket that changes state still fills. */
+  .rcard .strip .c {
+    transition:
+      background-color var(--t-settle) var(--ease-settle),
+      transform 350ms var(--ease-rise) calc(var(--i, 0) * 12ms);
+  }
+
+  @media (hover: hover) {
+    .rcard:hover .strip .c {
+      transform: translateY(-3px);
+    }
+  }
+
+  /* As the card rises into view, its tickets arrive one by one and the revealed ones raise their
+     apricot foot after them. Only on a card that was armed below the fold and has now been seen:
+     a card already on screen at load is never hidden to be shown again. */
+  [data-reveal="armed"][data-seen] .rcard .strip .c {
+    animation: cellin 550ms var(--ease-rise) backwards;
+    animation-delay: calc(200ms + var(--i, 0) * 26ms);
+  }
+
+  [data-reveal="armed"][data-seen] .rcard .strip .c[data-s="2"]::after {
+    animation: bandup 500ms var(--ease-rise) backwards;
+    animation-delay: calc(550ms + var(--i, 0) * 26ms);
+  }
+
+  /* A drawn raffle's winners breathe. Gated on the state it shows (a drawn winner, nothing else),
+     and held, like the How pictures, while the card is armed and unseen. It starts after the
+     arrival above would have finished. */
+  .rcard[data-phase="drawn"] .strip .c[data-s="3"] {
+    animation: winbreathe 2.8s ease-in-out 1.6s infinite;
+  }
+
+  [data-reveal="armed"]:not([data-seen]) .rcard[data-phase="drawn"] .strip .c[data-s="3"] {
+    animation-play-state: paused;
+  }
+
+  [data-reveal="armed"][data-seen] .rcard[data-phase="drawn"] .strip .c[data-s="3"] {
+    animation:
+      cellin 550ms var(--ease-rise) backwards,
+      winbreathe 2.8s ease-in-out infinite;
+    animation-delay:
+      calc(200ms + var(--i, 0) * 26ms),
+      1.6s;
+  }
 }
 
 .rcard-cta {
@@ -303,16 +490,18 @@
 /* ----------------------------------------------------------------------------- THE DRAW CHAIN
 
    Five links: what was revealed, what was published, what the chain added, what came out, and
-   who won. It is a summary of the ceremony below it and it never contradicts it, because every
-   figure in it is read out of the same modules at render time.
+   who won. One card (the `card` utility on the panel radius), a row of five cells from 900px and a
+   column under it, the cells parted by --rule hairlines.
 
-   The links are dim until the replay walks them. Dim rather than hidden: the whole chain is
-   readable at rest, and the walk adds pacing to an argument the document already makes. */
+   THE WALK. The landing's draw scene sets `data-walk` on the list while it plays and `data-on`
+   on the link of the beat it is showing. The active link takes a 2px apricot rule down its left
+   edge and full ink; a link already walked past drops its value and its note to --fg-3, and a
+   link still to come stays at full strength. Dimmed by colour and never by opacity, so a dimmed
+   link still reads at 5.10 (the card on its dusk floor, THE CARD FLOOR). With no attributes every link
+   is at full strength, which is the state the HTML ships in and the state under reduced motion. */
 .chain {
   display: grid;
-  gap: 1px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
+  overflow: hidden;
 }
 
 @media (min-width: 900px) {
@@ -322,38 +511,83 @@
 }
 
 .chain-link {
-  background: var(--panel);
+  position: relative;
   padding: clamp(18px, 2vw, 26px);
   display: grid;
   gap: 8px;
   align-content: start;
-  transition:
-    opacity var(--t-settle) var(--ease-settle),
-    background var(--t-settle) var(--ease-settle);
 }
 
-/* Only ever dimmed by a script that is also going to undim it. With no script every link is at
-   full strength, which is the state the HTML ships in. */
-.chain[data-walk] .chain-link {
-  opacity: 0.45;
+.chain-link + .chain-link {
+  border-top: 1px solid var(--rule);
 }
 
-.chain[data-walk] .chain-link[data-on="1"] {
+@media (min-width: 900px) {
+  .chain-link + .chain-link {
+    border-top: 0;
+    border-left: 1px solid var(--rule);
+  }
+}
+
+.chain-link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--event);
+  opacity: 0;
+  transition: opacity var(--t-settle) var(--ease-settle);
+}
+
+.chain-n,
+.chain-v,
+.chain-note {
+  transition: color var(--t-settle) var(--ease-settle);
+}
+
+/* Done links only: a link whose data-step is below the beat in data-walk. The scene writes the
+   beat as 0 to 4 and data-on="1" on its link (components/drum/draw-scene.tsx), so the links still
+   to come keep full strength until their beat arrives. */
+.chain[data-walk="1"] .chain-link[data-step="0"],
+.chain[data-walk="2"] .chain-link:is([data-step="0"], [data-step="1"]),
+.chain[data-walk="3"] .chain-link:is([data-step="0"], [data-step="1"], [data-step="2"]),
+.chain[data-walk="4"] .chain-link:is([data-step="0"], [data-step="1"], [data-step="2"], [data-step="3"]) {
+  & .chain-v,
+  & .chain-note {
+    color: var(--fg-3);
+  }
+}
+
+.chain[data-walk] .chain-link[data-on]::before {
   opacity: 1;
-  background: var(--recess);
+}
+
+.chain[data-walk] .chain-link[data-on] .chain-n,
+.chain[data-walk] .chain-link[data-on] .chain-note {
+  color: var(--fg);
 }
 
 /* ------------------------------------------------------------------------ THE VERIFY PANEL
 
    Collapsed by default, because this is the layer under the product rather than the product.
-   A <details>, so it works with no script at all and the browser owns the state.
+   A <details>, so it works with no script at all and the browser owns the state. The panel is the
+   `card` utility on the panel radius; its wells are --recess on the well radius.
 
    The marker is removed in both spellings the engines use; a stray triangle beside a hand-drawn
-   chevron is the tell that only one of them was written. */
+   chevron is the tell that only one of them was written. The summary does not change its surface
+   under the pointer: a wash over the card would take the count beside it under 4.5 at the haze
+   peak. The chevron answers instead. */
+/* The summary fills the panel, so the global focus ring (2px apricot at a 2px offset) draws just
+   outside the panel's edge. Nothing on the panel may clip, then: no overflow on the <details>, or
+   a keyboard reader tabbing here sees no ring at all (it was clipped on all four sides once). The
+   summary takes the panel's radius, which it never paints with, only so the ring follows the
+   panel's rounded corners instead of squaring them off. */
 .vpanel > summary {
   list-style: none;
   cursor: pointer;
-  transition: background var(--t-open) var(--ease-settle);
+  border-radius: var(--radius-panel);
 }
 
 .vpanel > summary::-webkit-details-marker {
@@ -364,10 +598,6 @@
   content: "";
 }
 
-.vpanel > summary:hover {
-  background: var(--phase);
-}
-
 .chev {
   width: 9px;
   height: 9px;
@@ -375,7 +605,13 @@
   border-right: 1px solid var(--fg);
   border-bottom: 1px solid var(--fg);
   transform: rotate(45deg);
-  transition: transform var(--t-open) var(--ease-settle);
+  transition:
+    transform var(--t-open) var(--ease-settle),
+    border-color var(--t-open) var(--ease-settle);
+}
+
+.vpanel > summary:hover .chev {
+  border-color: var(--event);
 }
 
 .vpanel[open] .chev {
@@ -384,63 +620,300 @@
   transform: rotate(-135deg);
 }
 
-/* ------------------------------------------------------------------------------- THE FLOW
+/* The seed: the one value everything else in the panel exists to produce, so it carries a faint
+   apricot light behind its glyphs, on a rose-tinted edge. The glow sits behind the ink and only
+   lifts the well around it; the chalk digest on the well stays 17.03. */
+.vseed {
+  border-color: rgba(var(--line-rgb), 0.35);
+  text-shadow: 0 0 14px rgba(var(--apricot-rgb), 0.55);
+}
 
-   Reveal deadline, condition met, reactive transaction, draw executed. Four plates and three
-   connectors. The last plate is bounded in --event because it is the only one of the four that
-   is an outcome rather than a state, and that is the whole claim of the section. */
-.flow-step {
+/* ---------------------------------------------------------------------- THE RIALO TIMELINE
+
+   Reveal deadline, condition met, reactive transaction, draw executed: a 2px track at 15px from
+   the left, a node on it for each plate, and the meter ramp filling the track from the top.
+
+   THE FILL AND THE NODES FOLLOW THE SCROLL, IN CSS. Both read view timelines measured against one
+   line 60% down the viewport. The fill's tip sits on that line: on the list's own timeline the
+   fill runs from 0 when the track's top (8px into the list) reaches the line to 1 when its bottom
+   (8px short of the end) does, so `entry calc(40vh + 8px)` to `entry calc(100% + 40vh - 8px)`,
+   since the entry range is exactly the list's own height long. Each node lights as its centre
+   (16px into a 32px node) reaches the same line, on its own timeline, over 24px of scroll. Fill
+   and node therefore agree by construction rather than by a guess at where the plates fall.
+
+   --fill and --lit are registered numbers whose initial value is 1, so wherever the timelines do
+   not run (no support, reduced motion, no script needed either way) the diagram is complete:
+   every node lit and the fill full. */
+@property --fill {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@property --lit {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
+@keyframes tl-fill {
+  from {
+    --fill: 0;
+  }
+
+  to {
+    --fill: 1;
+  }
+}
+
+@keyframes tl-lit {
+  from {
+    --lit: 0;
+  }
+
+  to {
+    --lit: 1;
+  }
+}
+
+.tl-wrap {
   position: relative;
-  border: 1px solid var(--bound);
-  background: var(--panel-2);
-  padding: 16px 18px;
-  display: grid;
-  gap: 5px;
-  margin-bottom: 34px;
 }
 
-.flow-step:last-child {
-  margin-bottom: 0;
-  border-color: var(--event);
+.tl {
+  position: relative;
+  padding-left: 46px;
 }
 
-.flow-arrow {
-  position: absolute;
-  left: 50%;
-  bottom: -34px;
-  width: 1px;
-  height: 34px;
-  background: var(--bound);
-}
-
-.flow-arrow::after {
+.tl::before,
+.tl::after {
   content: "";
   position: absolute;
-  left: -3px;
-  bottom: 5px;
-  width: 7px;
-  height: 7px;
-  border-right: 1px solid var(--bound);
-  border-bottom: 1px solid var(--bound);
-  transform: rotate(45deg);
+  left: 15px;
+  top: 8px;
+  width: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.tl::before {
+  bottom: 8px;
+  background: var(--rule);
+}
+
+.tl::after {
+  height: calc((100% - 16px) * var(--fill));
+  background: var(--ramp-meter);
+  box-shadow: var(--shadow-node);
+}
+
+.tl-step {
+  position: relative;
+  padding-bottom: 34px;
+}
+
+.tl-step:last-child {
+  padding-bottom: 0;
+}
+
+.tl-node {
+  position: absolute;
+  left: -46px;
+  top: 0;
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-chip);
+  border: 1.5px solid color-mix(in srgb, var(--event) calc(var(--lit) * 100%), var(--rule));
+  background: color-mix(in srgb, var(--cell-sold) calc(var(--lit) * 35%), var(--panel));
+}
+
+/* The node's glow is the named step on a layer of its own, faded with --lit, so a node lights
+   by the step's own value and never by an alpha invented here. */
+.tl-node::before {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  box-shadow: var(--shadow-node);
+  opacity: var(--lit);
+  pointer-events: none;
+}
+
+.tl-node > i {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-cell);
+  border: 1px solid var(--event);
+  background: color-mix(in srgb, var(--cell-sold) calc(var(--lit) * 100%), transparent);
+}
+
+/* The key node: the draw being sent. The second apricot, never coral. */
+.tl-step[data-key] .tl-node {
+  border-color: color-mix(
+    in srgb,
+    rgb(var(--apricot-2-rgb)) calc(var(--lit) * 100%),
+    rgba(var(--apricot-2-rgb), 0.6)
+  );
+  background: color-mix(
+    in srgb,
+    rgba(var(--apricot-2-rgb), 0.22) calc(var(--lit) * 100%),
+    var(--panel)
+  );
+}
+
+.tl-step[data-key] .tl-node > i {
+  border-color: rgb(var(--apricot-2-rgb));
+  background: color-mix(in srgb, rgb(var(--apricot-2-rgb)) calc(var(--lit) * 100%), transparent);
+}
+
+/* The pulse: an 8px chalk bead with the node glow, travelling the track. The one loop in this
+   diagram.
+
+   IT MOVES BY TRANSFORM, NOT BY `top`, AND THAT IS WHY IT HAS ITS OWN KEYFRAMES. The shared
+   `travel` (globals.css block 4) animates `top`, which costs a layout on every frame for as long
+   as the landing is open, wherever the reader is: measured at 1280x900, about 60 layouts a second
+   with it and 1 to 2 without. Here the span is as tall as the distance the bead covers (the rail
+   less the bead), the bead is drawn in its ::before at the span's top, and the span slides by
+   its own height, so `translateY(100%)` lands the bead exactly where `top: calc(100% - 8px)`
+   did. Transform and opacity only, so the compositor runs it and the main thread does nothing.
+
+   At rest, and under reduced motion where the animation is never declared, the span is at
+   opacity 0, so the still diagram has no stray bead on it.
+
+   OFF SCREEN IT DOES NOT TICK. The pulse sits in .tl-rail, an absolutely placed box over the
+   track with content-visibility: auto, so while the timeline is away from the viewport the rail's
+   contents are skipped, the loop with them. The rail is absolutely sized (top and bottom), so the
+   size containment that comes with skipping changes nothing. Paint containment would clip the
+   bead's 22px glow, so the rail reaches 24px past the track on every side and the pulse is placed
+   24px in: the bead sits at left 12px of the wrap and travels from its top to 8px short of its
+   foot, as before. */
+.tl-rail {
+  position: absolute;
+  left: -12px;
+  top: -24px;
+  bottom: -24px;
+  z-index: 2;
+  width: 56px;
+  pointer-events: none;
+  content-visibility: auto;
+}
+
+.tl-pulse {
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  width: 8px;
+  height: calc(100% - 56px);
+  opacity: 0;
+}
+
+.tl-pulse::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--fg);
+  box-shadow: var(--shadow-node);
+}
+
+@keyframes tl-travel {
+  0% {
+    opacity: 0;
+    transform: none;
+  }
+
+  10%,
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tl-pulse {
+    animation: tl-travel 4.5s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .tl {
+      animation: tl-fill linear both;
+      animation-timeline: view();
+      animation-range: entry calc(40vh + 8px) entry calc(100% + 40vh - 8px);
+    }
+
+    .tl-node {
+      animation: tl-lit linear both;
+      animation-timeline: view();
+      animation-range: entry calc(40vh + 4px) entry calc(40vh + 28px);
+    }
+  }
+}
+
+/* ----------------------------------------------------------------------- THE WINNER CARDS
+
+   components/ceremony.tsx's `CeremonyWinners`, on the landing and on /raffle/4. A winner card is
+   the one card that glows coral, because it holds a winner and coral means nothing else: the
+   large coral index, a coral edge, and --shadow-win-lg around the card. The glow arrives once,
+   when the card is shown: in the settled record, or when act 4 of a replay comes on stage (the
+   ceremony mounts every act at the start and marks the one on stage with `data-on`, so keying
+   this to mounting alone would play it on a hidden act). It does not breathe afterwards. Under
+   reduced motion it is simply there. */
+.cwin {
+  border-color: rgba(var(--coral-rgb), 0.45);
+  box-shadow: var(--shadow-win-lg);
+}
+
+@keyframes cwin-in {
+  from {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .crecord .cwin,
+  .act[data-on] .cwin {
+    animation: cwin-in 900ms var(--ease-settle) 150ms backwards;
+  }
+
+  /* On the landing the record mounts with the page, a section and the draw scene below the fold,
+     so a glow keyed to time would finish before anyone scrolled to it. Where view timelines exist
+     the record's glow arrives as the card enters the viewport instead. A replay's act 4 keeps the
+     timed rule above: it is on stage when it plays. */
+  @supports (animation-timeline: view()) {
+    .crecord .cwin {
+      animation: cwin-in linear both;
+      animation-timeline: view();
+      animation-range: entry 10% entry 70%;
+    }
+  }
 }
 
 /* --------------------------------------------------------------------------- REDUCED MOTION
 
    `transition-duration` only, never the `transition` shorthand: the shorthand clears
    `transition-property` with it, and a later rule that sets only a duration would then have
-   nothing to apply it to. app/motion.css is built on the same distinction and records why. */
+   nothing to apply it to. app/motion.css is built on the same distinction and records why. Every
+   keyframe animation above is declared inside a no-preference block, so there is none to stop. */
 @media (prefers-reduced-motion: reduce) {
-  .muster-stage[data-draw] .draw-line {
-    transition-duration: 1ms;
-  }
-
-  .step-dot,
+  .how-card,
   .rcard,
-  .rcard .strip,
   .rcard-cta,
-  .chain-link,
-  .vpanel > summary,
+  .chain-link::before,
+  .chain-n,
+  .chain-v,
+  .chain-note,
   .chev {
     transition-duration: 1ms;
   }

@@ -27,8 +27,9 @@ function rowMoney(raffle: Raffle): { amount: number; word: "pool" | "returned" }
  * reads one way on one screen and another way on the next is two raffles.
  *
  * PURE MARKUP. Every rule that draws this row lives in app/cell.css under `.row`, `.a-*` and
- * `.phase-tag`; every colour is a role token, so the row follows `.inv` into the record slab with
- * no second definition and no branch here. The only things this file decides are which strings go
+ * `.phase-tag`: the rounded plate, its lit edge, the light under the pointer, the pill tags and the
+ * entry. Every colour is a role token, so the row follows `.inv` into the record slab with no
+ * second definition and no branch here. The only things this file decides are which strings go
  * in which area and which of them come out of lib.
  *
  * NO CLIENT DIRECTIVE, deliberately. The board and the landing both render this on the server, and
@@ -56,24 +57,29 @@ function rowMoney(raffle: Raffle): { amount: number; word: "pool" | "returned" }
  * miniboard became cards and nothing imported it. The `mini` prop below is what is left of it, and
  * nothing passes it today.
  *
- * `.rows` AROUND THE LIST IS NOT OPTIONAL. The row opens by translating 4px to the right, a
- * transform's overflow propagates to the document, and a full bleed row without `.rows`
- * (`overflow-x: clip`) gives the whole page a 4px horizontal scrollbar on hover.
+ * `.rows` AROUND THE LIST IS NOT OPTIONAL. The row opens by translating 4px to the right and a
+ * transform's overflow propagates to the document, so `.rows` clips it (`overflow-x: clip`). It is
+ * also what insets the plates and spaces them 6px apart, and what pays back the inset as the row's
+ * padding so the columns still start on the gutter.
  *
  * CONTRAST, COMPUTED (WCAG 2.x relative luminance, white on black = 21.00), each pair against the
- * surface it actually sits on rather than against the page:
+ * surface it actually sits on rather than against the page; the record tone's wine after a bar:
  *
- *   row text        --fg / --panel-2     13.82 light,  15.01 inverted
- *   row text        --fg / --phase       12.55          (a revealing raffle sits on --phase)
- *   sub label       --fg-3 / --panel-2    5.27 light,   5.65 inverted
- *   sub label       --fg-3 / --phase      4.79
- *   drawn tag       --event / --panel-2   6.49 light,   8.01 inverted
- *   void tag        --fg-3 / --panel-2    5.27 light,   5.65 inverted
- *   tag boundary    --bound / --panel-2   4.77 light,   5.65 inverted   (needs 3:1, not 4.5)
- *   tag boundary    --bound / --phase     4.33
+ *   row text        --fg / --panel-2      15.06 | 14.98
+ *   row text        --fg / --phase        13.98          (a revealing raffle sits on --phase)
+ *   sub label       --fg-3 / --panel-2     5.13 | 5.10
+ *   sub label       --fg-3 / --phase       4.76
+ *   revealing tag   --event / --phase     11.47 | 12.30
+ *   drawn tag       --fg / --cell-sold     5.17          (a filled pill, the same on both)
+ *   void tag        --fg-3 / --panel-2     5.13 | 5.10
+ *   tag boundary    --bound / --panel-2    3.65 | 3.63   (needs 3:1, not 4.5)
+ *   tag boundary    --bound / --phase      3.39
  *
- * The floor is 4.79 on an 11px label, which clears AA for small text. The pool figure, the title
- * and the countdown are all --fg and never fall below 12.55.
+ * The light under the pointer is composited under the sub label and is capped for it: at its
+ * centre, 4% apricot keeps --fg-3 at 4.73 on --panel-2 and 4.70 on wine, and the 2% a revealing
+ * row takes keeps it at 4.56 on --phase (app/cell.css). The floor is 4.56 on an 11px-to-13px
+ * label, which clears AA for small text. The pool figure, the title and the countdown are all --fg
+ * and never fall below 13.98.
  */
 
 /**
@@ -188,8 +194,9 @@ export function RaffleRowCells({ raffle, mini = false, countdown, strip }: Raffl
       </span>
 
       <span className="a-phase">
-        {/* data-phase, not a colour class: app/cell.css tints the drawn tag with --event and the
-            void tag with --fg-3, and both roles already flip inside .inv. */}
+        {/* data-phase, not a colour class: app/cell.css draws each stage as its own pill (the
+            signal for revealing, a rose-sold fill for drawn, a dashed edge for void), from role
+            tokens, so the record tone needs nothing of its own here. */}
         <span className="phase-tag label" data-phase={raffle.phase}>
           {PHASE_WORD[raffle.phase]}
         </span>

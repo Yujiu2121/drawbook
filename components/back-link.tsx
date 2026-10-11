@@ -6,6 +6,7 @@ import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 
 import { useRenderedPath } from "@/components/nav-links";
 import { PendingMark } from "@/components/row-link";
+import { CHIP } from "@/lib/controls";
 import { recall } from "@/lib/nav-memory";
 
 /**
@@ -155,14 +156,16 @@ export function BackLink({ className = "" }: { className?: string }) {
       }}
       aria-label="Back to all raffles"
       /*
-        `relative` is for the pending mark below, which is out of flow and pinned to this chip's
-        leading edge. Everything else here is the chip: a hairline box, the label face, and the
-        surface it takes under the pointer. The minimum height is the wallet chip's, one label line
-        plus padding and border, so the arrow-only form below 640 stays as tall as its neighbours.
-        `tap` gives that 29px arrow a 44px square to be touched by on a touch screen or below 1024,
-        without drawing the chip any bigger (app/globals.css, block 7).
+        The masthead chip from lib/controls.ts, the one the wallet controls wear: a pill with a
+        --bound edge, the label face, and the same box, one label line plus padding and border, so
+        the arrow-only form below 640 stays as tall as its neighbours. The chip carries no text
+        colour of its own and this is the one it gets. `relative` is for the pending mark below,
+        which is out of flow and pinned to this chip's leading edge, and the surface it takes under
+        the pointer is the raised panel. `tap` gives that 29px arrow a 44px square to be touched by
+        on a touch screen or below 1024, without drawing the chip any bigger (app/globals.css,
+        block 7).
       */
-      className={`label tap relative inline-flex min-h-[calc(1.4em+0.75rem+2px)] items-center gap-1.5 border border-bound px-2 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-panel-2 ${className}`}
+      className={`${CHIP} tap relative text-fg hover:bg-panel-2 ${className}`}
     >
       {/*
         The way back is prerendered and prefetched like the way in, so this paints on a slow

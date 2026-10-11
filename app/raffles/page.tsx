@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ActivityFeed } from "@/components/activity-feed";
 import { Board } from "@/components/board";
 import { ChainRaffleList } from "@/components/chain-list";
+import { Reveal } from "@/components/fx";
 import { CLOCK_NOTE } from "@/lib/clock";
 import { MOCK_RAFFLES } from "@/lib/mock-raffles";
 import { activityOf } from "@/lib/raffle";
@@ -37,11 +38,20 @@ import { activityOf } from "@/lib/raffle";
  * CONTRAST, COMPUTED (WCAG 2.x relative luminance, 0.03928 knee,
  * L = 0.2126R + 0.7152G + 0.0722B, sanity-checked at #ffffff on #000000 = 21.00):
  *
- *   lead        --fg-2 / --panel   7.60   19px
- *   note        --fg-3 / --panel   5.73   13px
+ *   lead        --fg-2 / --panel    9.70   19px
+ *   note        --fg-3 / --panel    5.58   13px
+ *   eyebrow     --event / --panel  13.45   11px
  *
- * Both clear AA at their size. Every other pair on the route is quoted in the file that owns it.
+ * All clear AA at their size. Every other pair on the route is quoted in the file that owns it.
+ *
+ * NO WEBGL HERE. The drum lives on the landing; this route is the place its tickets come to rest,
+ * as plates of rows, and it loads nothing beyond the board's own islands.
  */
+
+/** The eyebrow over a section head. The same string as components/board.tsx writes, which says why
+    it is a string. */
+const EYEBROW =
+  "label flex items-center gap-3 text-event before:h-px before:w-7 before:shrink-0 before:bg-event before:content-['']";
 
 export const metadata: Metadata = {
   title: "Raffles",
@@ -72,22 +82,25 @@ export default function Page() {
       <ChainRaffleList />
 
       {/*
-        The line between the two sources. A heading at the same serif title size as "On chain",
+        The line between the two sources. A heading at the same title size and face as "On chain",
         so the page reads as two sections of equal rank, and a sentence that says what the second
-        one is before its countdown can be mistaken for a live one.
+        one is before its countdown can be mistaken for a live one. "not on chain" is its eyebrow,
+        drawn above the heading and read after it, as on every section head on this page.
       */}
       <section aria-labelledby="samples-heading" className="px-gutter pt-[clamp(32px,4.4vw,60px)]">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
-          <h2 id="samples-heading" className="m-0 font-serif text-title">
-            Sample raffles
-          </h2>
-          <p className="label text-fg-3">not on chain</p>
-        </div>
-        {/* One string rather than text around an expression: the prerender dropped the space
-            after the count when it was written as JSX text, and printed "The 5raffles". */}
-        <p className="mt-3 max-w-[58ch] text-sm text-fg-2">
-          {`The ${MOCK_RAFFLES.length} raffles below are a fixed demonstration record kept in this site’s code, not accounts on any chain. They stay to show the method: every draw in them can be recomputed from its published secrets, though on a sample that re-runs the code that made the record, so it cannot fail. Nothing done on them is signed or sent.`}
-        </p>
+        <Reveal>
+          <div className="flex flex-col gap-y-3">
+            <h2 id="samples-heading" className="m-0 headline-sub text-title">
+              Sample raffles
+            </h2>
+            <p className={`${EYEBROW} -order-1`}>not on chain</p>
+          </div>
+          {/* One string rather than text around an expression: the prerender dropped the space
+              after the count when it was written as JSX text, and printed "The 5raffles". */}
+          <p className="mt-3 max-w-[58ch] text-sm text-fg-2">
+            {`The ${MOCK_RAFFLES.length} raffles below are a fixed demonstration record kept in this site’s code, not accounts on any chain. They stay to show the method: every draw in them can be recomputed from its published secrets, though on a sample that re-runs the code that made the record, so it cannot fail. Nothing done on them is signed or sent.`}
+          </p>
+        </Reveal>
       </section>
 
       <Board raffles={MOCK_RAFFLES} />
@@ -105,12 +118,12 @@ export default function Page() {
       */}
       <section className="px-gutter py-[clamp(44px,7vw,96px)]">
         <div className="grid items-start gap-[clamp(26px,3.4vw,52px)] lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <div>
-            <h2 className="label text-fg-3">Notes on what you are reading</h2>
+          <Reveal>
+            <h2 className={EYEBROW}>Notes on what you are reading</h2>
 
             <p className="mt-2.5 max-w-[46ch] text-lg text-fg-2">
               A raffle inside its reveal window sits on a different surface, not a different badge.
-              The black is not decoration either: it is where the record begins.
+              The deeper surface is not decoration either: it is where the record begins.
             </p>
 
             {/*
@@ -144,11 +157,17 @@ export default function Page() {
               able to influence it. A holder can also withhold a reveal, blind, at the cost of
               their bond.
             </p>
-          </div>
+          </Reveal>
 
           {/* "Every sample", not "every raffle": the raffles on chain at the top of this page are
               not in this feed, and its ages are measured from the sample record's pinned instant. */}
-          <ActivityFeed events={events} limit={11} title="Activity, every sample" scope="all" />
+          <ActivityFeed
+            events={events}
+            limit={11}
+            title="Activity, every sample"
+            scope="all"
+            headClass={`${EYEBROW} mb-2.5`}
+          />
         </div>
       </section>
     </main>

@@ -21,16 +21,18 @@ import { useSelectedLayoutSegments } from "next/navigation";
  * below). Nothing else here has state, nothing fetches, nothing measures. The masthead around it
  * stays a Server Component and hands this in as one child, which is the repo's own pattern.
  *
- * WHY THE CURRENT ITEM CARRIES A RULE AND NOT JUST A SURFACE. Card on ground computes to 1.09:1.
- * That is a real surface in the material model and the right material, but it is nowhere near the
- * 3:1 a non-text indicator needs to be found, so on its own it would leave the current section
- * legible only to a screen reader. The 1px --event rule along the base of the plate is the cue
- * that carries the weight: 7.05:1 on the page, and it is a rule rather than a glow, so it costs
- * the material model nothing. The surface stays underneath it because two quiet cues read better
- * than one loud one.
+ * WHY THE CURRENT ITEM CARRIES A FOOT BAND AND NOT JUST A SURFACE. Each item is a pill on the
+ * masthead glass, tinted with the line colour at 8% under the pointer and 10% when it is the page
+ * you are on. That tint is the right material and nowhere near the 3:1 a non-text indicator needs,
+ * so on its own it would leave the current section legible only to a screen reader. The cue that
+ * carries the weight is a short apricot band, 12px by 2px, centred at the foot of the pill: --event
+ * at 13.45 on the glass. It is the same foot band a revealed ticket wears, which is what "you are
+ * here" means in a product made of tickets. Never coral: coral is a winner, and a page you are on
+ * has not won anything.
  *
- * The text does a third of the work on its own: --fg-2 at 7.60:1 for the sections you are not in,
- * --fg at 15.01:1 for the one you are.
+ * The text does a third of the work on its own: --fg-2 at 8.95 on the glass (7.87 at worst, over
+ * the drum's apricot band on the landing) for the sections you are not in, --fg at 15.12 for the
+ * one you are.
  */
 
 export interface Destination {
@@ -91,14 +93,14 @@ export function NavLinks({ className = "" }: { className?: string }) {
               <Link
                 href={d.href}
                 aria-current={current ? "page" : undefined}
-                className={`label relative block px-2.5 py-2.5 transition-colors duration-[var(--t-open)] ease-settle ${
-                  current ? "bg-panel-2 text-fg" : "text-fg-2 hover:text-fg"
+                className={`label relative block rounded-pill px-2.5 py-2.5 transition-colors duration-[var(--t-open)] ease-settle ${
+                  current
+                    ? "bg-[rgba(var(--line-rgb),.10)] text-fg"
+                    : "text-fg-2 hover:bg-[rgba(var(--line-rgb),.08)] hover:text-fg"
                 }`}
               >
                 {d.label}
-                {current ? (
-                  <span aria-hidden="true" className="absolute inset-x-0 bottom-0 block h-px bg-event" />
-                ) : null}
+                {current ? <FootTick /> : null}
               </Link>
             </li>
           );
@@ -108,7 +110,21 @@ export function NavLinks({ className = "" }: { className?: string }) {
   );
 }
 
-/** The secondary destination, on its own, for the wide bar. */
+/**
+ * The current-page cue: a 12px apricot band at the foot of the item. Positioned against the item,
+ * which is `relative`: centred under a bar link by default, 7px under its label. The menu's rows in
+ * components/mobile-nav.tsx are as wide as the menu, so they place it under the start of the label
+ * instead, where the eye already is.
+ */
+export function FootTick({ place = "bottom-[3px] left-[calc(50%-6px)]" }: { place?: string }) {
+  return <span aria-hidden="true" className={`absolute block h-[2px] w-3 rounded-pill bg-event ${place}`} />;
+}
+
+/**
+ * The secondary destination, on its own, for the wide bar: a ghost pill, bounded by a hairline and
+ * printed in --fg-2, so it reads as a place to go without competing with the filled call to action
+ * beside it. Its box is the label line plus py-2 and the border, the same height as the primary.
+ */
 export function DeployLink() {
   const isCurrent = useCurrent();
   const current = isCurrent(SECONDARY);
@@ -117,11 +133,14 @@ export function DeployLink() {
     <Link
       href={SECONDARY.href}
       aria-current={current ? "page" : undefined}
-      className={`label shrink-0 transition-colors duration-[var(--t-open)] ease-settle ${
-        current ? "text-fg" : "text-fg-3 hover:text-fg"
+      className={`label relative block shrink-0 rounded-pill border border-rule px-3 py-2 transition-colors duration-[var(--t-open)] ease-settle ${
+        current
+          ? "bg-[rgba(var(--line-rgb),.10)] text-fg"
+          : "text-fg-2 hover:bg-[rgba(var(--line-rgb),.08)] hover:text-fg"
       }`}
     >
       {SECONDARY.label}
+      {current ? <FootTick /> : null}
     </Link>
   );
 }

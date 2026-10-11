@@ -1,9 +1,9 @@
 /* ==========================================================================================
-   SWEEP / CELL: THE CELL VOCABULARY
+   DRUM / CELL: THE CELL VOCABULARY
 
    One object, four scales, written once so no route reinvents it.
 
-     .strip   a 6-22px sliver inside a board row
+     .strip   a 6-22px sliver inside a board row, or a row of small cells on a landing card
      .sheet   the ticket bed, one square cell per ticket, serial printed on it
      .blade   the detail route's hero: the strip grown to viewport scale
      .muster  the landing field: every ticket in Drawbook, banded by raffle
@@ -15,18 +15,22 @@
 
    WHAT THIS FILE MAY ASSUME
    Only role tokens from app/globals.css: --panel, --panel-2, --phase, --recess, --fg, --fg-2,
-   --fg-3, --rule, --bound, --event, --cell, --cell-sold, --cell-won, --on-cell, --on-sold,
-   --on-won, the two curves --ease-blade / --ease-settle, the six durations --t-*, and --pad.
-   Everything here follows .inv through those roles, so an inverted block needs no second rule
-   except where the note says otherwise and says why.
+   --fg-3, --rule, --bound, --event, --cell, --cell-sold, --cell-won, --cell-won-edge, --on-cell,
+   --on-sold, --on-won, the named radius and shadow steps, the curves --ease-blade /
+   --ease-settle, the durations --t-*, and --pad. No raw palette name appears in this file.
+
+   The cells do not follow .inv. A ticket is the same colour on the floor and in the record: the
+   record tone moves the surfaces around the cells one step into wine and leaves the cells alone,
+   so a settled raffle reads by its surface and its coral winners, never by its tickets changing
+   material under the reader.
 
    THE MATERIAL MODEL
-   The ground is the light source; ink is where light is blocked. A sold ticket is therefore a
-   dark block and an unsold one is the ground showing through. Nothing in this file casts, or
-   softens, or tints what is behind it, and nothing ramps one colour into another: a lightbox
-   seen square-on has no such effects to render. The five CSS properties that would express
-   them do not appear here, not even inside these comments, because the final sweep greps this
-   file for them by name and a comment would read as a hit.
+   A ticket is a cell of the dusk. Unsold, it is the ground itself; sold, it is rose; revealed,
+   it carries an apricot foot; won, it is coral and it glows. The glow is the one light a cell
+   may give off, and only at two scales, the sheet and the muster. A strip and a blade are the
+   two ends of the route morph, and app/motion.css clips a morphing snapshot to its own box, so a
+   glow there would be cut off mid-flight and pop back at the end. They stay square for the
+   same reason, and their winner is found by its hairline instead.
 
    WHAT IS SIZED BY WHAT
    A cell is NEVER sized by its content. Every .c takes its box from the grid it sits in and,
@@ -46,69 +50,56 @@
    CONTRAST, COMPUTED
 
    WCAG 2.x relative luminance, sanity-checked at white on black = 21.00. Every pair below is
-   against the surface it actually sits on, not against the page.
+   against the surface it actually sits on, not against the page. The cells are the same on the
+   floor and in the record, so each pair is listed once; where a surface around them changes, the
+   record value follows after a bar.
 
    The datum is the state of a ticket, so the pairs that must clear 3:1 are the ones that carry
-   that state, and each is listed twice where the light and inverted values differ.
+   that state:
 
-     unsold vs sold cell      --cell / --cell-sold    15.01 light,  7.49 inv strip, 15.01 inv sheet
-     sold cell on its bed     --cell-sold / bed       11.86 light sheet,  5.65 inv
-     unsold cell on its bed   --cell / --bound         5.18 light strip and blade
-     winner core on its bed   --cell-won / --recess    5.57 light sheet
-     winner core on panel     --cell-won / --panel     7.05 light muster
-     winner hairline on fill  --on-won / --cell-won    7.05 light,  8.01 inv
-     winner hairline on bed   --on-won / --bound       5.18 light,  5.65 inv
-     reveal mark on sold      iris-lift / --cell-sold  8.01 in both, see the note at .c
-     cell border on bed       --bound / --recess       4.10 light sheet
-     cell border on cell      --bound / --cell         5.18 light sheet
-     cell border on panel     --bound / --panel        5.18 light muster,  5.65 inv
-     ring, unsold cell        --on-cell / --cell      15.01 light, 15.01 inv sheet, 7.49 inv strip
-     ring, sold cell          iris-lift / --cell-sold  8.01 both
-     ring, winner cell        --on-won / --cell-won    7.05 light,  8.01 inv
-     meter track boundary     --bound / surface        5.18 panel, 4.77 panel-2, 4.33 phase,
-                                                       4.10 recess, 5.65 inv
-     meter hour fill          --fg / surface          15.01 panel, 13.82 panel-2, 15.01 inv
-     meter minute fill        --event / surface        7.05 panel,  6.49 panel-2,  8.01 inv
-     phase tag boundary       --bound / --panel-2      4.77 light
+     sold vs unsold cell      --cell-sold / --cell     3.17   rose-sold against dusk
+     unsold cell on its bed   --cell / --bound         3.97   strip and blade
+     unsold cell boundary     --bound / --recess       4.13   sheet;  --bound / dusk 3.97 | record
+     sold cell on its bed     --cell-sold / --recess   3.30   sheet
+     reveal band on sold      --event / --cell-sold    4.24   apricot on rose-sold
+     winner on its bed        --cell-won / --recess    7.04   sheet;  6.77 on dusk | record
+     winner on panel          --cell-won / --panel     6.77   muster
+     winner hairline on bed   --cell-won-edge / bound  3.90   strip and blade
+     winner hairline vs sold  --cell-won-edge / sold   4.89   a winner beside a sold neighbour
+     ring, unsold cell        --on-cell / --cell      16.38
+     ring, sold cell          --event / --cell-sold    4.24
+     ring, winner cell        --on-won / --cell-won    6.19
+     refund strike            --on-sold / --cell-sold  5.17
+     meter track boundary     --bound / surface        3.97 panel, 3.65 panel-2, 3.39 phase,
+                                                       4.13 recess | 3.63 record
+     meter hour fill          --fg / surface          16.38 panel, 15.06 panel-2 | 14.98 record
+     meter minute fill        --event / surface       13.45 panel, 12.36 panel-2 | 12.30 record
 
    Text, against 4.5:1:
 
-     serial on unsold cell    --on-cell / --cell      15.01 light, 15.01 inv sheet
-     serial on sold cell      --on-sold / --cell-sold  7.49 both
-     serial on winner cell    --on-won / --cell-won    7.05 light,  8.01 inv
-     meter figure             --fg-3 / --panel         5.73 light,  5.65 inv
-     meter figure on a row    --fg-3 / --panel-2       5.27 light
-     drawn tag                --event / --panel-2      6.49 light;  --event / --panel 8.01 inv
-     void tag                 --fg-3 / --panel-2       5.27 light
+     serial on unsold cell    --on-cell / --cell      16.38
+     serial on sold cell      --on-sold / --cell-sold  5.17
+     serial on winner cell    --on-won / --cell-won    6.19
+     meter figure             --fg-3 / --panel         5.58 | 5.10 record
+     meter figure on a row    --fg-3 / --panel-2       5.13
 
-   THE THREE PAIRS BELOW 3:1, AND WHY EACH IS STRUCTURE RATHER THAN A DATUM
+   THE PAIRS BELOW 3:1, AND WHY EACH IS STRUCTURE RATHER THAN A DATUM
 
-   1. A sold cell against the strip bed, --cell-sold on --bound, is 2.90 on light. The bed is a
-      1px grid between cells, and the thing it separates is two states that are 15.01 apart. A
-      run of sold tickets is supposed to read as one dark block; that is what a sold-out raffle
-      looks like. Darkening the bed to fix 2.90 would push the unsold cell, currently 5.18,
-      into the same complaint from the other side.
-   2. An unsold cell against the bed: 1.33 in the inverted strip, 1.26 in the light sheet, 2.66
-      in the inverted sheet. An unsold ticket is the absence of ink, so it is meant to merge
-      with the bed. The state it has to be distinguishable from is the sold cell, above.
-   3. --rule against the surface it divides, 1.58 light and 1.35 inverted. A row separator is
-      neither a control boundary nor a graphic that carries information, and --bound exists for
-      the ones that are.
+   1. A sold cell against the strip bed, --cell-sold on --bound, is 1.25. The bed is a 1px grid
+      between cells, and a run of sold tickets is supposed to read as one rose block; that is
+      what a sold-out raffle looks like. The datum, sold against unsold, is 3.17.
+   2. An unsold cell against the sheet bed or the muster ground: dusk on pit is 1.04, dusk on
+      dusk is 1.00. An unsold ticket is the ground showing through, so it is meant to merge with
+      what is under it, and its --bound edge (4.13, 3.97) is what draws it.
+   3. A winner beside a sold cell, coral on rose-sold, is 2.14. Hue carries that pair, and the
+      --cell-won-edge hairline in the strip and the blade carries it in contrast (4.89).
+   4. --rule against the surface it divides, 1.45 to 1.77. A row separator is neither a control
+      boundary nor a graphic that carries information, and --bound exists for the ones that are.
 
-   TWO PLACES THIS DELIBERATELY DEPARTS FROM THE PREVIEW, BOTH BECAUSE THE NUMBER FAILED
-
-   a. The preview outlines a winning ticket that belongs to you in --ink. On light that is
-      --ink on --iris: 2.13, on the one cell the archive exists to show you. The outline is
-      --on-won here, which is --paper on light (7.05) and --ink inverted (8.01), and which is
-      already documented in globals.css as "the serial AND the yours-marker printed on a
-      winner". Everything printed on a winner is --on-won.
-   b. The preview's two countdown meters fill a --edge track with --ink and --iris. Those are
-      2.90 and 1.36 against the track, so the minute meter is very nearly invisible and its
-      extent is exactly the datum the meter exists for. Here the track is bounded rather than
-      filled: a 1px --bound boundary on a transparent interior, with the fill in --fg and
-      --event. The fill now reads against whatever surface the meter sits on at 13.82 or better
-      for the hour and 6.49 or better for the minute, and the track's extent reads at 4.10 or
-      better. The visible bar weights, 4px and 2px, are unchanged.
+   WHY THE SOLD CELL IS NOT THE PALETTE'S CELL COLOUR
+   The palette's cell is #b85c63, and under it a 10px chalk serial is 3.78, a wine serial 3.96
+   and the apricot band 3.10. --cell-sold is --rose-sold, #9a4a52, which carries all three
+   (5.17, and 4.24 for the band). The 3D drum keeps #b85c63. See block 2 of globals.css.
    ========================================================================================== */
 
 /* ------------------------------------------------------------------------------ THE CELL
@@ -133,15 +124,17 @@
   background: var(--cell);
   color: var(--on-cell);
 
-  /* The reveal mark and the ring on a sold cell. A sold cell is --cell-sold in BOTH palettes,
-     because ink blocking light does not change when the surface around it inverts, so the
-     mark on it takes the inverted event colour in both: --event on light is --iris, 2.13 on
-     --ink, while --iris-lift is 8.01. This is the one raw palette name in this file and it is
-     here rather than in a role because there is no surface it flips with. */
-  --cell-mark: var(--iris-lift);
+  /* The reveal mark and the ring on a sold cell: the apricot signal, 4.24 on rose-sold. It is
+     a role now, not a palette name, because the record tone no longer moves the cells or the
+     signal, so there is nothing for the mark to flip with. */
+  --cell-mark: var(--event);
 
   /* The ring colour for this cell's own state: whatever is legible printed ON this fill. */
   --cell-ring: var(--on-cell);
+
+  /* A buy or a reveal that lands on the four-second poll fills the cell rather than snapping it.
+     A transition, so nothing moves on the first paint: there is no earlier style to come from. */
+  transition: background-color var(--t-settle) var(--ease-settle);
 }
 
 .c[data-s="1"],
@@ -163,14 +156,30 @@
   bottom: 0;
   height: 36%;
   background: var(--cell-mark);
+  transition: transform var(--t-settle) var(--ease-rise);
+}
+
+/* THE FOOT RISES, BUT ONLY FOR A REVEAL THE READER WATCHED LAND. The band is a new box the
+   moment a cell turns revealed, and a new box has no earlier style to transition from, so the
+   rise needs @starting-style. Ungated, that would raise every band on the page at first paint.
+   So it is opt-in: an island sets data-cells="live" on an ancestor AFTER it mounts, and from then
+   on a cell that turns revealed raises its band from the foot. The bands that were already
+   revealed in the server render were drawn before the attribute existed and do not move. */
+@media (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    [data-cells="live"] .c[data-s="2"]::after {
+      transform: translateY(100%);
+    }
+  }
 }
 
 /* Refunded, on the void branch only. A refunded ticket was genuinely bought, so it keeps the
    sold block: drawing it as unsold made raffle 0005 read as a raffle nobody entered while its
    own facts table said Sold 5. The single hairline across the middle is the strike that says
-   the purchase was undone. --on-sold on --cell-sold is 7.49 in both palettes, which is the
-   pair this file already documents for the serial printed on a sold cell, so the strike needs
-   no new token and clears 3:1 as a non-text mark at every scale. No ::after conflict with
+   the purchase was undone. --on-sold on --cell-sold is 5.17, which is the pair this file already
+   documents for the serial printed on a sold cell, so the strike needs no new token and clears
+   3:1 as a non-text mark at every scale. A rule and not a hatching: a hatch at 7px wide is a
+   grey cell, and a grey cell is the colour of nothing in this system. No ::after conflict with
    state 2: that mark is a 36% bar on the foot, this one is 1px across the waist. */
 .c[data-s="4"] {
   background: var(--cell-sold);
@@ -196,19 +205,22 @@
   --cell-ring: var(--on-won);
 }
 
-/* A winner standing on a --bound bed needs its own hairline: --cell-won on --bound is 1.36 on
-   light, and the strip and the blade are exactly where the archive's two winning tickets have
-   to be findable. --on-won gives 5.18 against that bed on light and 5.65 inverted, and 7.05 /
-   8.01 against the fill it encloses, so both edges of the hairline compute. On a --recess bed
-   (the sheet) and on --panel (the muster) the fill already clears 3:1 unaided, so the winner
-   stays a solid block there and the hairline would only soften its edge. */
+/* A winner standing on a --bound bed needs its own hairline: coral on --bound is 1.70, and the
+   strip and the blade are exactly where the archive's two winning tickets have to be findable.
+   --cell-won-edge is 3.90 against that bed and 4.89 against a sold neighbour, so the winner's
+   edge computes from both sides. It is a border, not a glow: these two scales are the ends of
+   the route morph, and a glow outside the box would be clipped mid-flight. */
 .strip .c[data-s="3"],
 .blade .c[data-s="3"] {
-  border: 1px solid var(--on-won);
+  border: 1px solid var(--cell-won-edge);
 }
 
-.inv .sheet .c[data-s="3"] {
-  border-color: var(--on-won);
+/* On a --recess bed (the sheet) and on --panel (the muster) the coral already clears 3:1 unaided
+   (7.04 and 6.77), so the winner stays a solid block there and takes the one light a cell may
+   give off. Neither scale is ever a named view-transition element, so the glow is never cut. */
+.sheet .c[data-s="3"],
+.mband .c[data-s="3"] {
+  box-shadow: var(--shadow-win);
 }
 
 /* The two rings. Different insets rather than different colours, so a ticket that is yours AND
@@ -225,7 +237,8 @@
 
 /* Every cell in a sheet is a real button covering the whole cell. Its focus ring is the cell's
    own ring colour, drawn inside: the page-wide :focus-visible in globals.css is --event at
-   offset 2px, which lands on the bed, and --event on the inverted bed is 1.42. */
+   offset 2px, which lands on the 2px gap of the bed and the neighbouring cell, so it would ring
+   the wrong ticket as much as the right one. Inside, it is always printed on its own fill. */
 .c button {
   position: absolute;
   inset: 0;
@@ -260,7 +273,8 @@
    a mini row that wants a mark rather than a meter.
 
    The bed is --bound, not --recess. At 1px the bed is the boundary between cells rather than a
-   surface under them, and --bound is the token for a data-cell boundary. */
+   surface under them, and --bound is the token for a data-cell boundary. The board strip is
+   square, cell and box alike: it is the source rectangle of the route morph. */
 .strip {
   --strip-h: 10px;
   --strip-open: 2.2;
@@ -284,6 +298,34 @@
   --strip-h: 6px;
 }
 
+/* THE CARD STRIP. The landing's sample cards only, never the board: a row of small rounded
+   tickets on no bed at all, separated by real gaps rather than by a 1px boundary. With no bed
+   under them, an unsold ticket is drawn by its own --bound outline on the --cell fill (3.97 on
+   dusk), and sold, revealed and won cells keep their fills, each of which clears 3:1 against the
+   card unaided. The gap is 5px or 30% of one ticket's pitch, whichever is less, so a 40-ticket
+   raffle in a narrow card still gets cells rather than gaps. --strip-h is the card's to set. */
+.strip[data-scale="card"] {
+  --strip-h: 22px;
+
+  gap: min(5px, calc(30% / var(--n, 20)));
+  padding: 0;
+  background: transparent;
+}
+
+.strip[data-scale="card"] .c {
+  border-radius: var(--radius-cell);
+}
+
+.strip[data-scale="card"] .c[data-s="0"] {
+  border: 1px solid var(--bound);
+}
+
+/* A card strip is never a named view-transition element, so its winner may glow like the
+   sheet's. It keeps the --cell-won-edge hairline from the strip rule above as well. */
+.strip[data-scale="card"] .c[data-s="3"] {
+  box-shadow: var(--shadow-win);
+}
+
 /* ------------------------------------------------------------------------------ THE SHEET
 
    Scale two. The ticket bed on a detail route: one square cell per ticket, carrying its serial
@@ -298,25 +340,19 @@
   gap: 2px;
   padding: 2px;
   background: var(--recess);
+  border-radius: var(--radius-well);
 }
 
 .sheet .c {
   aspect-ratio: 1;
   border: 1px solid var(--bound);
+  border-radius: var(--radius-cell);
 }
 
-/* THE INVERTED SHEET. On an inverted route --recess is --line-inv, and a sold --ink cell on it
-   is 1.35: the tickets people actually bought become holes held together by a hairline while
-   the tickets nobody bought are the loudest thing on the page. Two role remaps fix it for this
-   one component, and they are remaps rather than hardcoded hexes so nothing here can drift
-   away from the palette: the bed becomes the boundary colour and the cell becomes the
-   foreground colour, which puts a dark block in a light grid. The cost is that an unsold cell
-   now sits 2.66 from its bed instead of 5.65; that is the structural pair, not the datum, and
-   the datum (sold against unsold, and sold against the bed) goes from 1.35 to 15.01 and 5.65. */
-.inv .sheet {
-  --recess: var(--bound);
-  --cell: var(--fg);
-}
+/* THE SHEET IN THE RECORD. Inside .inv the bed's --recess becomes dusk, so the bed is the page
+   colour inside a wine section and every cell keeps its own material: the unsold cells merge
+   with the bed and are drawn by their --bound edge (3.97), and the sold, revealed and won cells
+   stand on it at 3.17, 4.24 and 6.77. Nothing is remapped here, and nothing needs to be. */
 
 /* ------------------------------------------------------------------------------ THE BLADE
 
@@ -391,6 +427,7 @@
 
 .mband .c {
   border: 1px solid var(--bound);
+  border-radius: var(--radius-cell);
   transform-origin: left center;
   transform: var(--cell-t, none);
   transition: transform var(--t-blade) var(--ease-blade) var(--cell-delay, 0ms);
@@ -413,7 +450,21 @@
 /* ------------------------------------------------------------------------------ THE ROW
 
    A board row is a grid of named areas, not a table. Six areas at desk width, four stacked
-   lines on a phone.
+   lines on a phone. Each row is a plate of its own: a rounded --panel-2 slab with a --rule
+   edge, 6px from the next, so the list reads as the drum's tickets come to rest in a rack
+   rather than as the lines of a ledger. One rule set serves the floor, the record and the
+   list read from the chain.
+
+   THE PLATE IS INSET, THE TEXT IS NOT. .rows pulls its own padding in by --row-inset and the
+   row pays the same amount back as its own padding, so a plate's edge sits a little outside
+   the gutter and the six columns inside it still start exactly on --gutter, under the column
+   header and the section head. The 1px border is taken out of that padding too.
+
+   NO BACKDROP FILTER, NO FILTER, NO 3D, AND NO SHADOW ON A ROW. The strip inside it is the
+   source rectangle of the route morph (app/motion.css), so nothing on the row may change what
+   the browser captures for it. The plate is pre-composited --panel-2, its lit top edge is a
+   pseudo-element border rather than a box-shadow, and its light is a gradient on a
+   pseudo-element under the text.
 
    THE OPEN. The system this replaces ran the row's rise as a spring at stiffness 520, damping
    34, mass 0.7, and its own comment warned that a springy card reads as jelly, which is
@@ -423,14 +474,35 @@
    honest port is not a bouncing cubic-bezier, it is a monotone ease at about that duration:
    --ease-settle is cubic-bezier(.2,.8,.2,1), whose two output control points are both inside
    [0,1] and which therefore cannot overshoot at all, at --t-open, 200ms. The gesture is two
-   transforms, the row's 4px and the strip's scaleY, and no height and no width anywhere.
+   transforms, the row's 4px and the strip's scaleY, and no height and no width anywhere. The
+   edge turning --bound and the lit top edge arrive on the same 200ms.
 
-   .rows IS REQUIRED around any list of rows. A full-bleed row translated 4px to the right
-   overhangs the viewport, and a transform's overflow propagates to the document, so without it
-   the whole page gains a 4px horizontal scrollbar on hover. `clip` rather than `hidden`
-   because clip does not create a scroll container. */
+   .rows IS REQUIRED around any list of rows. A row translated 4px to the right can overhang
+   its container, and a transform's overflow propagates to the document, so without it the
+   page can gain a horizontal scrollbar on hover. `clip` rather than `hidden` because clip
+   does not create a scroll container. */
 .rows {
+  --row-inset: clamp(10px, 1.4vw, 20px);
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-inline: calc(var(--gutter) - var(--row-inset));
   overflow-x: clip;
+}
+
+/* THE KEY CARD LINES UP WITH THE PLATES UNDER IT. The board's key (components/board.tsx) is a
+   card directly above the rows, so it takes the same inset: its edge sits --row-inset outside
+   the gutter like a plate's, and its padding pays the inset back, less the 1px edge, so the text
+   inside it starts on --gutter like a row's. One left edge for the objects, one for the text. */
+.board-key {
+  --row-inset: clamp(10px, 1.4vw, 20px);
+
+  padding-inline: calc(var(--gutter) - var(--row-inset));
+}
+
+.board-key-card {
+  padding-inline: max(0px, calc(var(--row-inset, 0px) - 1px));
 }
 
 /*
@@ -456,6 +528,10 @@
 .row {
   position: relative;
 
+  /* The light below sits at z-index -1, which only means "under the text, over the plate"
+     inside a stacking context of the row's own. */
+  isolation: isolate;
+
   /*
      ROOM. This was a flat 15px, which is tight for two lines of type at 13px and 11px and reads
      as a spreadsheet rather than as a list of things you can enter. The row is the one object on
@@ -464,28 +540,82 @@
      and gives a desk the air.
   */
   padding-block: clamp(18px, 2vw, 26px);
+  padding-inline: max(0px, calc(var(--row-inset, 0px) - 1px));
 
   /* var(--fg), not `inherit`. The row is an <a>, so it needs a colour of its own or the UA
-     paints it link blue; and `inherit` would carry down the rgb that body already resolved,
-     which means a row inside an .inv list would stay ink on ink. --fg resolves at the row. */
+     paints it link blue; and `inherit` would carry down the rgb that body already resolved
+     rather than the role. --fg resolves at the row. */
   color: var(--fg);
   text-decoration: none;
   background: var(--panel-2);
-  border-bottom: 1px solid var(--rule);
-  transition: transform var(--t-open) var(--ease-settle);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-row);
+  transition:
+    transform var(--t-open) var(--ease-settle),
+    border-color var(--t-open) var(--ease-settle);
 }
 
-/* A raffle inside its reveal window is a different surface, not a tint on the same one. */
+/* THE LIGHT UNDER THE POINTER. One delegated pointermove listener per .rows container, on a
+   fine pointer only (components/live-rows.tsx, `useRowLight`), writes --mx and --my in the
+   row's own pixels; this paints a soft apricot pool there while the row is hovered.
+
+   4%, AND 2% ON A REVEALING ROW, BECAUSE TEXT SITS UNDER THE POINTER. At its centre the pool
+   is composited straight under the row's --fg-3 sub-line. At 10% that line falls to 4.09 on
+   --panel-2 and 3.75 on --phase; at 4% it is 4.73 on --panel-2 and 4.70 on the record's wine,
+   and a revealing row's --phase, already the tightest surface (4.76 bare), takes 2% for 4.56. */
+.row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(var(--apricot-rgb), var(--row-light, 0.04)),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity var(--t-settle) var(--ease-settle);
+}
+
+/* THE LIT TOP EDGE. A border drawn by a pseudo-element over the row's own top border, so it
+   follows the plate's radius and fades into the corners, and so the row itself never carries a
+   box-shadow: the row is an ancestor of the named strip. Apricot at 55% over the --rule edge. */
+.row::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border-top: 1px solid rgba(var(--apricot-rgb), 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-open) var(--ease-settle);
+}
+
+/* A raffle inside its reveal window is a different surface, not a tint on the same one, and
+   it carries a 2px apricot rule on its leading edge: the signal, saying this raffle is waiting
+   on its holders. The extra pixel of border comes out of the padding, so the columns stay put. */
 .row[data-phase="revealing"],
 .row.wash {
+  --row-light: 0.02;
+
   background: var(--phase);
+  border-left: 2px solid var(--event);
+  padding-left: max(0px, calc(var(--row-inset, 0px) - 2px));
 }
 
-/* .hot is the same state as :hover, set from the muster above: moving the cursor over a band
-   drives that raffle's row, because they are one object. */
+/* .hot is the same state as :hover, set by an island that drives a row from elsewhere: the
+   hovered row and the thing driving it are one object. */
 .row:focus-visible,
 .row.hot {
   transform: translateX(4px);
+  border-color: var(--bound);
+}
+
+.row:focus-visible::after,
+.row.hot::after {
+  opacity: 1;
 }
 
 .row:focus-visible .strip,
@@ -496,6 +626,11 @@
 @media (hover: hover) {
   .row:hover {
     transform: translateX(4px);
+    border-color: var(--bound);
+  }
+
+  .row:hover::after {
+    opacity: 1;
   }
 
   .row:hover .strip {
@@ -503,8 +638,21 @@
   }
 }
 
-/* A full-bleed row translated 4px right pushed a 2px focus ring past the viewport edge, so a
-   keyboard user saw a three-sided box. The ring is inside the row. */
+/* The pool exists only where the pointer can be: a coarse pointer never writes --mx, and a
+   pool parked at the centre of a tapped row would be a light nobody aimed. */
+@media (hover: hover) and (pointer: fine) {
+  .row:hover::before {
+    opacity: 1;
+  }
+}
+
+/* The revealing row's rule stays apricot when the rest of the edge turns --bound. */
+.row[data-phase="revealing"]:is(:hover, :focus-visible, .hot) {
+  border-left-color: var(--event);
+}
+
+/* The ring sits inside the plate, following its radius, so a row translated 4px never pushes
+   it against the edge of the list. */
 .row:focus-visible {
   outline-offset: -3px;
 }
@@ -524,11 +672,14 @@
 
    It disappears at the narrow layout, where the row restacks into four lines and a column header
    would be labelling columns that no longer exist.
+
+   It carries no rule under it any more. The rows below are separate plates, each with its own
+   edge, and a full-width hairline over a rack of inset plates would be a second, competing
+   boundary for the same list.
 */
 .rowhead {
   padding-block: 0 10px;
   color: var(--fg-3);
-  border-bottom: 1px solid var(--rule);
 }
 
 .a-serial { grid-area: serial; }
@@ -546,19 +697,118 @@
   text-overflow: ellipsis;
 }
 
+/* THE PHASE TAG, a pill. Four looks for four stages, and each survives greyscale by its edge or
+   its fill rather than by its hue alone:
+
+     selling     neutral: --fg on the row, a --bound edge (3.65 on --panel-2, 3.63 on wine)
+     revealing   the signal: apricot text and edge (11.47 on --phase, 12.30 on wine)
+     drawn       a filled pill, chalk on a rose-sold wash (5.17). Not coral: coral is a winning
+                 ticket and nothing else, and a stage is not a ticket.
+     void        --fg-3 (5.13 on --panel-2, 5.10 on wine) on a dashed --bound edge
+
+   Anything else, such as a chain raffle's "Ready", keeps the neutral pill. */
 .phase-tag {
   display: inline-block;
-  padding: 2px 6px;
+  padding: 3px 9px;
   border: 1px solid var(--bound);
+  border-radius: var(--radius-pill);
   white-space: nowrap;
 }
 
-.phase-tag[data-phase="drawn"] {
+.phase-tag[data-phase="revealing"] {
   color: var(--event);
+  border-color: var(--event);
+}
+
+.phase-tag[data-phase="drawn"] {
+  color: var(--fg);
+  background: var(--cell-sold);
+  border-color: var(--cell-sold);
 }
 
 .phase-tag[data-phase="void"] {
   color: var(--fg-3);
+  border-style: dashed;
+}
+
+/* --------------------------------------------------------------------- THE ROWS ENTERING
+
+   On a cold load of the board, the rows rise into place one after another and each strip's
+   tickets grow up out of their bed, column by column. Nowhere else.
+
+   THE SERVER ARMS IT, BECAUSE A HYDRATION IS TOO LATE. On a hard load the HTML paints long
+   before any island hydrates, so an island that hid the rows at hydration would hide rows the
+   reader had already seen and then raise them again (the landing's hero measured exactly that,
+   components/landing/hero.tsx). So the list's wrapper is server-rendered with data-enter="cold"
+   and this animation runs from the first paint, with no script at all. A client render, which is
+   every soft navigation and above all the return trip from a raffle, renders no attribute, so
+   the rows there paint at rest in the first frame. components/live-rows.tsx owns the attribute
+   and removes it once the entry has finished, so a later reorder cannot replay it.
+
+   A live raffle read from the chain is never in the server HTML. Its row is marked on the row
+   itself, data-enter="run", by components/chain-list.tsx the first time that address is listed
+   in this document, before the browser paints it, and never on a later read.
+
+   THE TRANSFORM IS ON THE <a>. A sorted floor row sits inside a motion.div whose transform the
+   reorder writes; the entry never touches that wrapper. Fill is BACKWARDS only, so the row
+   holds its hidden first frame through its stagger and afterwards no rule is left on it.
+
+   Screen only, so a printed board is never caught on a hidden first frame, and never under a
+   reduced-motion preference: the rows are simply there. */
+@media screen and (prefers-reduced-motion: no-preference) {
+  .rows[data-enter] > :nth-child(2) { --enter-i: 1; }
+  .rows[data-enter] > :nth-child(3) { --enter-i: 2; }
+  .rows[data-enter] > :nth-child(4) { --enter-i: 3; }
+  .rows[data-enter] > :nth-child(5) { --enter-i: 4; }
+  .rows[data-enter] > :nth-child(6) { --enter-i: 5; }
+  .rows[data-enter] > :nth-child(7) { --enter-i: 6; }
+  .rows[data-enter] > :nth-child(n + 8) { --enter-i: 7; }
+
+  :is(.rows[data-enter] .row, .row[data-enter]) {
+    animation: row-enter var(--t-enter) var(--ease-rise) backwards;
+    animation-delay: calc(var(--enter-i, 0) * var(--t-stagger));
+  }
+
+  /* 12ms a ticket, capped at 480ms so a 200-ticket raffle does not take 2.4s to arrive. The
+     second declaration needs sibling-index(); a browser without it drops that line and keeps
+     the first, so every ticket in a strip grows at once instead of in column order. */
+  :is(.rows[data-enter] .row, .row[data-enter]) .strip .c {
+    transform-origin: center bottom;
+    animation: cell-rise var(--t-settle) var(--ease-rise) backwards;
+    animation-delay: calc(var(--enter-i, 0) * var(--t-stagger) + 140ms);
+    animation-delay: calc(
+      var(--enter-i, 0) * var(--t-stagger) + 140ms + min((sibling-index() - 1) * 12ms, 480ms)
+    );
+  }
+
+  /* The bed comes in with its tickets. Left at rest, the --bound bed showed through the whole
+     strip before a single cell had risen, so a 17-of-40 raffle and a void one both read for half
+     a second as a full meter. The bed's colour fades in from nothing as the first column lands,
+     so the grid lines draw in with the cells. Background colour only, and only during this
+     cold-load entry, so the strip's geometry and the morph are untouched. */
+  :is(.rows[data-enter] .row, .row[data-enter]) .strip {
+    animation: bed-in var(--t-settle) var(--ease-rise) backwards;
+    animation-delay: calc(var(--enter-i, 0) * var(--t-stagger) + 140ms);
+  }
+}
+
+@keyframes bed-in {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+@keyframes cell-rise {
+  from {
+    transform: scaleY(0);
+  }
 }
 
 /* ------------------------------------------------------------- THE TWO COUNTDOWN METERS
@@ -570,9 +820,12 @@
    Neither has a transition and neither ever will: a countdown that eases lies about when it
    hit zero. The fill is one composited scaleX per tick, never a width.
 
-   The track is bounded, not filled. See note (b) in the header: a filled --bound track puts
-   the minute fill at 1.36 against it, and the fill's extent is the datum. 6px and 4px here are
-   outside measurements including the 1px boundary, so the bars themselves stay 4px and 2px. */
+   The track is bounded, not filled: a 1px --bound boundary (3.97 on the page, 3.39 at worst on
+   --phase) on a transparent interior, so the track's extent reads on every surface and the fill
+   reads against the surface itself, --fg at 14.98 or better and --event at 11.47 or better. A
+   filled track would put the fill against the track instead, and the fill's extent is the
+   datum. 6px and 4px are outside measurements including the boundary, so the bars themselves
+   are 4px and 2px, and the pill ends are the only rounding a meter carries. */
 /* The figure track is `auto`, not a fixed clamp. Measured at 390px: "14 hours left" set as a
    label is 149px wide and a clamp(120px, 13vw, 220px) track gives it 120, so a nowrap figure
    overflowed the track, then the section, then the document, and the whole page gained a 9px
@@ -609,6 +862,7 @@
 .minrule {
   background: transparent;
   border: 1px solid var(--bound);
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
@@ -697,6 +951,8 @@
 @media (prefers-reduced-motion: reduce) {
   .row,
   .strip,
+  .c,
+  .c::after,
   .mband .c {
     transition: none;
   }

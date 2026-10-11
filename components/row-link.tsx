@@ -193,15 +193,14 @@ export function RowLink({ id, children, ...rest }: RowLinkProps) {
  * WHY IT IS DRAWN THIS WAY. `.row` is `position: relative`, and this is out of flow, so it takes
  * no grid area and cannot disturb the six columns. The row is already translated 4px and its
  * strip already open under the pointer, so a hover-shaped state would say nothing; a mark that
- * was not there a moment ago does. It is ink on the row's own surface, two pixels, the same two
- * pixels as the blade's gap and padding: no shadow, no pulse, no keyframe, nothing to reduce
- * under `prefers-reduced-motion` because nothing here moves.
+ * was not there a moment ago does. It is the ink colour on the row's own surface, two pixels, the
+ * same two pixels as the blade's gap and padding: no shadow, no pulse, no keyframe, nothing to
+ * reduce under `prefers-reduced-motion` because nothing here moves.
  *
- * `--fg` rather than any one colour, so it flips with the row it sits on and cannot go quiet on
- * the ink half of the board. Measured against the three surfaces a row actually paints (WCAG 2.x
- * relative luminance, 0.03928 knee, sanity-checked at #ffffff on #000000 = 21.00): 15.01 on the
- * settled rows' --ink, 13.82 on --panel-2, 12.55 on a revealing row's --phase. A non-text graphic
- * owes 3:1.
+ * `--fg` rather than any one colour, so it follows the role wherever the row sits. Measured
+ * against the three surfaces a row actually paints (WCAG 2.x relative luminance, 0.03928 knee,
+ * sanity-checked at #ffffff on #000000 = 21.00): 15.06 on --panel-2, 13.98 on a revealing row's
+ * --phase, 14.98 on the record tone's wine. A non-text graphic owes 3:1.
  *
  * IT IS EXPORTED because components/back-link spends it on the way out, where the dead window
  * is the same one: one definition, one geometry, one explanation, and the return trip does not

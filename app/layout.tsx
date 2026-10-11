@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
 import { Masthead } from "@/components/masthead";
@@ -7,9 +7,12 @@ import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 /**
- * The faces are self-hosted from `app/fonts`, not fetched through `next/font/google`.
+ * Two faces, self-hosted from `app/fonts`, not fetched through `next/font/google`: Archivo for
+ * every word, from the masthead to the manifesto (the headlines at width 112, weight 800), and
+ * Martian Mono for figures, hex, addresses and labels. There was a third, Young Serif, for the
+ * headlines of the light system; it retired with that system, and its file went with it.
  *
- * Two durable reasons: a first paint that is being judged should make no third-party request, and
+ * Self-hosted for two durable reasons: a first paint that is being judged should make no third-party request, and
  * a self-hosted build cannot be broken by a font host flapping. That second one is not
  * hypothetical. During the port fonts.gstatic.com was unreachable from the build machine and
  * `next/font/google` failed the build outright with `module-not-found`. That outage ended (both
@@ -21,7 +24,7 @@ import "./globals.css";
  *
  * **The width axis is load-bearing.** Every `font-variation-settings: "wdth" ...` in `globals.css`
  * and `cell.css` depends on it, and a weight-only file makes all of them do nothing without
- * erroring. `.label` is drawn at wdth 75 and `.monument` at wdth 112; pinned at the default width
+ * erroring. `.label` is drawn at wdth 75, `.monument` and `.headline` at wdth 112; pinned at the default width
  * the labels render 0.700em per glyph against the 0.600em they are drawn at, 17% wider, and the
  * masthead overflows. Both advances were measured in Chromium off these files. Verified present
  * after subsetting: Archivo carries wght 100..900 and wdth 62..125, Martian Mono carries wght
@@ -51,13 +54,6 @@ const mono = localFont({
   variable: "--font-geist-mono",
   display: "swap",
   src: [{ path: "./fonts/martian-mono-latin-var.woff2", weight: "100 800", style: "normal" }],
-});
-
-/** The display serif. One weight, no italic, and that is the point: structural rather than luxurious. */
-const serif = localFont({
-  variable: "--font-serif",
-  display: "swap",
-  src: [{ path: "./fonts/young-serif-latin-400.woff2", weight: "400", style: "normal" }],
 });
 
 /**
@@ -97,6 +93,16 @@ const siteUrl = previewHost
  */
 const description =
   "A commit-reveal raffle program on Rialo testnet. Deploy a raffle, buy, reveal, draw and claim with real testnet transactions, then recompute the draw yourself. Randomized and checkable.";
+
+/**
+ * The browser chrome takes the page's own dusk, and the UA draws its form controls and scrollbars
+ * for a dark page. Values only: the ground's hex is repeated from globals.css block 2 because a
+ * meta tag cannot read a custom property.
+ */
+export const viewport: Viewport = {
+  themeColor: "#170c10",
+  colorScheme: "dark",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -177,7 +183,7 @@ export default function RootLayout({
         rewrites the text nodes React owns, which can break hydration outright.
       */
       translate="no"
-      className={`${display.variable} ${mono.variable} ${serif.variable}`}
+      className={`${display.variable} ${mono.variable}`}
     >
       <body>
         {/*
@@ -195,7 +201,7 @@ export default function RootLayout({
         */}
         <a
           href="#content"
-          className="label fixed top-2.5 left-gutter z-[90] -translate-y-[calc(100%+20px)] border border-bound bg-panel px-3 py-2.5 text-fg focus:translate-y-0"
+          className="label fixed top-2.5 left-gutter z-[90] -translate-y-[calc(100%+20px)] rounded-pill border border-bound bg-panel px-3 py-2.5 text-fg focus:translate-y-0"
         >
           Skip to content
         </a>

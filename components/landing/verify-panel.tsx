@@ -27,8 +27,24 @@ import type { DrawStep } from "@/lib/raffle";
  * `deriveSeed` hashes them in, and the trace is `deriveWinnerTrace`'s own steps with the pool size
  * each one sampled from, which is the number that proves the second winner could not be the first.
  *
- * CONTRAST: --fg-3 on --recess is 4.53 on light and 5.57 inverted, which is the tightest passing
- * pair in the system and the one every label in this panel sits on.
+ * TWO COLUMNS ONLY WHEN THE PANEL ITSELF IS WIDE. It is a container query on the panel, not a
+ * media query on the viewport, because the page sets it beside the commitment field on a wide
+ * screen, where the panel is about half the measure (measured: 541px at 1280, 694px at 1920). The
+ * old viewport rule split that into two columns of about 210 and 240px, and every nonce broke
+ * over two lines. From 760px of panel the two columns hold a nonce whole.
+ *
+ * THE MATERIAL. One card on the card ramp, its corners on the panel step, with every digest in a
+ * --recess well cut into it. The summary line is the signal colour because it is the one control
+ * here; the seed carries a faint apricot light because it is the one value everything else in the
+ * panel exists to produce.
+ *
+ * CONTRAST, against the surface each pair sits on (WCAG 2.x, as in app/globals.css):
+ *   --event / the card ramp      the summary line, 12.25 over the ground, 11.40 at the haze peak
+ *   --fg-3  / the card ramp      the headings and the count, 5.10 and 4.73
+ *   --fg-3  / --recess (pit)     the nonce indices, 5.80
+ *   --fg    / --recess           every digest, 17.03. The seed's glow sits behind the glyphs and
+ *                                only lightens the well around them, never the ink.
+ *   --cell-won / the card ramp   the winning tickets, 6.17 and 5.55
  */
 
 export interface VerifyPanelProps {
@@ -55,22 +71,26 @@ export function VerifyPanel({
   trace,
 }: VerifyPanelProps) {
   return (
-    <details className="vpanel border border-bound bg-panel-2">
+    <details className="vpanel card @container rounded-panel">
+      {/* The count sits under the title rather than beside it: the panel shares its row with the
+          commitment field on a wide screen, and beside the title the two broke over four lines. */}
       <summary className="flex items-center gap-4 px-[clamp(18px,2vw,26px)] py-5">
-        <span className="serial text-sm">The working, sample raffle {serial}</span>
-        <span className="label ml-auto hidden text-fg-3 sm:block">
-          {nonces.length} nonces &middot; 1 chain value &middot; 1 seed &middot; {trace.length}{" "}
-          winners
+        <span className="grid min-w-0 gap-1.5">
+          <span className="label text-event">The working, sample raffle {serial}</span>
+          <span className="label hidden text-fg-3 sm:block">
+            {nonces.length} nonces &middot; 1 chain value &middot; 1 seed &middot; {trace.length}{" "}
+            winners
+          </span>
         </span>
-        <span aria-hidden="true" className="chev" />
+        <span aria-hidden="true" className="chev ml-auto" />
       </summary>
 
-      <div className="grid gap-[clamp(24px,3vw,44px)] border-t border-rule p-[clamp(20px,2.4vw,30px)] min-[900px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+      <div className="grid gap-[clamp(24px,3vw,44px)] border-t border-rule p-[clamp(20px,2.4vw,30px)] @min-[760px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div className="min-w-0">
           <h3 className="label m-0 mb-2.5 text-fg-3">Revealed nonces, sorted</h3>
           {/* Capped and scrollable: eighteen digests is a column taller than the panel beside it,
               and a disclosure that opens into three screens of hex has not disclosed anything. */}
-          <div className="recess max-h-[300px] overflow-y-auto bg-recess p-3">
+          <div className="max-h-[300px] overflow-y-auto rounded-well bg-recess p-3">
             <table className="w-full border-collapse">
               <tbody>
                 {nonces.map((n) => (
@@ -88,10 +108,12 @@ export function VerifyPanel({
 
         <div className="min-w-0">
           <h3 className="label m-0 mb-2.5 text-fg-3">Chain value</h3>
-          <p className="recess digest m-0 bg-recess p-3 text-label text-fg">{chainValue}</p>
+          <p className="digest m-0 rounded-well bg-recess p-3 text-label text-fg">{chainValue}</p>
 
           <h3 className="label m-0 mt-[26px] mb-2.5 text-fg-3">Seed</h3>
-          <p className="recess digest m-0 bg-recess p-3 text-label text-fg">{seed}</p>
+          <p className="vseed digest m-0 rounded-well border bg-recess p-3 text-label text-fg">
+            {seed}
+          </p>
 
           <h3 className="label m-0 mt-[26px] mb-2.5 text-fg-3">Eligible pool</h3>
           <p className="m-0 text-fg-2">{eligible} tickets, sold and revealed.</p>
@@ -112,7 +134,7 @@ export function VerifyPanel({
                   <td className="border-b border-rule py-2 pr-2.5">{i + 1}</td>
                   <td className="border-b border-rule py-2 pr-2.5">{step.poolBefore}</td>
                   <td className="border-b border-rule py-2 pr-2.5">{step.pick}</td>
-                  <td className="border-b border-rule py-2 text-event">{step.winner}</td>
+                  <td className="border-b border-rule py-2 text-cell-won">{step.winner}</td>
                 </tr>
               ))}
             </tbody>

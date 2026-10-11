@@ -2,7 +2,8 @@ import { Fragment, type CSSProperties } from "react";
 
 import { PHASE_WORD, Strip } from "./cell";
 import { Countdown, CountdownRules } from "./countdown";
-import { LiveRows, type LiveRow } from "./live-rows";
+import { Reveal, Tilt } from "./fx";
+import { LiveRows, Rows, type LiveRow } from "./live-rows";
 import { RaffleRowCells, rowLabel, rowContainerProps } from "./row";
 import { NamedStrip, RowLink } from "./row-link";
 import { activeDeadline, isLive, serialOf } from "@/lib/cell";
@@ -15,12 +16,11 @@ import { summarize, type Phase, type Raffle } from "@/lib/raffle";
  * next deadline printed at monument size, a key to the two things the rows never name, the raffles
  * still on the floor, and the record of what has already settled.
  *
- * THE FLOOR NOW COMES BEFORE THE RECORD, AND THAT IS A CHANGE. The old order put the settled
- * raffles directly under the countdown and the enterable ones below them, which is the order an
- * auditor wants and the reverse of the order a visitor does: the first list on the page was the
- * one list nothing can be done with. It also put the dark slab in the middle of a light page and
- * sent the reader from it back into light. The record is evidence, it is still printed on the dark
- * surface, and it now sits at the foot where the footer continues it.
+ * THE FLOOR COMES BEFORE THE RECORD. An older order put the settled raffles directly under the
+ * countdown and the enterable ones below them, which is the order an auditor wants and the reverse
+ * of the order a visitor does: the first list on the page was the one list nothing can be done
+ * with. The record is evidence, it is printed in the record tone (`.inv`, one step into wine), and
+ * it sits at the foot where the footer continues it.
  *
  * THIS FILE HAS NO CLIENT DIRECTIVE AND THAT IS THE WHOLE POINT OF THE REWRITE.
  * The board it replaces was 455 lines of Client Component, and its own header comment named the
@@ -30,11 +30,11 @@ import { summarize, type Phase, type Raffle } from "@/lib/raffle";
  * components/live-rows.tsx, for the sort control. Everything below is markup the server emits
  * once, including all five ticket strips, which is 112 cells that used to be hydrated.
  *
- * THE OLD BOARD'S `LIFTED_SHADOW` IS DELETED RATHER THAN PORTED.
- * `0 2px 3px rgb(0 0 0 / 0.55), 0 26px 40px -16px rgb(0 0 0 / 0.9)` was a light source this room
- * does not have. The ground is the light and ink is where light is blocked, so a card lifted off
- * the page has nothing to cast a shadow onto and nothing to cast one with. The row says it has
- * been picked up by moving and by growing its strip, which are the two things a real object does.
+ * A ROW CASTS NO SHADOW, EVEN NOW THAT THINGS GLOW. The strip inside it is the source rectangle of
+ * the route morph, so the row and everything around the strip stay free of shadow, filter and 3D
+ * (app/motion.css). The row says it has been picked up by moving 4px, growing its strip, turning
+ * its edge --bound and lighting its top edge, all drawn inside its own box; the pool of light that
+ * follows the pointer is painted under its text, not cast outside it.
  *
  * EVERY ROW IS A LINK, INCLUDING THE TWO STILL SELLING.
  * The design this ports expands raffles 0001 and 0002 in place, and it has to, because it is one
@@ -64,17 +64,34 @@ import { summarize, type Phase, type Raffle } from "@/lib/raffle";
  * L = 0.2126R + 0.7152G + 0.0722B, sanity-checked at #ffffff on #000000 = 21.00), each pair
  * against the surface it actually sits on rather than against the page:
  *
- *   monument, title      --fg / --panel      15.01 light
- *   eyebrow, meta        --fg-3 / --panel     5.73 light
- *   section head, meta   --fg-3 / --panel     5.73 light, 5.65 inside the record slab
- *   hour meter fill      --fg / --panel      15.01 light   (a datum, needs 3:1)
- *   minute meter fill    --event / --panel    7.05 light   (a datum, needs 3:1)
- *   meter track          --bound / --panel    5.18 light   (the extent is part of the datum)
+ *   monument, title      --fg / --panel      16.38
+ *   eyebrow              --event / --panel   13.45, 12.30 inside the record slab
+ *   meta, captions       --fg-3 / --panel     5.58, 5.10 inside the record slab
+ *   key card text        --fg-3 / card top    5.10 (the card ramp's top stop over dusk)
+ *   hour meter fill      --fg / --panel      16.38   (a datum, needs 3:1)
+ *   minute meter fill    --event / --panel   13.45   (a datum, needs 3:1)
+ *   meter track          --bound / --panel    3.97   (the extent is part of the datum)
  *
- * The record slab is `.inv`, which remaps every role rather than restating a colour, so the rows
- * inside it need no branch and carry no second definition: --panel-2 becomes --ink, --fg becomes
- * --paper, --bound becomes --paper-3, and the phase tag's boundary goes from 4.77 to 5.65.
+ * The deadline's haze is the glow at 18% at its centre, behind the figure. Over the plain ground
+ * --fg-3 on it would be 5.14. Measured in the rendered page on 2026-10-10, with the page's own haze
+ * and film under it, by sampling the screenshot behind each label: --fg-3 is 5.08 at worst (the
+ * eyebrow at 390), 5.13 at 1280 and 1920, and 5.26 to 5.33 on the meta line and the meter figures.
+ *
+ * The record slab is `.inv`, which moves the surfaces one step into wine and nothing else: every
+ * text, boundary and accent role already passes on wine, so the rows inside it need no branch and
+ * carry no second definition. Wine against the dusk ground is 1.09, so the slab draws its edge with
+ * a --rule hairline top and bottom.
  */
+
+/**
+ * THE EYEBROW over each section head: the 11px label in the signal colour behind a 28px rule. A
+ * class string, not a component, because the same string is written in components/chain-list.tsx
+ * and app/raffles/page.tsx, and neither may import this module (it would carry the whole sample
+ * record into the client bundle of the one, and is no lighter for the other). Apricot on the
+ * ground is 13.45 and on the record's wine 12.30.
+ */
+const EYEBROW =
+  "label flex items-center gap-3 text-event before:h-px before:w-7 before:shrink-0 before:bg-event before:content-['']";
 
 /* ------------------------------------------------------------------------ the rows */
 
@@ -119,10 +136,16 @@ function BoardRow({ raffle }: { raffle: Raffle }) {
  * ones still moving, which on a board where nothing is moving is nothing at all, so the band is
  * simply absent rather than printing a zero.
  *
- * THE SIZE IS THE ALARM AND THERE IS NO SECOND SIGNAL FOR IT. components/countdown.tsx publishes
- * `data-tier` on the figure, and the final hour swaps --text-monument for --text-alarm on the
- * element that owns the attribute. No hue changes, no border appears and nothing flashes: the
- * number simply becomes the largest thing on the screen, which is what the last hour of a sale is.
+ * THE SIZE IS THE ALARM, AND THE SIGNAL COLOUR SAYS SO. components/countdown.tsx publishes
+ * `data-tier` on the figure, and the final hour swaps --text-monument for --text-alarm and --fg for
+ * --event on the element that owns the attribute. No border appears and nothing flashes: the number
+ * becomes the largest thing on the screen and turns apricot, the signal, which is what the last
+ * hour of a sale is. It is a solid colour on purpose: the headline ramp is never put on a figure
+ * that ticks, because a clipped ramp would swallow that swap.
+ *
+ * THE HAZE BEHIND IT is the room's own light, the glow at 18% fading out from behind the figure,
+ * painted as the section's background so nothing is layered over the text. The figure is solid
+ * --fg Martian Mono, and its glyph budgets are the ones in app/globals.css.
  *
  * THE FIGURE GIVES UP ITS RESERVED WIDTH HERE, AND ONLY HERE.
  * `COUNTDOWN_RESERVE` holds 8ch so a row's last column cannot shunt sideways when the ladder
@@ -138,6 +161,11 @@ function BoardRow({ raffle }: { raffle: Raffle }) {
  * better failure than giving the whole document a horizontal scrollbar. `clip` rather than
  * `hidden`, so no scroll container is created.
  */
+const DEADLINE_HAZE: CSSProperties = {
+  backgroundImage:
+    "radial-gradient(ellipse 62% 78% at 30% 58%, rgba(var(--glow-rgb), 0.18), transparent 72%)",
+};
+
 function NextDeadline({ raffle }: { raffle: Raffle }) {
   const s = summarize(raffle);
   const selling = raffle.phase === "selling";
@@ -155,6 +183,7 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
     <section
       aria-label="Next sample deadline"
       className="group overflow-x-clip px-gutter pt-[clamp(16px,2.4vw,34px)] pb-[clamp(14px,2vw,24px)]"
+      style={DEADLINE_HAZE}
     >
       <p className="label text-fg-3">
         {selling ? "Sale closes" : "Reveals close"}
@@ -172,11 +201,11 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
             definition, which is exactly the rung the final hour prints. */}
         <Countdown
           deadline={deadline}
-          className="monument min-w-0! text-monument text-fg data-[tier=final]:text-alarm"
+          className="monument min-w-0! text-monument text-fg data-[tier=final]:text-alarm data-[tier=final]:text-event"
         />
 
         <div className="min-w-0 flex-[1_1_220px] pb-[clamp(6px,1vw,14px)]">
-          <p className="font-serif text-title">{raffle.config.title}</p>
+          <p className="headline-sub text-title">{raffle.config.title}</p>
           <p className="label text-fg-3 mt-2">
             <MetaLine parts={meta} />
           </p>
@@ -210,11 +239,10 @@ function NextDeadline({ raffle }: { raffle: Raffle }) {
 
    EVERY STATE THE ROWS DRAW, ON BOTH SURFACES THEY DRAW IT ON. The key used to stop at four
    states, so raffle 0005's refunded tickets (state 4, a sold block struck through) read as
-   "Bought". And it only showed the light floor: inside the dark record `.inv` remaps the cell
-   roles, so 0004's winners are the pale --iris-lift, the same colour as a published secret's foot
-   bar in a light-only key, and nothing on the page explained that. Each entry now shows the cell
-   twice, as a one-cell strip on the floor and again inside a chip of the record's own surface, so
-   the reader can match either half of the board against it.
+   "Bought". Each entry shows the cell twice, as a one-cell strip on a chip of the floor rows'
+   own surface and again on a chip of the record's, so the reader can match either half of the
+   board against it. The record tone no longer changes a ticket, so the two read the same; what
+   the pair shows now is that the record is a different surface, not different tickets.
 */
 const TICKET_KEY: { state: 0 | 1 | 2 | 3 | 4; word: string }[] = [
   { state: 0, word: "Not sold yet" },
@@ -229,6 +257,8 @@ const TICKET_KEY: { state: 0 | 1 | 2 | 3 | 4; word: string }[] = [
  * hairline (`.strip .c[data-s="3"]`) all come from the same rules as the board's own strips.
  */
 function KeyCell({ state }: { state: 0 | 1 | 2 | 3 | 4 }) {
+  // A one-cell strip, never named and never inside a row: the tilt on the key card below is
+  // allowed to lean it, which it could never do to the board's own strips.
   return (
     <span className="strip w-3.5" style={{ "--strip-h": "20px" } as CSSProperties}>
       <i className="c" data-s={state} />
@@ -251,78 +281,83 @@ const STAGE_KEY: { phase: Phase; body: string }[] = [
 ];
 
 /**
- * THE KEY IS A PLATE, AND THAT IS WHAT BREAKS THE PAGE INTO SECTIONS.
+ * THE KEY IS A CARD, AND THAT IS WHAT BREAKS THE PAGE INTO SECTIONS.
  *
- * Measured before this existed: five sections on this route, every gap between them exactly
- * 0px, four of the five transparent on the same ground, and not one border on any of them. The
- * top 631px was the countdown, the key and the floor list running together as one surface with
- * three different jobs in it. The only break the page had was the record's inversion.
+ * Measured before the key had a surface of its own: five sections on this route, every gap
+ * between them exactly 0px, four of the five transparent on the same ground. The top of the page
+ * was the countdown, the key and the floor list running together as one surface with three
+ * different jobs in it.
  *
- * A hairline would have been the cheap fix and it is the wrong one. Every row already carries
- * `border-bottom: 1px solid var(--rule)`, so a section separated by that same line makes the
- * page's strongest structural signal and its weakest identical, and the result reads as more
- * grid rather than as fewer sections. A section break has to be a different KIND of thing from
- * a row break.
- *
- * So it is a surface change, which is the device the landing uses to get eight legible
- * sections, and the surface is --panel-2, which is the row's own. No new material enters the
- * system: the key stops being more text on the ground and becomes an object sitting between
- * the hero and the list, which is what a legend is. One change buys both missing breaks, the
- * end of the countdown and the start of the floor.
- *
- * Full bleed, with a --rule edge top and bottom, because a plate inset from the gutter would
- * be a card, and a card is a thing you can open.
+ * A hairline would have been the cheap fix and it is the wrong one. A section break has to be a
+ * different KIND of thing from a row break, and the rows are now plates of their own. So the key
+ * is a card: the card ramp under a --rule edge, at the panel radius, sitting
+ * between the countdown and the list as an object, which is what a legend is. Its edge and its text
+ * sit where a row plate's do (app/cell.css, .board-key), so the card and the rows below it share
+ * one left edge for the objects and one for the text. It leans toward a
+ * fine pointer (`Tilt`, 6 degrees at most), with the 4% glare app/fx.css allows on the card ramp.
+ * Nothing inside it is a row or a named strip, which is the only reason it may lean.
  */
 function BoardKey() {
   return (
     <section
       aria-labelledby="board-key"
-      className="grid gap-[clamp(26px,3.4vw,56px)] border-y border-rule bg-panel-2 px-gutter py-[clamp(26px,3.4vw,44px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+      className="board-key pt-[clamp(10px,1.6vw,20px)] pb-[clamp(8px,1.2vw,16px)]"
     >
-      <div>
-        <h2 id="board-key" className="label text-fg-3">
-          Reading this page
-        </h2>
-        <p className="mt-2.5 max-w-[46ch] text-lg text-fg-2">
-          Every row below is one raffle, and the bar of blocks in it is that raffle&rsquo;s
-          tickets, one block each.
-        </p>
+      <Reveal>
+        <Tilt
+          max={6}
+          glare
+          className="card board-key-card grid gap-[clamp(26px,3.4vw,56px)] rounded-panel py-[clamp(22px,2.8vw,40px)] min-[860px]:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"
+        >
+          <div>
+            <h2 id="board-key" className={EYEBROW}>
+              Reading this page
+            </h2>
+            <p className="mt-3 max-w-[46ch] text-lg text-fg-2">
+              Every row below is one raffle, and the bar of blocks in it is that raffle&rsquo;s
+              tickets, one block each.
+            </p>
 
-        <ul className="mt-[clamp(18px,2.2vw,26px)] flex flex-wrap gap-x-[clamp(16px,2vw,28px)] gap-y-3">
-          {TICKET_KEY.map(({ state, word }) => (
-            <li key={state} className="flex items-center gap-2.5">
-              <span aria-hidden="true" className="flex items-center gap-1.5">
-                <KeyCell state={state} />
-                {/* The record's surface, painted: `.inv` remaps the roles, `bg-panel` paints them. */}
-                <span className="inv flex bg-panel p-[3px]">
-                  <KeyCell state={state} />
-                </span>
-              </span>
-              <span className="text-sm text-fg-2">{word}</span>
-            </li>
-          ))}
-        </ul>
+            <ul className="mt-[clamp(18px,2.2vw,26px)] flex flex-wrap gap-x-[clamp(16px,2vw,28px)] gap-y-3">
+              {TICKET_KEY.map(({ state, word }) => (
+                <li key={state} className="flex items-center gap-2.5">
+                  <span aria-hidden="true" className="flex items-center gap-1.5">
+                    {/* The floor's row surface, painted. */}
+                    <span className="flex rounded-cell bg-panel-2 p-[3px]">
+                      <KeyCell state={state} />
+                    </span>
+                    {/* The record's surface, painted: `.inv` remaps the roles, `bg-panel` paints them. */}
+                    <span className="inv flex rounded-cell bg-panel p-[3px]">
+                      <KeyCell state={state} />
+                    </span>
+                  </span>
+                  <span className="text-sm text-fg-2">{word}</span>
+                </li>
+              ))}
+            </ul>
 
-        <p className="mt-3 max-w-[46ch] text-sm text-fg-3">
-          Each block is shown twice: as the light rows draw it, and as the dark record does.
-        </p>
-      </div>
+            <p className="mt-3 max-w-[46ch] text-sm text-fg-3">
+              Each block is shown twice: as the open rows draw it, and as the settled record does.
+            </p>
+          </div>
 
-      <div>
-        <h3 className="label text-fg-3">The four stages</h3>
-        <dl className="mt-2.5 grid gap-x-[clamp(16px,2vw,28px)] gap-y-3.5 min-[560px]:grid-cols-2">
-          {STAGE_KEY.map(({ phase, body }) => (
-            <div key={phase}>
-              <dt>
-                <span className="phase-tag label" data-phase={phase}>
-                  {PHASE_WORD[phase]}
-                </span>
-              </dt>
-              <dd className="mt-2 max-w-[40ch] text-sm text-fg-3">{body}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+          <div>
+            <h3 className="label text-fg-3">The four stages</h3>
+            <dl className="mt-2.5 grid gap-x-[clamp(16px,2vw,28px)] gap-y-3.5 min-[560px]:grid-cols-2">
+              {STAGE_KEY.map(({ phase, body }) => (
+                <div key={phase}>
+                  <dt>
+                    <span className="phase-tag label" data-phase={phase}>
+                      {PHASE_WORD[phase]}
+                    </span>
+                  </dt>
+                  <dd className="mt-2 max-w-[40ch] text-sm text-fg-3">{body}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </Tilt>
+      </Reveal>
     </section>
   );
 }
@@ -332,10 +367,15 @@ function BoardKey() {
 /**
  * The record: everything that has already settled.
  *
- * It is `.inv`, and the inversion is the point rather than a style. A raffle that has left the
- * floor is evidence, and evidence in this product is printed on the dark surface the ceremony
- * ends on. The class remaps the roles; `bg-panel text-fg` is what paints them, because
+ * It is `.inv`, the record tone, and that is the point rather than a style. A raffle that has left
+ * the floor is evidence, and evidence in this product is printed one step into wine, the surface
+ * the ceremony ends on. The class remaps the roles; `bg-panel text-fg` is what paints them, because
  * app/globals.css defines `.inv` as a token block and deliberately never paints anything itself.
+ * Wine against the ground is 1.09, so the slab's edge is a --rule hairline top and bottom, never a
+ * lighter wine.
+ *
+ * Its rows go through `Rows`, the floor's own wrapper without the sort, so they carry the same
+ * cold-load entry and the same light under the pointer.
  */
 function Record({ raffles }: { raffles: readonly Raffle[] }) {
   if (raffles.length === 0) return null;
@@ -350,7 +390,10 @@ function Record({ raffles }: { raffles: readonly Raffle[] }) {
   ].filter(Boolean) as string[];
 
   return (
-    <section aria-labelledby="board-record" className="inv bg-panel text-fg">
+    <section
+      aria-labelledby="board-record"
+      className="inv border-y border-rule bg-panel pb-[clamp(26px,3.4vw,44px)] text-fg"
+    >
       <SectionHead
         id="board-record"
         title="The record"
@@ -361,11 +404,11 @@ function Record({ raffles }: { raffles: readonly Raffle[] }) {
 
       <ColumnHead />
 
-      <div className="rows">
+      <Rows>
         {raffles.map((raffle) => (
           <BoardRow key={raffle.config.id} raffle={raffle} />
         ))}
-      </div>
+      </Rows>
     </section>
   );
 }
@@ -395,7 +438,7 @@ function Floor({ raffles }: { raffles: readonly Raffle[] }) {
   });
 
   return (
-    <section aria-labelledby="board-floor">
+    <section aria-labelledby="board-floor" className="pb-[clamp(30px,4vw,56px)]">
       <SectionHead
         id="board-floor"
         title="On the floor"
@@ -436,32 +479,36 @@ function SectionHead({
   className?: string;
 }) {
   return (
-    <div className={`px-gutter ${className}`}>
+    <Reveal className={`px-gutter ${className}`}>
       {/*
-          THE HEAD IS A HEADING NOW, NOT A CAPTION.
+          THE HEAD IS A HEADING, NOT A CAPTION.
 
-          "On the floor" and "The record" were set in the same 11px uppercase label as the column
-          names, the sort control and the meta line beside them, which made the two entry points of
-          the page indistinguishable from its smallest furniture. A reader scrolling had nothing to
-          land on between the countdown and the first row.
+          "On the floor" and "The record" were once set in the same 11px uppercase label as the
+          column names, the sort control and the meta line beside them, which made the two entry
+          points of the page indistinguishable from its smallest furniture. A reader scrolling had
+          nothing to land on between the countdown and the first row.
 
-          --text-title in the serif is 34px at the cap, against a countdown that is about 200px, so
-          it cannot compete with the monument and does not try to. The meta line stays at label
-          size and drops to its own line under the heading, because a 34px serif and an 11px mono
-          sharing a baseline is a pairing neither of them wins.
+          --text-title in Archivo at width 108 is 30px at the cap, against a countdown that is
+          about 200px, so it cannot compete with the monument and does not try to.
+
+          THE META LINE IS THE EYEBROW. It is drawn above the heading, in the apricot label behind a
+          short rule, by `-order-1`, and it stays after the heading in the document, so a screen
+          reader still meets the heading first and the facts after it.
       */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
-        <h2 id={id} className="m-0 font-serif text-title">
+      <div className="flex flex-col gap-y-3">
+        <h2 id={id} className="m-0 headline-sub text-title">
           {title}
         </h2>
 
-        <p className="label text-fg-3">
-          <MetaLine parts={meta} />
+        <p className={`${EYEBROW} -order-1`}>
+          <span>
+            <MetaLine parts={meta} />
+          </span>
         </p>
       </div>
 
       {lead ? <p className="mt-3 max-w-[54ch] text-sm text-fg-2">{lead}</p> : null}
-    </div>
+    </Reveal>
   );
 }
 

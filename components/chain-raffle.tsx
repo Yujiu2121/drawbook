@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import Link from "next/link";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
 
+import { Reveal, Tilt, useInView } from "@/components/fx";
+
 import {
   Cap,
   NETWORK,
@@ -65,7 +67,7 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * ONE RAFFLE, READ FROM THE CHAIN.
  *
  * The same page as a sample raffle at /raffle/[id], built from the same parts (the blade, the pool
- * at --text-pool, the serif title, the deadlines strip, the ticket sheet, the facts table, the
+ * at --text-pool, the headline title, the deadlines strip, the ticket sheet, the facts table, the
  * audit) with one difference that changes everything about it: nothing here is a record that was
  * true when the site was built. Every figure is decoded from the raffle account by lib/chain, the
  * account is polled every four seconds and again after every action, and the phase is computed from
@@ -73,8 +75,9 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  *
  * NO FAKE SUCCESS. Every action below says it is done only after lib/chain reports the transaction
  * executed, and shows that transaction's signature. A refusal from the program is decoded into the
- * plain-English sentence for its error code and printed in reversed print, never in a colour: the
- * signal hue in this product means a winner, and the system has no error colour on purpose.
+ * plain-English sentence for its error code and printed in reversed print, never in a colour: coral
+ * in this product means a winner, apricot is the signal, and the system has no error colour on
+ * purpose.
  *
  * THE AUTOMATIC DRAW IS SCHEDULED, NOT PROMISED. A raffle made since the schedule shipped asks
  * Rialo's Subscriber program, in its Create transaction, to send Draw five seconds after reveals close
@@ -91,6 +94,19 @@ import { connect, refreshBalance } from "@/lib/wallet-store";
  * account's own bytes: the revealed nonces, the chain value the program read at the draw, and the
  * winners it flagged. It rebuilds the seed with SHA-256 and replays the winner selection, then
  * compares. It can say "does not match", and if the program and the library ever disagreed it would.
+ *
+ * THE SETTLE IS THE CUE. When the draw lands (Rialo's, or anyone's), <main> takes `.inv`, the record
+ * tone, and its background steps from the floor's dusk to wine over --t-invert, once, while the
+ * winners arrive lit in coral. Both are said again in words: the phase tag reads Drawn and the
+ * facts read "Sent by Rialo". The step is armed with the cells (data-cells="live"), so a raffle that
+ * was already drawn when the page opened is wine from its first frame and never replays the cue.
+ * Under reduced motion the step is a cut. Nothing here moves in a loop.
+ *
+ * MOTION IS A REPAINT OF REAL DATA, NEVER A PERFORMANCE. A cell fills when the four-second read
+ * finds it sold and its foot rises when it finds it revealed (app/cell.css, armed by
+ * data-cells="live" only after the first read has painted, so nothing animates on arrival). The
+ * sections below the fold rise into view once (<Reveal>, opacity and transform only, never on the
+ * blade or the sheet). No figure counts up and nothing is drawn before the chain says it happened.
  *
  * WIDTH. The page is laid out from 360px up with no horizontal scroll: every long string (an
  * address, a signature, a seed) is set in the narrow `digest` instance and allowed to break, and
@@ -294,18 +310,28 @@ function rialoSending(s: ScheduleState | null, r: ChainRaffle, now: number): boo
 
 /* --------------------------------------------------------------- small pieces */
 
-/** A section heading in caption voice, as on a sample raffle. */
+/**
+ * A section heading as an eyebrow: the label in the apricot signal behind a short rule of the same
+ * colour. Apricot on the floor is 13.45 and on the record tone's wine 12.30; the rule is drawn by a
+ * pseudo-element, so the heading's text, which the demo names, is the words alone.
+ */
 function Head2({ id, children, className = "" }: { id?: string; children: ReactNode; className?: string }) {
   return (
-    <h2 id={id} className={`label text-fg-3 ${className}`}>
+    <h2
+      id={id}
+      className={`label flex items-center gap-3 text-event before:h-px before:w-7 before:shrink-0 before:bg-event ${className}`}
+    >
       {children}
     </h2>
   );
 }
 
-/** The well: cut into the page. `recess` beside `bg-recess` is the hook that keeps --fg-3 legible inside `.inv`. */
+/**
+ * The well: cut into the page, rounded as a well. --recess is the pit on the floor and dusk inside
+ * the record tone, and every text role passes on both: --fg-3 is 5.80 on the pit and 5.58 on dusk.
+ */
 function Well({ children }: { children: ReactNode }) {
-  return <div className="recess overflow-x-auto bg-recess px-4 py-3.5">{children}</div>;
+  return <div className="overflow-x-auto rounded-well bg-recess px-4 py-3.5">{children}</div>;
 }
 
 function Formula({ children }: { children: ReactNode }) {
@@ -463,9 +489,12 @@ function RunResult({ run }: { run: Run }) {
     );
   }
   if (run.kind === "done") {
+    // A card with the signal's rule down its left edge: the one receipt on the page that this tab
+    // just produced. The eyebrow is apricot (12.25 on the card), the body the card's usual --fg-2.
     return (
-      <div className="mt-4 border border-bound px-4 py-3.5">
-        <p className="label text-fg">Done, and executed on chain</p>
+      <div className="card relative mt-4 rounded-card px-5 py-4">
+        <span aria-hidden="true" className="absolute top-4 bottom-4 left-0 w-0.5 bg-event" />
+        <p className="label text-event">Done, and executed on chain</p>
         <p className="mt-2 text-sm text-fg-2">{run.text}</p>
         <Receipts sigs={run.sigs} />
       </div>
@@ -520,6 +549,26 @@ export function ChainRaffleView({ address }: { address: string }) {
     second ticket paid for.
   */
   const inFlight = useRef(false);
+
+  /*
+    Whether the cells may animate a change. Off until the first read of the account has painted,
+    then on for the life of the page, so a buy or a reveal that lands on a later read fills its cell
+    or raises its foot, and the tickets that were already revealed when the page arrived stay still.
+    Two frames after the account is first set: the first paints it, the second arms the cells.
+  */
+  const [cellsLive, setCellsLive] = useState(false);
+  const hasRaffle = raffle !== null;
+  useEffect(() => {
+    if (cellsLive || !hasRaffle) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setCellsLive(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [cellsLive, hasRaffle]);
 
   /* Read once per wallet: whether its key and a ticket's secret would survive a reload. */
   const walletAddress = wallet?.address ?? null;
@@ -631,7 +680,7 @@ export function ChainRaffleView({ address }: { address: string }) {
       <main className="pt-mast pb-[clamp(48px,8vw,104px)]">
         <div className="px-gutter pt-[clamp(24px,4vw,52px)]">
           <BackToBoard />
-          <h1 className="font-serif mt-[clamp(16px,2.4vw,28px)] text-display">
+          <h1 className="headline headline-ramp mt-[clamp(16px,2.4vw,28px)] text-display">
             {load.kind === "invalid"
               ? "Not an address"
               : load.kind === "missing"
@@ -1100,7 +1149,8 @@ export function ChainRaffleView({ address }: { address: string }) {
 
   return (
     <main
-      className={`pt-mast pb-[clamp(48px,8vw,104px)] ${settled ? "inv bg-panel text-fg" : ""}`}
+      data-cells={cellsLive ? "live" : undefined}
+      className={`pt-mast pb-[clamp(48px,8vw,104px)] ${cellsLive ? "transition-[background-color] duration-[var(--t-invert)] ease-settle motion-reduce:transition-none" : ""} ${settled ? "inv bg-panel text-fg" : ""}`}
     >
       <ChainBlade raffle={r} label={fieldLabel} />
 
@@ -1127,12 +1177,12 @@ export function ChainRaffleView({ address }: { address: string }) {
 
             <Cap className="mt-2.5">RLO · {pool.sub}</Cap>
 
-            <h1 className="font-serif mt-[22px] mb-[18px] text-display [overflow-wrap:anywhere]">
+            <h1 className="headline headline-ramp mt-[22px] mb-[18px] text-display [overflow-wrap:anywhere]">
               {cleanTitle(r.title) || "Untitled raffle"}
             </h1>
 
             {/* The two deadlines, each naming itself, each with its own live distance. */}
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] border border-bound">
+            <div className="card grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] overflow-hidden rounded-well">
               {[
                 /*
                   Once a window is over the cell says "deadline", not "closed at". A sale that sold
@@ -1150,7 +1200,7 @@ export function ChainRaffleView({ address }: { address: string }) {
                   left: live ? ladder(r.revealDeadline, now) : null,
                 },
               ].map((cell) => (
-                <div key={cell.term} className="border-r border-bound px-3.5 py-3 last:border-r-0">
+                <div key={cell.term} className="border-r border-rule px-3.5 py-3 last:border-r-0">
                   <Cap>{cell.term}</Cap>
                   <div className="figure mt-1.5 text-sm">{stampMs(cell.at)}</div>
                   {cell.left !== null && (
@@ -1204,20 +1254,22 @@ export function ChainRaffleView({ address }: { address: string }) {
             )}
 
             {/* ------------------------------------------------------ the actions */}
-            <section
-              aria-labelledby="act-heading"
-              className="mt-[clamp(26px,3vw,38px)] border-t border-rule pt-6"
-            >
-              {panel}
-              <RunResult run={run} />
-              <p role="status" aria-live="polite" className="sr-only">
-                {run.kind === "done"
-                  ? run.text
-                  : run.kind === "failed"
-                    ? `Not done. ${run.refusal.text}`
-                    : ""}
-              </p>
-            </section>
+            <Reveal>
+              <section
+                aria-labelledby="act-heading"
+                className="mt-[clamp(26px,3vw,38px)] border-t border-rule pt-6"
+              >
+                {panel}
+                <RunResult run={run} />
+                <p role="status" aria-live="polite" className="sr-only">
+                  {run.kind === "done"
+                    ? run.text
+                    : run.kind === "failed"
+                      ? `Not done. ${run.refusal.text}`
+                      : ""}
+                </p>
+              </section>
+            </Reveal>
 
             {/* -------------------------------------------------------- the sheet */}
             <section aria-labelledby="sheet-heading" className="mt-[clamp(26px,3vw,38px)]">
@@ -1266,17 +1318,14 @@ export function ChainRaffleView({ address }: { address: string }) {
 
             {/* ------------------------------------------------------ the winners */}
             {phase === "drawn" && winners.length > 0 && (
-              <section aria-labelledby="winners-heading" className="mt-[clamp(26px,3vw,38px)]">
-                <Head2 id="winners-heading" className="mb-2.5">
-                  The draw
-                </Head2>
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 min-[760px]:grid-cols-2">
-                  {winners.map((t) => (
-                    <div key={t.index} className="flex items-start gap-4 border border-bound p-4">
-                      <div className="monument text-event" style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}>
-                        {pad2(t.index)}
-                      </div>
-                      <div className="min-w-0">
+              <Reveal>
+                <section aria-labelledby="winners-heading" className="mt-[clamp(26px,3vw,38px)]">
+                  <Head2 id="winners-heading" className="mb-2.5">
+                    The draw
+                  </Head2>
+                  <div className="grid grid-cols-[minmax(0,1fr)] gap-3 min-[760px]:grid-cols-2">
+                    {winners.map((t) => (
+                      <WinnerCard key={t.index} index={t.index}>
                         <Cap>
                           Winner {t.winRank} of {r.effectiveWinners}
                         </Cap>
@@ -1286,149 +1335,155 @@ export function ChainRaffleView({ address }: { address: string }) {
                           {t.paid ? "Paid" : "Not claimed yet"}
                           {t.holder === me ? " · yours" : ""}
                         </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
+                      </WinnerCard>
+                    ))}
+                  </div>
+                </section>
+              </Reveal>
             )}
 
             {/* -------------------------------------------------------- the audit */}
-            <section aria-labelledby="audit-heading" className="mt-[clamp(26px,3vw,38px)]">
-              <Head2 id="audit-heading" className="mb-2.5">
-                {phase === "selling" ? "What a purchase publishes" : "Audit"}
-              </Head2>
+            <Reveal>
+              <section aria-labelledby="audit-heading" className="mt-[clamp(26px,3vw,38px)]">
+                <Head2 id="audit-heading" className="mb-2.5">
+                  {phase === "selling" ? "What a purchase publishes" : "Audit"}
+                </Head2>
 
-              {phase === "selling" && (
-                <>
+                {phase === "selling" && (
+                  <>
+                    <Well>
+                      <Formula>
+                        {`commitment = SHA256( "drawbook-v2|commit|" ‖ raffle address ‖ ticket number ‖ your address ‖ your secret )`}
+                      </Formula>
+                    </Well>
+                    <Note className="mt-3">
+                      That hash is all that leaves the browser at purchase. It binds the secret to your
+                      address, this raffle and one exact ticket, so it cannot be lifted onto another.
+                      The secret itself is posted at reveal, and until then nobody can compute the seed.
+                    </Note>
+                  </>
+                )}
+
+                {(phase === "revealing" || phase === "ready") && (
+                  <>
+                    <Well>
+                      <Formula>
+                        {`seed = SHA256( "drawbook-v2|seed|" ‖ raffle address ‖ sort(${r.revealed} secrets so far) ‖ <chain value, read at the draw> )`}
+                      </Formula>
+                    </Well>
+                    <Note className="mt-3">
+                      The chain value does not exist yet. The program reads it in the draw transaction,
+                      after every secret is public, which is why staying silent to steer the seed is a
+                      bet nobody can price. The limit is stated rather than hidden: whoever produces
+                      the draw block could try candidate values if they can influence that read at all.
+                    </Note>
+                  </>
+                )}
+
+                {phase === "void" && (
                   <Well>
                     <Formula>
-                      {`commitment = SHA256( "drawbook-v2|commit|" ‖ raffle address ‖ ticket number ‖ your address ‖ your secret )`}
+                      {"Nobody revealed, so there is no sorted secret list and no seed. None was derived and none can be: that is what void means, and it is the correct outcome rather than a failure."}
                     </Formula>
                   </Well>
-                  <Note className="mt-3">
-                    That hash is all that leaves the browser at purchase. It binds the secret to your
-                    address, this raffle and one exact ticket, so it cannot be lifted onto another.
-                    The secret itself is posted at reveal, and until then nobody can compute the seed.
-                  </Note>
-                </>
-              )}
+                )}
 
-              {(phase === "revealing" || phase === "ready") && (
-                <>
-                  <Well>
-                    <Formula>
-                      {`seed = SHA256( "drawbook-v2|seed|" ‖ raffle address ‖ sort(${r.revealed} secrets so far) ‖ <chain value, read at the draw> )`}
-                    </Formula>
-                  </Well>
-                  <Note className="mt-3">
-                    The chain value does not exist yet. The program reads it in the draw transaction,
-                    after every secret is public, which is why staying silent to steer the seed is a
-                    bet nobody can price. The limit is stated rather than hidden: whoever produces
-                    the draw block could try candidate values if they can influence that read at all.
-                  </Note>
-                </>
-              )}
-
-              {phase === "void" && (
-                <Well>
-                  <Formula>
-                    {"Nobody revealed, so there is no sorted secret list and no seed. None was derived and none can be: that is what void means, and it is the correct outcome rather than a failure."}
-                  </Formula>
-                </Well>
-              )}
-
-              {phase === "drawn" && (
-                <>
-                  <Well>
-                    <Formula>
-                      {`seed = SHA256( "drawbook-v2|seed|" ‖ ${r.address} ‖ sort(${r.revealed} secrets) ‖ u64be(${r.chainSeed.toString()}) )`}
-                    </Formula>
-                  </Well>
-                  <div className="mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAudit("pending");
-                        // A frame first, so the button visibly does something before a hash that is
-                        // usually instant; the result is still computed from the account just read.
-                        requestAnimationFrame(() => setAudit(auditDraw(r)));
-                      }}
-                      className={SECONDARY}
-                    >
-                      Recompute in this tab
-                    </button>
-                  </div>
-                  <AuditResult raffle={r} audit={audit} winners={winners} />
-                </>
-              )}
-            </section>
+                {phase === "drawn" && (
+                  <>
+                    <Well>
+                      <Formula>
+                        {`seed = SHA256( "drawbook-v2|seed|" ‖ ${r.address} ‖ sort(${r.revealed} secrets) ‖ u64be(${r.chainSeed.toString()}) )`}
+                      </Formula>
+                    </Well>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAudit("pending");
+                          // A frame first, so the button visibly does something before a hash that is
+                          // usually instant; the result is still computed from the account just read.
+                          requestAnimationFrame(() => setAudit(auditDraw(r)));
+                        }}
+                        className={SECONDARY}
+                      >
+                        Recompute in this tab
+                      </button>
+                    </div>
+                    <AuditResult raffle={r} audit={audit} winners={winners} />
+                  </>
+                )}
+              </section>
+            </Reveal>
           </div>
 
           {/* --------------------------------------------------------------- the facts */}
-          <div className="min-w-0">
+          <Reveal className="min-w-0">
             <Head2 className="mb-2.5">Facts, read from the account</Head2>
-            <table className="w-full table-fixed border-collapse text-sm">
-              <tbody>
-                <Fact term="Raffle account">
-                  <Long>{r.address}</Long>
-                </Fact>
-                <Fact term="Program">
-                  <span title={PROGRAM_ID}>{shortAddress(PROGRAM_ID, 6, 6)}</span>
-                </Fact>
-                <Fact term="Creator">
-                  <span title={r.creator}>{shortAddress(r.creator, 6, 6)}</span>
-                  {r.creator === me && <span className="label ml-2 text-fg">you</span>}
-                </Fact>
-                <Fact term="Stage">{CHAIN_PHASE_WORD[phase]}</Fact>
-                <Fact term="Prize deposited">{formatKelvin(r.prize)} RLO</Fact>
-                <Fact term="Ticket price">{formatKelvin(r.ticketPrice)} RLO</Fact>
-                <Fact term="Reveal bond">{formatKelvin(r.revealBond)} RLO</Fact>
-                <Fact term="Supply">{r.supply}</Fact>
-                <Fact term="Sold">{r.sold}</Fact>
-                <Fact term="Revealed">{r.revealed}</Fact>
-                <Fact term="Winners set">{r.winners}</Fact>
-                <Fact term="Created">{stampMs(r.createdAt)}</Fact>
-                <Fact term="Automatic draw">{scheduleWord(sched, r, settled)}</Fact>
-                {sched !== null && sched.kind !== "none" && (
-                  <Fact term="Schedule account">
-                    <Long>{sched.address}</Long>
+            {/* A card around the same rows: no padding above or below them, so the column is as
+                tall as it was and "Automatic draw" stays where the demo looks for it. */}
+            <div className="card rounded-card px-4">
+              <table className="w-full table-fixed border-collapse text-sm [&_tr:last-child>*]:border-b-0">
+                <tbody>
+                  <Fact term="Raffle account">
+                    <Long>{r.address}</Long>
                   </Fact>
-                )}
-                {sched !== null && sched.kind === "sent" && (
-                  <Fact term="Sent by Rialo">
-                    <Long>{sched.firing.signature}</Long>
+                  <Fact term="Program">
+                    <span title={PROGRAM_ID}>{shortAddress(PROGRAM_ID, 6, 6)}</span>
                   </Fact>
-                )}
-                {sched !== null && sched.kind !== "none" && (
-                  <Fact term="Schedule deposit">
-                    {sched.kind !== "withdrawn" && sched.deposit !== null
-                      ? `${formatKelvin(sched.deposit)} RLO held`
-                      : "returned to the creator"}
+                  <Fact term="Creator">
+                    <span title={r.creator}>{shortAddress(r.creator, 6, 6)}</span>
+                    {r.creator === me && <span className="label ml-2 text-fg">you</span>}
                   </Fact>
-                )}
-                {settled && <Fact term="Settled">{stampMs(r.drawnAt)}</Fact>}
-                {phase === "drawn" && (
-                  <>
-                    <Fact term="Winners drawn">{r.effectiveWinners}</Fact>
-                    <Fact term="Pool">{formatKelvin(r.pool)} RLO</Fact>
-                    <Fact term="Per winner">{formatKelvin(r.perWinner)} RLO</Fact>
-                    <Fact term="Chain value">
-                      <Long>{r.chainSeed.toString()}</Long>
+                  <Fact term="Stage">{CHAIN_PHASE_WORD[phase]}</Fact>
+                  <Fact term="Prize deposited">{formatKelvin(r.prize)} RLO</Fact>
+                  <Fact term="Ticket price">{formatKelvin(r.ticketPrice)} RLO</Fact>
+                  <Fact term="Reveal bond">{formatKelvin(r.revealBond)} RLO</Fact>
+                  <Fact term="Supply">{r.supply}</Fact>
+                  <Fact term="Sold">{r.sold}</Fact>
+                  <Fact term="Revealed">{r.revealed}</Fact>
+                  <Fact term="Winners set">{r.winners}</Fact>
+                  <Fact term="Created">{stampMs(r.createdAt)}</Fact>
+                  <Fact term="Automatic draw">{scheduleWord(sched, r, settled)}</Fact>
+                  {sched !== null && sched.kind !== "none" && (
+                    <Fact term="Schedule account">
+                      <Long>{sched.address}</Long>
                     </Fact>
-                    {r.seed && (
-                      <Fact term="Seed">
-                        <Long>{r.seed}</Long>
+                  )}
+                  {sched !== null && sched.kind === "sent" && (
+                    <Fact term="Sent by Rialo">
+                      <Long>{sched.firing.signature}</Long>
+                    </Fact>
+                  )}
+                  {sched !== null && sched.kind !== "none" && (
+                    <Fact term="Schedule deposit">
+                      {sched.kind !== "withdrawn" && sched.deposit !== null
+                        ? `${formatKelvin(sched.deposit)} RLO held`
+                        : "returned to the creator"}
+                    </Fact>
+                  )}
+                  {settled && <Fact term="Settled">{stampMs(r.drawnAt)}</Fact>}
+                  {phase === "drawn" && (
+                    <>
+                      <Fact term="Winners drawn">{r.effectiveWinners}</Fact>
+                      <Fact term="Pool">{formatKelvin(r.pool)} RLO</Fact>
+                      <Fact term="Per winner">{formatKelvin(r.perWinner)} RLO</Fact>
+                      <Fact term="Chain value">
+                        <Long>{r.chainSeed.toString()}</Long>
                       </Fact>
-                    )}
-                  </>
-                )}
-                {phase === "void" && (
-                  <Fact term="Prize refunded">{r.creatorRefunded ? "yes" : "not yet"}</Fact>
-                )}
-                <Fact term="Account holds">{formatKelvin(r.kelvins)} RLO</Fact>
-              </tbody>
-            </table>
+                      {r.seed && (
+                        <Fact term="Seed">
+                          <Long>{r.seed}</Long>
+                        </Fact>
+                      )}
+                    </>
+                  )}
+                  {phase === "void" && (
+                    <Fact term="Prize refunded">{r.creatorRefunded ? "yes" : "not yet"}</Fact>
+                  )}
+                  <Fact term="Account holds">{formatKelvin(r.kelvins)} RLO</Fact>
+                </tbody>
+              </table>
+            </div>
 
             {/* ------------------------------------------------------- activity */}
             <section aria-labelledby="activity-heading" className="mt-[26px]">
@@ -1440,9 +1495,9 @@ export function ChainRaffleView({ address }: { address: string }) {
               ) : activity.length === 0 ? (
                 <Note>The node returned no transactions for this account.</Note>
               ) : (
-                <ol className="grid">
+                <ol className="card grid rounded-card px-4">
                   {activity.slice(0, 12).map((a) => (
-                    <li key={a.signature} className="border-b border-rule py-2.5">
+                    <li key={a.signature} className="border-b border-rule py-2.5 last:border-b-0">
                       <div className="label text-fg-3">
                         {a.at === null ? "time not reported" : stampMs(a.at < 1e12 ? a.at * 1000 : a.at)}
                         {sched !== null && sched.kind === "sent" && sched.firing.signature === a.signature
@@ -1458,7 +1513,7 @@ export function ChainRaffleView({ address }: { address: string }) {
                 <Note className="mt-2.5">The newest 12 of {activity.length}.</Note>
               )}
             </section>
-          </div>
+          </Reveal>
         </div>
       </div>
     </main>
@@ -1466,6 +1521,55 @@ export function ChainRaffleView({ address }: { address: string }) {
 }
 
 /* --------------------------------------------------------------------- pieces */
+
+const REDUCED = "(prefers-reduced-motion: reduce)";
+
+/**
+ * A drawn ticket, lit. The number is coral (--cell-won, 6.17 on the card and 6.19 on the record
+ * tone), the one place on the page coral is text, and the card arrives with the winner's large
+ * light around it and lets it settle, once, to a quieter glow that stays: the settle is the cue,
+ * the rest is the state. It settles only once the card is on screen, so a draw that lands while the
+ * winners are below the fold is still seen arriving. Nothing loops. Under reduced motion it is
+ * drawn at rest from the start.
+ *
+ * The lean is on <Tilt>, the light on the card inside it, because app/fx.css owns the tilt's
+ * transition and a glow transition on the same element would be overwritten. This page names no
+ * view-transition element, so neither can clip a route morph.
+ */
+function WinnerCard({ index, children }: { index: number; children: ReactNode }) {
+  // This view renders only after the account is read, never in the server HTML, so the media query
+  // can be read while the first state is made.
+  const [rest, setRest] = useState(() => typeof window !== "undefined" && window.matchMedia(REDUCED).matches);
+  const ref = useRef<HTMLDivElement | null>(null);
+  // The same bottom margin <Reveal> waits for, then the length of its rise, so the light starts
+  // settling once the card has risen into view rather than while it is still invisible.
+  const seen = useInView(ref, "0px 0px -8% 0px");
+  useEffect(() => {
+    if (rest || !seen) return;
+    const rise = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--t-rise")) || 700;
+    const timer = window.setTimeout(() => setRest(true), rise);
+    return () => window.clearTimeout(timer);
+  }, [rest, seen]);
+
+  return (
+    <Tilt max={6} className="rounded-card">
+      <div
+        ref={ref}
+        className={`card flex items-start gap-4 rounded-card p-4 transition-[box-shadow] duration-[1600ms] ease-settle motion-reduce:transition-none ${
+          rest ? "shadow-[0_0_28px_-12px_rgba(255,107,61,0.55)]" : "shadow-win-lg"
+        }`}
+      >
+        <div
+          className="monument text-cell-won [text-shadow:0_0_22px_rgba(255,107,61,0.35)]"
+          style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}
+        >
+          {pad2(index)}
+        </div>
+        <div className="min-w-0">{children}</div>
+      </div>
+    </Tilt>
+  );
+}
 
 function BackToBoard() {
   return (
@@ -1481,8 +1585,8 @@ function BackToBoard() {
 
 /**
  * The recomputation, set beside the record it checks. A mismatch refuses in words and in reversed
- * print, never in the signal hue: a fraud dressed as a celebration would be the worst thing this
- * page could do.
+ * print, never in coral and never in apricot: a fraud dressed as a celebration would be the worst
+ * thing this page could do.
  */
 function AuditResult({
   raffle,
@@ -1501,7 +1605,7 @@ function AuditResult({
 
   return (
     <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
-      <div className="recess min-w-0 bg-recess px-4 py-3.5">
+      <div className="min-w-0 rounded-well bg-recess px-4 py-3.5">
         <dl className="grid gap-4">
           <div>
             <dt className="label text-fg-3">Seed, recomputed here</dt>
@@ -1526,7 +1630,7 @@ function AuditResult({
         {audit.matches ? (
           <p className="text-sm text-fg">Match. Same seed, same tickets, same order.</p>
         ) : (
-          <p className="label bg-fg px-4 py-3 text-panel">
+          <p className="label rounded-row bg-fg px-4 py-3 text-panel">
             Mismatch. The account does not agree with the recomputation.
           </p>
         )}

@@ -124,8 +124,12 @@ export function Strip({
   scale,
 }: {
   raffle: Raffle;
-  /** `mini` is the 6px mark used by the landing miniboard, where the strip is a sign, not a meter. */
-  scale?: "mini";
+  /**
+   * `mini` is the 6px mark used by the landing miniboard, where the strip is a sign, not a meter.
+   * `card` is the landing sample cards' row of small rounded tickets (app/cell.css). Never on the
+   * board, whose strip is the square source rectangle of the route morph.
+   */
+  scale?: "mini" | "card";
 }) {
   return (
     <span

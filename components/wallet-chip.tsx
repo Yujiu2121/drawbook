@@ -6,7 +6,7 @@ import NumberFlow from "@number-flow/react";
 import { ArrowClockwise, ArrowDown, CaretDown, Plugs, SignOut } from "@phosphor-icons/react/dist/ssr";
 
 import { rafflesWithSecrets } from "@/lib/chain/nonces";
-import { BUTTON } from "@/lib/controls";
+import { BUTTON, CHIP } from "@/lib/controls";
 import { formatRLO } from "@/lib/raffle";
 import { KELVIN } from "@/lib/rialo-rpc";
 import { shortAddress } from "@/lib/wallet";
@@ -71,38 +71,87 @@ import { announceOpen, useCloseWhenOtherOpens } from "./mobile-nav";
  * "28.655.533" beside a pool of "16.25" on a phone set to a comma-decimal locale, a dot meaning two things on one
  * screen.
  *
- * WORK IN FLIGHT IS A HELD CONTROL, NOT A SPINNER. While a request is out the control sits on
- * `--panel-2`, the raised surface, its word changes to "Connecting", "Requesting" or "Retrying",
+ * WORK IN FLIGHT IS A HELD CONTROL, NOT A SPINNER. While a request is out the control takes a 14%
+ * line tint, lighter than the chip at rest, its word changes to "Connecting", "Requesting" or "Retrying",
  * and `aria-busy` carries it to anyone not looking. It costs no frame and survives
  * `prefers-reduced-motion` unchanged.
  *
- * NOTHING HERE IS EVER THE SIGNAL HUE: `--event` appears nowhere in the file. It is ceremonial in
- * this system, and an error printed in it would read as a win from the corner of the eye. Failures
- * are plain sentences, with the engine's own wording kept on the `title` for whoever needs it.
+ * NOTHING HERE IS EVER THE SIGNAL HUE OR THE WINNER'S: neither `--event` nor coral is painted
+ * anywhere in this file. Apricot is the signal and coral is a winner, and an error printed in
+ * either would read as a win from the corner of the eye. FAUCET wears the palette's secondary, apricot-2, a step away
+ * from the signal, because it is the one control a presenter has to find at a glance on a phone.
+ * Failures are plain sentences, with the engine's own wording kept on the `title` for whoever
+ * needs it.
  *
- * CONTRAST, COMPUTED against the surface each token actually sits on, formula sanity-checked at
- * white on black = 21.00. On `--panel` #e9eaf6: --fg 15.01, --fg-2 7.60, --fg-3 5.73, --bound 5.18.
- * On `--panel-2` #dfe1f1, the hover, held and notice surface: --fg 13.82, --fg-2 7.00, --fg-3 5.27,
- * --bound 4.77. Every text pair clears AA at 4.5 on both, and `--bound` clears the 3:1 that
- * SC 1.4.11 asks of a control boundary on both.
+ * THE BAR IS GLASS NOW, AND THE PANELS ARE GLASS CARDS. The chips sit on the masthead pill, and
+ * the wallet panel and ChainNotice hang 6px under it as floating glass cards with the pill's own
+ * insets, from the viewport rather than from the pill (components/masthead.tsx says why that
+ * matters). Inside the bar only --fg, --fg-2 and FAUCET's apricot-2 are written; --fg-3 appears in
+ * the panel only.
+ *
+ * CONTRAST, COMPUTED against the surface each token actually sits on, every rgba composited first,
+ * formula sanity-checked at white on black = 21.00. The second figure is the worst case: the glass
+ * over the drum's apricot band on the landing.
+ *   the chip (5% line over the glass)   --fg 13.99 | 12.14, --fg-2 8.28 | 7.19, apricot-2 9.43 | 8.19
+ *   the account ramp, top stop          --fg 9.21 | 8.22, --fg-2 5.45 | 4.87 (the "RLO" unit and
+ *                                       "Not read yet", label size); the address is --fg
+ *   the panel and the notice (glass)    --fg 15.12 | 13.26, --fg-2 8.95 | 7.85, --fg-3 5.15 | 4.52
+ *   hover, a 12% line tint              --fg 12.33 | 10.63, --fg-2 7.30 | 6.29, apricot-2 8.31 | 7.16
+ *   held and open, a 14% line tint      --fg 11.85 | 10.21, --fg-2 7.02 | 6.04, apricot-2 7.99 | 6.88
+ *   the account ramp, hover and open    --fg 8.31 | 7.46 and 8.07 | 7.26; --fg-2 would fall to
+ *                                       4.42 and 4.30 under the label floor, so "RLO" and "Not read
+ *                                       yet" turn --fg in those two states (group-hover, group-aria-
+ *                                       expanded). Open also draws the boundary in --fg-2, so the
+ *                                       state never rests on a fill alone.
+ *   the panel's buttons, hover 10%      --fg 12.82 | 11.05; held 14%, 11.85 | 10.21
+ *   --bound, the chip's boundary        3.39 on the glass, 2.94 over the apricot band; every chip
+ *                                       is also named by its own text or icon, so the boundary is
+ *                                       not the only thing identifying the control (SC 1.4.11)
+ */
+
+/*
+ * The chip shell is CHIP in lib/controls.ts, shared with the back arrow, so a boundary drawn here is
+ * the same boundary BackLink draws beside it. Its box is the one these chips have always had, one
+ * label line plus py-1.5 and the border: 29px, so a chip holding only an 11px icon (the faucet below
+ * 1024) is as tall as one holding a word. 29px is the drawn box, not the target: the controls below
+ * add `tap` (app/globals.css, block 7), which on a touch screen or below 1024 hangs an invisible
+ * 44px square, or a 44px-tall band on a wider chip, around each of them. It is added per control
+ * rather than in CHIP because `NetChip` shares the shell and is not a control.
+ *
+ * THE TINT GOES UP, NEVER DOWN. On the glass, --panel-2 (--veil) is darker than the chip at rest, so
+ * a hover or a held state painted with it read as the control sinking, at about 1.08:1. Hover,
+ * held and open are the bar's own line tint at a higher alpha instead (12% and 14% over CHIP's
+ * 5%), the direction the nav links and the menu button already move in.
+ *
+ * A held or open control takes its tint through an `aria-busy:` or `aria-expanded:` variant rather
+ * than a plain class, because CHIP already paints a background colour and two background-colour
+ * utilities on one element are settled by stylesheet order, not by the order they are written in.
+ * A variant always sorts after the plain utility, so it wins every time.
  */
 
 /**
- * The chip shell, shared by both chips and the controls, so a boundary drawn here is the same
- * boundary `BackLink` draws beside it. Same padding as BackLink, because bordered objects on one
- * line have to share a height.
- *
- * The minimum height is one label line (1.4em of 11px) plus the padding and the border, which is
- * the height a chip with a word in it already has. Without it a chip holding only an 11px icon,
- * the faucet below 1024, came out 25px tall beside 29px neighbours, and 4px smaller to hit.
- *
- * 29px is the drawn box, not the target. The controls below add `tap` (app/globals.css, block 7),
- * which on a touch screen or below 1024 hangs an invisible 44px square, or a 44px-tall band on a
- * wider chip, around each of them. It is added per control rather than here because `NetChip`
- * shares this shell and is not a control.
+ * FAUCET's own paint: apricot-2 ink (9.43 on the chip, 8.19 over an apricot cell) inside a 35%
+ * apricot-2 hairline. The raw `var(--apricot-2)` read is deliberate: the role layer has no
+ * secondary-signal role yet, and FAUCET is the only control that wears this hue.
  */
-const CHIP =
-  "label inline-flex min-h-[calc(1.4em+0.75rem+2px)] shrink-0 items-center gap-1.5 border border-bound px-2 py-1.5 transition-colors duration-[var(--t-open)] ease-settle";
+const FAUCET_PAINT = "text-[var(--apricot-2)] border-[rgba(var(--apricot-2-rgb),.35)]!";
+
+/**
+ * The account chip's paint: a rose-into-wine ramp, the one gradient chip in the bar, because it is
+ * the one that is you. Connect wears it too, since it is the same chip before it has an address.
+ * The figures are in CONTRAST above.
+ */
+const ACCOUNT_PAINT =
+  "bg-[image:linear-gradient(180deg,rgba(var(--rose-rgb),.34),rgba(var(--glow-rgb),.26))] text-fg";
+
+/**
+ * BUTTON for the wallet panel. BUTTON's own hover is --panel-2, which on the glass card is one
+ * level from the card itself and reads as nothing; here it is the bar's line tint at 10%, lighter
+ * than the card. Swapped by string rather than added, because two `hover:bg-` utilities on one
+ * element are settled by stylesheet order. If BUTTON stops carrying `hover:bg-panel-2` this falls
+ * back to BUTTON unchanged.
+ */
+const PANEL_BUTTON = BUTTON.replace("hover:bg-panel-2", "hover:bg-[rgba(var(--line-rgb),.10)]");
 
 /**
  * 11px, from the label step, without the label step's 0.14em tracking. `text-label` carries both
@@ -154,7 +203,7 @@ export function NetChip() {
   const offline = isOffline(state);
 
   return (
-    <span className={`${CHIP} text-fg-3`} title={offline && rpcError ? rpcError : undefined}>
+    <span className={`${CHIP} text-fg-2`} title={offline && rpcError ? rpcError : undefined}>
       <span className="hidden 2xl:inline">Rialo</span>
       <span className="text-fg">{NETWORK.name}</span>
 
@@ -188,12 +237,14 @@ export function NetChip() {
  * This used to be the raw engine string, "Failed to fetch", printed only where 22 characters of a
  * truncating note had room, which in practice meant 1600px and up: at 1280 the note collapsed to
  * zero width and on a phone it was not rendered, so the presenter's two screens showed nothing at
- * all while the chain was down. Now it is a strip hung under the bar at every width, in plain
- * words, with a Retry that asks the node immediately instead of waiting out the six-second poll.
+ * all while the chain was down. Now it is a glass card hung under the pill at every width, as wide
+ * as the pill, in plain words, with a Retry that asks the node immediately instead of waiting out
+ * the six-second poll.
  *
- * It sits on `--panel-2`, the raised surface, not on a colour: this system has no error colour on
- * purpose. It is fixed under the bar, so it covers the top of the page while it is up; that is the
- * honest trade for an outage notice, and it goes away by itself on the first poll that answers.
+ * It is the chrome's glass, not a colour: this system has no error colour on purpose, and coral in
+ * particular is a winner. It is fixed under the bar, so it covers the top of the page while it is
+ * up; that is the honest trade for an outage notice, and it goes away by itself on the first poll
+ * that answers.
  *
  * A failed connect is the second thing it can say, because the Connect control's own word changing
  * to "Try again" says that something failed without saying what.
@@ -221,7 +272,7 @@ export function ChainNotice() {
         {sentence}
       </span>
       {sentence === null ? null : (
-        <div className="fixed right-0 left-0 top-mast z-[78] flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule bg-panel-2 px-gutter py-2.5 whitespace-normal">
+        <div className="fixed inset-x-[calc(var(--gutter)-12px)] top-[calc(var(--mast)+6px)] z-[78] flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[22px] glass px-5 py-3 whitespace-normal shadow-panel">
           <p aria-hidden="true" title={detail ?? undefined} className="min-w-0 flex-1 text-sm text-fg">
             {sentence}
           </p>
@@ -231,9 +282,7 @@ export function ChainNotice() {
               onClick={() => void retry()}
               disabled={retrying}
               aria-busy={retrying}
-              className={`${CHIP} text-fg disabled:cursor-not-allowed ${
-                retrying ? "bg-panel" : "hover:bg-panel"
-              }`}
+              className={`${CHIP} text-fg hover:bg-[rgba(var(--line-rgb),.12)] disabled:cursor-not-allowed aria-busy:bg-[rgba(var(--line-rgb),.14)]`}
             >
               <ArrowClockwise size={11} weight="bold" aria-hidden="true" />
               {retrying ? "Retrying" : "Retry"}
@@ -430,9 +479,7 @@ export function WalletChip() {
           disabled={connecting}
           aria-busy={connecting}
           title={failed && error ? error : undefined}
-          className={`${CHIP} tap text-fg disabled:cursor-not-allowed ${
-            connecting ? "bg-panel-2" : "hover:bg-panel-2"
-          }`}
+          className={`${CHIP} tap ${ACCOUNT_PAINT} hover:bg-[rgba(var(--line-rgb),.12)] disabled:cursor-not-allowed aria-busy:bg-[rgba(var(--line-rgb),.14)]`}
         >
           <Plugs size={11} weight="bold" aria-hidden="true" />
           {connecting ? (
@@ -473,9 +520,7 @@ export function WalletChip() {
         aria-busy={funding}
         aria-label={funding ? `Requesting 1 RLO from the ${NETWORK.faucet} faucet` : FAUCET_LABEL}
         title={FAUCET_LABEL}
-        className={`${CHIP} tap text-fg disabled:cursor-not-allowed ${
-          funding ? "bg-panel-2" : "hover:bg-panel-2"
-        }`}
+        className={`${CHIP} tap ${FAUCET_PAINT} hover:bg-[rgba(var(--line-rgb),.12)] disabled:cursor-not-allowed aria-busy:bg-[rgba(var(--line-rgb),.14)]`}
       >
         <ArrowDown size={11} weight="bold" aria-hidden="true" />
         {/* The word joins at 1024, which is the narrowest laptop this is demonstrated on; below it
@@ -492,13 +537,13 @@ export function WalletChip() {
         aria-expanded={panelOpen}
         aria-controls={panelId}
         title={wallet.address}
-        className={`${CHIP} tap text-fg ${panelOpen ? "bg-panel-2" : "hover:bg-panel-2"}`}
+        className={`group ${CHIP} tap ${ACCOUNT_PAINT} hover:bg-[rgba(var(--line-rgb),.12)] aria-expanded:bg-[rgba(var(--line-rgb),.14)] aria-expanded:border-fg-2`}
       >
         <span className="sr-only">Wallet</span>
         {/* An address is base58 and case carries meaning, so the label voice is undone here:
             `normal-case` against the uppercase, `tracking-normal` against the 0.14em. Below 640 it
             keeps only its first four characters; the whole address is the first thing in the panel. */}
-        <span className="mono normal-case tracking-normal text-fg-2" style={SMALL}>
+        <span className="mono normal-case tracking-normal text-fg" style={SMALL}>
           <span className="sm:hidden">{`${wallet.address.slice(0, 4)}…`}</span>
           <span className="hidden sm:inline">{shortAddress(wallet.address, 4, 4)}</span>
         </span>
@@ -512,7 +557,7 @@ export function WalletChip() {
         <span className="hidden items-baseline gap-1 md:inline-flex">
           <span className="sr-only">Balance</span>
           {balance === null ? (
-            <span className="text-fg-3">Not read yet</span>
+            <span className="text-fg-2 group-hover:text-fg group-aria-expanded:text-fg">Not read yet</span>
           ) : (
             <>
               <NumberFlow
@@ -529,11 +574,11 @@ export function WalletChip() {
                 transformTiming={LAND}
                 spinTiming={LAND}
               />
-              <span className="text-fg-3">RLO</span>
+              <span className="text-fg-2 group-hover:text-fg group-aria-expanded:text-fg">RLO</span>
             </>
           )}
         </span>
-        <CaretDown size={10} weight="bold" aria-hidden="true" className="hidden text-fg-3 sm:block" />
+        <CaretDown size={10} weight="bold" aria-hidden="true" className="hidden text-fg-2 sm:block" />
       </button>
 
       <LiveNote text={note} />
@@ -549,7 +594,7 @@ export function WalletChip() {
             so the two never show at once (each closes when the other opens). `whitespace-normal`
             undoes the bar's nowrap, which a fixed child still inherits.
           */
-          className="fixed right-0 left-0 top-mast z-[79] max-h-[calc(100dvh-var(--mast))] overflow-y-auto border-b border-rule bg-panel px-pad pt-5 pb-6 whitespace-normal sm:left-auto sm:w-[380px] sm:border-l sm:px-6"
+          className="fixed inset-x-[calc(var(--gutter)-12px)] top-[calc(var(--mast)+6px)] z-[79] max-h-[calc(100dvh-var(--mast)-12px)] overflow-y-auto rounded-[22px] glass px-pad pt-5 pb-6 whitespace-normal shadow-panel sm:left-auto sm:right-[calc(var(--gutter)-12px)] sm:w-[380px] sm:px-6"
         >
           <p className="label text-fg-3">{usedLocalKey ? "Burner wallet" : "Wallet"}</p>
           <p className="mt-2 text-sm text-fg-2">
@@ -581,9 +626,7 @@ export function WalletChip() {
             onClick={() => void requestFaucet()}
             disabled={funding}
             aria-busy={funding}
-            className={`${BUTTON} mt-5 w-full justify-center disabled:cursor-not-allowed ${
-              funding ? "bg-panel-2" : ""
-            }`}
+            className={`${PANEL_BUTTON} mt-5 w-full justify-center disabled:cursor-not-allowed aria-busy:bg-[rgba(var(--line-rgb),.14)]`}
           >
             <ArrowDown size={12} weight="bold" aria-hidden="true" />
             {/* The network is already named in the sentence above, so the button can say what it
@@ -611,7 +654,7 @@ export function WalletChip() {
                     : "Disconnect this wallet from Drawbook in this browser?"}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button type="button" onClick={forget} className={BUTTON}>
+                  <button type="button" onClick={forget} className={PANEL_BUTTON}>
                     <SignOut size={12} weight="bold" aria-hidden="true" />
                     {usedLocalKey ? "Delete the key" : "Disconnect"}
                   </button>
@@ -622,7 +665,7 @@ export function WalletChip() {
                       moveFocus.current = true;
                       setConfirming(false);
                     }}
-                    className={BUTTON}
+                    className={PANEL_BUTTON}
                   >
                     Keep it
                   </button>
@@ -636,7 +679,7 @@ export function WalletChip() {
                   moveFocus.current = true;
                   setConfirming(true);
                 }}
-                className="label inline-flex items-center gap-1.5 py-1.5 text-fg-3 transition-colors duration-[var(--t-open)] ease-settle hover:text-fg"
+                className={PANEL_BUTTON}
               >
                 <SignOut size={11} weight="bold" aria-hidden="true" />
                 {usedLocalKey ? "Forget this wallet" : "Disconnect"}

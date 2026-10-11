@@ -1,0 +1,1040 @@
+/* ==========================================================================================
+   THE DRUM: THE LANDING'S 3D TICKET DRUM, ITS PINNED DRAW SCENE, AND THEIR FALLBACKS
+
+   Owned by the landing (app/page.tsx and components/drum/). Every rule here is scoped to a class
+   only the landing renders: .hero-grid, .drumslot, .drum-canvas, .lgrid, .ds (the draw scene),
+   .braid, .cfield and .close-orb.
+
+   THE ONE MEDIA QUERY THAT MATTERS
+
+     @media (prefers-reduced-motion: no-preference) and (scripting: enabled)
+
+   is the condition under which the draw scene and the braid are pinned and played by the scroll.
+   It is a media query and not a class added after hydration for one reason: the pinned scene is
+   several viewports tall, and a height that arrived with the script would push everything under it
+   down by several viewports the moment the island woke. Here the height is in the first paint or
+   not at all. With no script (`scripting: none`), in a browser too old to know the feature, or
+   under a reduced-motion preference, nothing is pinned: the scene is ordinary flow and shows its
+   head, its chain and its ticket sheet stacked, which is the section as it read before the drum.
+
+   LAYERING. The drum canvas is fixed to the viewport at z-index -1 inside <main>, which the landing
+   isolates: above the body's haze and film, below every word on the page. Anything with an opaque
+   background (the ceremony's record tone, a card) covers it, which is why the hero figure and the
+   scene carry none.
+
+   CONTRAST. Text over the canvas sits on glass (the scene's statement and panel, at the 94% glass
+   globals.css computes against) or on the page beside a canvas masked to a disc around the drum,
+   so no drum light reaches the copy column. The figure caption and its note under the drum were
+   checked by sampling the rendered pixels; see components/drum/scene.ts for the halo cap.
+   ========================================================================================== */
+
+/* ------------------------------------------------------------------------------ THE CANVAS */
+
+.drum-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: -1;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* In the opening the drum's light is held to its own slot: a soft disc around the drum, cut off
+   past the slot's left edge (the copy column) and its bottom edge (the caption and its note), so
+   no ring, halo or grain of dust is ever drawn under a word. Measured by sampling the rendered
+   pixels under the lead, the caption and the note at 390, 1280 and 1920. */
+.drum-canvas[data-zone="hero"] {
+  visibility: visible;
+  -webkit-mask-image:
+    radial-gradient(circle at var(--mx) var(--my), #000 var(--mr0), transparent var(--mr1)),
+    linear-gradient(180deg, #000 calc(var(--mb) - 40px), transparent var(--mb)),
+    linear-gradient(90deg, transparent var(--ml), #000 calc(var(--ml) + 40px));
+  -webkit-mask-composite: source-in, source-in;
+  mask-image:
+    radial-gradient(circle at var(--mx) var(--my), #000 var(--mr0), transparent var(--mr1)),
+    linear-gradient(180deg, #000 calc(var(--mb) - 40px), transparent var(--mb)),
+    linear-gradient(90deg, transparent var(--ml), #000 calc(var(--ml) + 40px));
+  mask-composite: intersect;
+}
+
+/* In the scene the drum fills the pinned stage and nothing outside it. */
+.drum-canvas[data-zone="scene"] {
+  visibility: visible;
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent var(--mt),
+    #000 calc(var(--mt) + 64px),
+    #000 calc(var(--mb) - 64px),
+    transparent var(--mb)
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent var(--mt),
+    #000 calc(var(--mt) + 64px),
+    #000 calc(var(--mb) - 64px),
+    transparent var(--mb)
+  );
+}
+
+/* ------------------------------------------------------------------------------ THE HERO */
+
+.hero-grid {
+  display: grid;
+  align-items: center;
+  gap: clamp(20px, 3vw, 48px);
+  padding: clamp(24px, 5vw, 72px) var(--gutter);
+}
+
+@media (min-width: 980px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+    min-height: calc(100svh - var(--mast));
+  }
+}
+
+/* On a narrow screen the figure goes first, the drum at 300px as it does in the approved preview
+   and its caption and note directly under it, then the copy. The figure steps out of the box tree
+   so both parts can take the same order (document order keeps the caption under the slot); it
+   keeps its role and its caption in the accessibility tree. */
+@media (max-width: 979px) {
+  .hero-figure {
+    display: contents;
+  }
+
+  .hero-figure > .drumslot {
+    order: -1;
+  }
+
+  .hero-figure > figcaption {
+    order: -1;
+  }
+}
+
+/* The slot. Its height is fixed by this rule alone, so the drum replacing the muster moves
+   nothing: the muster fills the same box the drum is drawn into. */
+.drumslot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 300px;
+}
+
+@media (min-width: 980px) {
+  .drumslot {
+    height: min(70vh, 640px);
+  }
+}
+
+/* The muster keeps its own --field height on a wide screen, centred in the taller slot, so its
+   cells are the shape they have always been; on a narrow screen it fills the 300px slot. */
+.drumslot .muster {
+  flex: 1 1 auto;
+  min-width: 0;
+  transition: opacity 600ms var(--ease-settle);
+}
+
+@media (max-width: 979px) {
+  .drumslot .muster {
+    --field: 100%;
+  }
+}
+
+/* The drum has drawn: the muster steps aside, and its five band links stay in the tab order. A
+   focused band brings the whole muster back, with the band's own focus ring, so a keyboard reader
+   sees exactly what they are on. */
+.drumslot[data-drum="on"] .muster {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drumslot[data-drum="on"] .muster:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ...and the drum steps aside while it is, so the two drawings never overlap and the band's
+   focus ring is not lost under turning cells. */
+.drumslot[data-drum="on"]:focus-within > .drum-canvas {
+  visibility: hidden;
+}
+
+/* The headline's word boxes, which the opening raises the words out of. The box reaches 0.14em
+   below the line so the comma's tail is not clipped by its own overflow. */
+.hero-line {
+  display: block;
+}
+
+.hero-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+}
+
+.hero-word > i {
+  display: inline-block;
+  font-style: normal;
+}
+
+@media (min-width: 980px) {
+  .hero-line {
+    white-space: nowrap;
+  }
+}
+
+/* ------------------------------------------------------------------------------ CARD GRIDS
+
+   The sample cards: three live cards a row and the two in the record two a row on a wide screen
+   (spans of 2 and 3 in six columns), two columns below 980px, one below 640px. */
+.lgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(14px, 1.5vw, 20px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .lgrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lgrid > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 980px) {
+  .lgrid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .lgrid > li,
+  .lgrid > li:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .lgrid[data-span="3"] > li,
+  .lgrid[data-span="3"] > li:last-child:nth-child(odd) {
+    grid-column: span 3;
+  }
+}
+
+/* ------------------------------------------------------------------------------ THE DRAW SCENE
+   Base rules first: the static section, which is what no script and reduced motion get. */
+
+.ds {
+  position: relative;
+}
+
+/* A way past the scene for a keyboard: off screen until focused, and never in the flow. It sits
+   on the gutter, and a masthead's height down, so the fixed masthead never covers it when the
+   scene's top is at the top of the screen. */
+.ds-skip {
+  position: absolute;
+  top: calc(var(--mast) + 12px);
+  left: var(--gutter);
+  scroll-margin-top: calc(var(--mast) + 12px);
+  z-index: 6;
+  padding: 10px 14px;
+  border: 1px solid var(--bound);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  color: var(--fg);
+  transform: translateY(-200%);
+  opacity: 0;
+}
+
+.ds-skip:focus {
+  transform: none;
+  opacity: 1;
+}
+
+.ds-stage {
+  position: relative;
+}
+
+.ds-scene {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(26px, 3vw, 40px);
+}
+
+/* The chain reads before the sheet in the static section, as it did before the sheet was added. */
+.ds-hud {
+  order: -1;
+}
+
+.ds-tag,
+.ds-rail,
+.ds-beats,
+.ds-pool,
+.ds-labels,
+.ds-flash {
+  display: none;
+}
+
+.ds-grid {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+}
+
+/* The scene's grid is five across, the same 5 by 4 the drum forms, at every width. */
+.ds-grid .sheet {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* ---- PINNED: script running and motion allowed. */
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .ds {
+    height: 420vh;
+  }
+
+  .ds-stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    overflow: hidden;
+  }
+
+  /* PINNED BUT NOT RUNNING: the first paint before the island wakes, or a page whose script
+     chunk never arrived. The height above is already in place, so nothing below moves, and the
+     still stage shows the section as it reads with no script: the head, the chain in plain sight
+     and the sheet beside it. Every hand-off below is scoped to .ds[data-run] for this reason. */
+  .ds:not([data-run]) .ds-stage {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: clamp(18px, 2.4vw, 28px);
+    padding: calc(var(--mast) + 16px) var(--gutter) 16px;
+  }
+
+  .ds:not([data-run]) .ds-statement > * {
+    margin: 0;
+  }
+
+  .ds:not([data-run]) .ds-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    align-items: center;
+    gap: 32px;
+  }
+
+  /* The statement: the section head, on glass, over the drum as the stage arrives. */
+  .ds[data-run] .ds-statement {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    padding: calc(var(--mast) + 16px) var(--gutter) 24px;
+    pointer-events: none;
+  }
+
+  .ds[data-run] .ds-statement > * {
+    margin: 0;
+    max-width: 46rem;
+    padding: clamp(22px, 3vw, 40px);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-panel);
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+    backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+    box-shadow: var(--shadow-panel);
+    pointer-events: auto;
+  }
+
+  /* Faded out, never hidden: the heading and its "not on chain" lead stay in the accessibility
+     tree after the reader has scrolled past (components/drum/draw-scene.tsx sets the flag). */
+  .ds[data-run] .ds-statement[data-out] > * {
+    pointer-events: none;
+  }
+
+  .ds[data-run] .ds-scene {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+    align-items: center;
+    gap: 40px;
+    height: 100%;
+    padding: calc(var(--mast) + 28px) var(--gutter) 28px;
+  }
+
+  /* The grid slot. A size container, so the sheet in it can be the largest 5 by 4 that fits. */
+  .ds[data-run] .ds-grid {
+    max-width: none;
+    height: min(66vh, 600px);
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ds[data-run] .ds-grid .sheet {
+    width: min(100cqw, 125cqh);
+    flex: none;
+  }
+
+  /* The drum draws the grid: the sheet keeps its box for the drum to measure, unseen. */
+  .ds[data-run][data-drum="on"] .ds-grid .sheet {
+    opacity: 0;
+  }
+
+  /* The chain becomes the panel's screen-reader text. Every word of it is still read. */
+  .ds[data-run] .ds-chain {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ---- THE PANEL */
+  .ds[data-run] .ds-hud {
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px;
+    border: 1px solid var(--rule);
+    border-radius: 22px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+    backdrop-filter: blur(var(--blur-glass)) saturate(1.3);
+    box-shadow: var(--shadow-panel);
+    transition:
+      opacity 500ms var(--ease-settle),
+      transform 600ms var(--ease-rise);
+  }
+
+  /* Held back until the statement has gone. Only while the island runs: a stage that is pinned
+     but never woke (a chunk that did not arrive) keeps its chain in plain sight. */
+  .ds[data-run]:not([data-hud="on"]) .ds-hud {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+
+  .ds[data-run] .ds-tag {
+    display: inline-flex;
+    align-self: flex-start;
+    padding: 6px 11px;
+    border: 1px solid rgba(var(--apricot-2-rgb), 0.3);
+    border-radius: var(--radius-pill);
+    color: var(--apricot-2);
+  }
+
+  /* The rail: the chain's five names, the one in play lit. */
+  .ds[data-run] .ds-rail {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ds[data-run] .ds-rail > li {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-top: 8px;
+    border-top: 2px solid var(--rule);
+    color: var(--fg-3);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 75;
+    font-weight: 600;
+    font-size: var(--text-label);
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+    text-transform: uppercase;
+    transition:
+      color 300ms var(--ease-settle),
+      border-color 300ms var(--ease-settle);
+  }
+
+  .ds[data-run] .ds-rail > li[data-state="done"] {
+    border-top-color: var(--bound);
+  }
+
+  .ds[data-run] .ds-rail > li[data-state="on"] {
+    border-top-color: var(--event);
+    color: var(--fg);
+  }
+
+  /* One link at a time, stacked in one grid cell so the panel is as tall as its tallest beat
+     from the first frame and never changes height while the reader scrolls. */
+  .ds[data-run] .ds-beats {
+    display: grid;
+  }
+
+  .ds[data-run] .ds-beat {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition:
+      opacity 160ms linear,
+      transform 300ms var(--ease-settle),
+      visibility 0s linear 160ms;
+  }
+
+  .ds[data-run] .ds-beat[data-on] {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 350ms var(--ease-settle) 140ms,
+      transform 500ms var(--ease-rise) 140ms,
+      visibility 0s;
+  }
+
+  .ds[data-run] .ds-val {
+    color: var(--event);
+    font-size: clamp(1.75rem, 2.6vw, 2.5rem);
+  }
+
+  .ds[data-run] .ds-hex {
+    color: var(--fg);
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  .ds[data-run] .ds-note {
+    color: var(--fg-2);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+  }
+
+  .ds[data-run] .ds-picks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .ds[data-run] .ds-pick {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-well);
+  }
+
+  .ds[data-run] .ds-pick > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .ds[data-run] .ds-pick dt {
+    color: var(--fg-3);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 75;
+    font-weight: 600;
+    font-size: var(--text-label);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .ds[data-run] .ds-pick dd {
+    margin: 0;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 100;
+    font-weight: 500;
+    font-size: var(--text-sm);
+  }
+
+  /* A winner's ticket, once the cursor has landed on it, in the winner's colour. Coral on the
+     glass is 6.25, and 5.49 over an apricot cell behind it. */
+  .ds[data-run] .ds-pick[data-landed] [data-v="ticket"] {
+    color: var(--cell-won);
+  }
+
+  .ds[data-run] .ds-restline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 400ms var(--ease-settle);
+  }
+
+  .ds[data-run] .ds-beat[data-rest] .ds-restline {
+    opacity: 1;
+  }
+
+  /* The pool strip: twenty tickets in ticket order. */
+  .ds[data-run] .ds-pool {
+    display: block;
+    padding-top: 14px;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The count appears once the silent tickets have left; the head keeps its height either way,
+     so the panel never moves under the reader. */
+  .ds[data-run] .ds-pool-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    min-height: 24px;
+    margin-bottom: 8px;
+    color: var(--fg-3);
+  }
+
+  .ds[data-run] .ds-pool-head b {
+    min-width: 2ch;
+    text-align: right;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 100;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 24px;
+    letter-spacing: 0;
+    transition: color 300ms var(--ease-settle);
+  }
+
+  .ds[data-run] .ds-pool-head b[data-tick] {
+    color: var(--event);
+  }
+
+  .ds[data-run] .ds-pool-row {
+    display: flex;
+    gap: 3px;
+  }
+
+  .ds[data-run] .ds-pool-row > i {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    aspect-ratio: 0.72;
+    overflow: hidden;
+    border: 1px solid var(--cell-sold);
+    border-radius: var(--radius-cell);
+    background: var(--cell-sold);
+    transition:
+      flex-grow 500ms var(--ease-settle),
+      margin 500ms var(--ease-settle),
+      opacity 400ms linear,
+      border-width 500ms var(--ease-settle),
+      background-color 250ms linear;
+  }
+
+  /* The foot: every ticket on this strip revealed except the silent two. */
+  .ds[data-run] .ds-pool-row > i::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 36%;
+    background: var(--event);
+  }
+
+  .ds[data-run] .ds-pool-row > i[data-silent]::after,
+  .ds[data-run] .ds-pool-row > i[data-cur]::after {
+    display: none;
+  }
+
+  /* BELOW THE TYPE SCALE, ON PURPOSE. The serials printed on the strip's cells (10px, 9px under
+     980px) and over the drum's grid (10px, .ds-labels) are the one place this file sets type
+     under the 11px label step. They are aria-hidden figures on cells a few px wider than the
+     figure itself; every one is also in the sheet, the chain and the working at full size. */
+  .ds[data-run] .ds-pool-row > i > b {
+    position: absolute;
+    font-style: normal;
+    inset: 0 0 36% 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--on-sold);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 75;
+    font-weight: 600;
+    font-size: 10px;
+    letter-spacing: -0.04em;
+  }
+
+  .ds[data-run] .ds-pool-row > i[data-sil] {
+    border-color: var(--bound);
+    background: var(--cell);
+  }
+
+  .ds[data-run] .ds-pool-row > i[data-sil] > b {
+    color: var(--fg-3);
+  }
+
+  /* The cursor: rose-hi, with the serial in wine on it at 5.89. */
+  .ds[data-run] .ds-pool-row > i[data-cur] {
+    border-color: var(--fg);
+    background: var(--rose-hi);
+  }
+
+  .ds[data-run] .ds-pool-row > i[data-cur] > b {
+    color: var(--on-won);
+    inset: 0;
+  }
+
+  .ds[data-run] .ds-pool-row > i[data-out] {
+    flex-grow: 0;
+    flex-basis: 0;
+    margin: 0 -1.5px;
+    border-width: 0;
+    opacity: 0;
+  }
+
+  /* ---- THE LABELS over the drum's grid, placed by components/drum/drum-stage.tsx. */
+  .ds[data-run] .ds-labels {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .ds[data-run]:not([data-drum="on"]) .ds-labels {
+    display: none;
+  }
+
+  .ds[data-run] .ds-labels > span {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform, opacity;
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-variation-settings: "wdth" 75;
+    font-weight: 600;
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    text-shadow: 0 0 6px rgba(var(--dusk-rgb), 0.9);
+  }
+
+  .ds[data-run] .ds-labels > span[data-off] {
+    color: var(--fg-3);
+  }
+
+  /* Printed on the coral body: wine on coral is 6.19. */
+  .ds[data-run] .ds-labels > span[data-won] {
+    color: var(--on-won);
+    text-shadow: none;
+  }
+
+  /* ---- THE WINNER, named while it is held toward the reader. */
+  .ds[data-run] .ds-flash {
+    display: block;
+    position: absolute;
+    left: 50%;
+    bottom: calc(50% + min(40cqw, 50cqh) + 14px);
+    z-index: 4;
+    opacity: 0;
+    transform: translateX(-50%);
+    pointer-events: none;
+    white-space: nowrap;
+    color: var(--cell-won);
+    font-family: var(--font-sans);
+    font-variation-settings: "wdth" 112;
+    font-weight: 800;
+    font-size: clamp(28px, 4.4vw, 64px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 28px rgba(var(--coral-rgb), 0.45);
+  }
+
+  /* ---- THE SHEET, when there is no WebGL to draw the grid: the same beats as attributes. */
+  .ds[data-run] .ds-grid .c {
+    transition:
+      background-color var(--t-settle) var(--ease-settle),
+      opacity var(--t-settle) var(--ease-settle),
+      transform var(--t-grow) var(--ease-settle),
+      box-shadow var(--t-settle) var(--ease-settle);
+  }
+
+  .ds[data-run] .ds-grid .c[data-s="2"]:not([data-band])::after {
+    transform: translateY(100%);
+  }
+
+  /* A winner before its pick is a revealed ticket like the rest: the draw has not happened yet. */
+  .ds[data-run] .ds-grid .c[data-s="3"]:not([data-won]) {
+    background: var(--cell-sold);
+    border-color: var(--bound);
+    color: var(--on-sold);
+    box-shadow: none;
+  }
+
+  .ds[data-run] .ds-grid .c[data-s="3"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 36%;
+    background: var(--event);
+    transform: translateY(100%);
+    transition:
+      transform var(--t-settle) var(--ease-rise),
+      opacity var(--t-settle) linear;
+  }
+
+  .ds[data-run] .ds-grid .c[data-s="3"][data-band]::after {
+    transform: none;
+  }
+
+  .ds[data-run] .ds-grid .c[data-s="3"][data-won]::after {
+    opacity: 0;
+  }
+
+  .ds[data-run] .ds-grid .c[data-dim] {
+    background: var(--cell);
+    border-color: var(--bound);
+    opacity: 0.55;
+  }
+
+  .ds[data-run] .ds-grid .c[data-glow] {
+    box-shadow: var(--shadow-node);
+  }
+
+  .ds[data-run] .ds-grid .c[data-cursor] {
+    background: var(--rose-hi);
+    color: var(--on-won);
+  }
+
+  .ds[data-run] .ds-grid .c[data-fly] {
+    z-index: 2;
+    transform: scale(1.25);
+  }
+
+  .ds[data-run] .ds-grid .c[data-recede] {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) and (min-width: 980px) {
+  .ds {
+    height: 560vh;
+  }
+}
+
+/* A phone: the grid above, the panel below, and the rail as five short bars. */
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) and (max-width: 979px) {
+  /* Not running: a phone has no room to hold the head, the chain and the sheet in one screen, so
+     the stage is not stuck at all and reads as the static section, at the top of its height. */
+  .ds:not([data-run]) .ds-stage {
+    position: relative;
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: clamp(48px, 8vw, 112px) var(--gutter) 0;
+  }
+
+  .ds:not([data-run]) .ds-statement > * {
+    margin-bottom: clamp(30px, 4vw, 56px);
+  }
+
+  .ds:not([data-run]) .ds-scene {
+    display: flex;
+  }
+
+  .ds[data-run] .ds-statement {
+    align-items: center;
+  }
+
+  .ds[data-run] .ds-scene {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 10px;
+    padding-top: calc(var(--mast) + 14px);
+    padding-bottom: 12px;
+  }
+
+  .ds[data-run] .ds-grid {
+    height: auto;
+    min-height: 0;
+  }
+
+  .ds[data-run] .ds-hud {
+    gap: 10px;
+    padding: 16px 16px 14px;
+    border-radius: 18px;
+  }
+
+  .ds[data-run]:not([data-hud="on"]) .ds-hud {
+    transform: translateY(30px);
+  }
+
+  .ds[data-run] .ds-rail > li {
+    height: 3px;
+    padding-top: 0;
+    border-top-width: 3px;
+    font-size: 0;
+  }
+
+  .ds[data-run] .ds-val {
+    font-size: 1.5rem;
+  }
+
+  .ds[data-run] .ds-pool {
+    padding-top: 10px;
+  }
+
+  /* Under the label step: see the pool strip above. */
+  .ds[data-run] .ds-pool-row > i > b {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) and (max-width: 639px) {
+  .ds[data-run] .ds-flash {
+    bottom: auto;
+    top: calc(50% + min(40cqw, 50cqh) + 10px);
+    font-size: 26px;
+  }
+}
+
+/* ------------------------------------------------------------------------------ THE BRAID */
+
+.braid {
+  position: relative;
+}
+
+.braid-stage {
+  position: relative;
+  height: 640px;
+  padding: 24px var(--gutter);
+}
+
+@media (max-width: 719px) {
+  .braid-stage {
+    height: 620px;
+  }
+}
+
+.braid-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .braid {
+    height: 240vh;
+  }
+
+  .braid-stage {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh;
+    padding: calc(var(--mast) + 24px) var(--gutter) 24px;
+  }
+}
+
+/* With no script there is nothing to draw it with, so it takes no room. */
+@media (scripting: none) {
+  .braid {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------------------ THE FIELD */
+
+.cfield-box {
+  position: relative;
+  min-height: 520px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  background: rgba(var(--dusk-rgb), 0.7);
+}
+
+@media (max-width: 639px) {
+  .cfield-box {
+    min-height: 420px;
+  }
+}
+
+.cfield-box > canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cfield-static {
+  position: absolute;
+  inset: 18px;
+  margin: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.95;
+  color: rgba(160, 132, 130, 0.55);
+}
+
+.cfield-box[data-drawn] .cfield-static {
+  visibility: hidden;
+}
+
+.cfield-cap {
+  margin-top: 12px;
+  color: var(--fg-3);
+}
+
+/* ------------------------------------------------------------------------------ THE CLOSE
+
+   One orb of the room's own light behind the last call to action, at the haze's 18% and no more,
+   so --fg-2 over its centre stays where the haze peak row in globals.css puts it. */
+.close-orb {
+  position: absolute;
+  right: -12vw;
+  top: -30%;
+  z-index: -1;
+  width: min(72vw, 900px);
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    rgba(var(--glow-rgb), 0.18),
+    rgba(var(--glow-rgb), 0.06) 38%,
+    transparent 64%
+  );
+}
+
+/* ------------------------------------------------------------------------------ SECTION FIVE
+   The section around the draw scene: padded like every other section when it is still, and run
+   edge to edge when it is pinned, because the stage then carries its own gutter. */
+.ds-section {
+  padding: clamp(48px, 8vw, 112px) var(--gutter);
+}
+
+.ds-after {
+  margin-top: clamp(26px, 3vw, 40px);
+}
+
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .ds-section {
+    padding: 0 0 clamp(48px, 8vw, 112px);
+  }
+
+  .ds-after {
+    margin-top: 0;
+    padding: 0 var(--gutter);
+  }
+}

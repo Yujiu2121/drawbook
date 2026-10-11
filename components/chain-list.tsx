@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 
 import {
@@ -15,6 +15,8 @@ import {
   shortMs,
   useNow,
 } from "@/components/chain-ui";
+import { Reveal } from "@/components/fx";
+import { useRowLight } from "@/components/live-rows";
 import { COUNTDOWN_RESERVE } from "@/lib/cell";
 import { listRaffles } from "@/lib/chain/actions";
 import { phaseOf, type ChainPhase, type ChainRaffle } from "@/lib/chain/program";
@@ -42,7 +44,33 @@ import { shortAddress } from "@/lib/raffle";
  * NO VIEW TRANSITION NAME. The sample rows name their strips for the morph into /raffle/[id]; a
  * live row goes to /r/[address], which names nothing, so naming this strip would start a morph with
  * nowhere to land.
+ *
+ * A ROW ARRIVES ONCE PER ADDRESS. The first time an address is listed in this document its row
+ * rises into place (app/cell.css, THE ROWS ENTERING), marked on the row itself in a layout effect,
+ * so before the browser has painted it. The thirty-second re-read lists the same addresses and
+ * moves nothing, a return from a raffle's page finds every address already seen, and a raffle
+ * deployed in another tab rises in alone when the next read finds it.
  */
+
+/** Every address whose row has already arrived in this document. Module memory, like the sort. */
+const arrived = new Set<string>();
+
+/*
+  THE LAST READ, KEPT FOR THE WAY BACK. Module memory again, for the return trip from a raffle's
+  page. The board is remounted by a soft navigation, and a list that started over from "loading"
+  was one sentence tall while BackLink put the remembered scroll back, so when the rows arrived
+  the board under them had grown and the reader's row was no longer where they left it (measured:
+  a row left at top 440 came back at 95). So a remount starts from the raffles last read, drawn at
+  once, and the thirty-second read refreshes them as before. If the clock has not ticked yet, the
+  loading sentence holds the height the rows last had. A hard load has empty memory, so the server
+  HTML and the hydration are exactly what they were.
+*/
+let lastRaffles: ChainRaffle[] | null = null;
+let lastListHeight = 0;
+
+/** The same eyebrow the board's section heads carry: an 11px apricot label behind a short rule. */
+const EYEBROW =
+  "label flex items-center gap-3 text-event before:h-px before:w-7 before:shrink-0 before:bg-event before:content-['']";
 
 type State =
   | { kind: "loading" }
@@ -97,6 +125,7 @@ function ChainRow({ r, phase, now }: { r: ChainRaffle; phase: ChainPhase; now: n
       href={`/r/${r.address}`}
       className="row"
       data-phase={phase}
+      data-addr={r.address}
       aria-label={`${title}, on ${NETWORK}, created by ${shortAddress(r.creator, 4, 4)}. ${CHAIN_PHASE_WORD[phase]}, ${r.sold} of ${r.supply} tickets sold, pool ${formatKelvin(pool)} RLO.`}
     >
       <span className="a-serial serial" style={{ fontSize: "var(--text-label)" }} title={r.address}>
@@ -159,14 +188,24 @@ function ChainRow({ r, phase, now }: { r: ChainRaffle; phase: ChainPhase; now: n
 
 export function ChainRaffleList() {
   const now = useNow();
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [state, setState] = useState<State>(() =>
+    lastRaffles !== null ? { kind: "ready", raffles: lastRaffles, stale: null } : { kind: "loading" },
+  );
+  const list = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLDivElement>(null);
+  // The light's listener sits on the section, which is mounted from the first render; the list
+  // inside it does not exist until the first read lands.
+  const section = useRef<HTMLElement>(null);
+  useRowLight(section);
 
   useEffect(() => {
     let alive = true;
     const read = async () => {
       try {
         const raffles = await listRaffles();
-        if (alive) setState({ kind: "ready", raffles, stale: null });
+        if (!alive) return;
+        lastRaffles = raffles;
+        setState({ kind: "ready", raffles, stale: null });
       } catch (error) {
         const message = describeError(error).text;
         if (!alive) return;
@@ -192,6 +231,47 @@ export function ChainRaffleList() {
   }, []);
 
   const rows = state.kind === "ready" && now > 0 ? order(state.raffles, now) : [];
+  const shownKey = rows
+    .slice(0, MAX_ROWS)
+    .map(({ r }) => r.address)
+    .join(" ");
+
+  /*
+    The arrival, before paint. Only addresses this document has not listed before are marked, each
+    with its place among the newcomers for the stagger, and the mark comes off when that row's
+    animations have finished so a later reorder of the list cannot replay it. Under a reduced
+    motion preference the address is still recorded as arrived, and nothing is marked.
+  */
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (el === null || shownKey === "") return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let place = 0;
+    for (const row of Array.from(el.querySelectorAll<HTMLElement>("a.row[data-addr]"))) {
+      const address = row.dataset.addr;
+      if (address === undefined || arrived.has(address)) continue;
+      arrived.add(address);
+      if (still) continue;
+      row.dataset.enter = "run";
+      row.style.setProperty("--enter-i", String(Math.min(place++, 7)));
+      const running = row.getAnimations({ subtree: true }).map((a) => a.finished);
+      void Promise.allSettled(running).then(() => {
+        row.removeAttribute("data-enter");
+        row.style.removeProperty("--enter-i");
+      });
+    }
+  }, [shownKey]);
+
+  // The height the rows took, from the column head to the foot of the section, so a remount whose
+  // clock has not ticked yet can hold it with the loading sentence. Read whenever rows are drawn.
+  useLayoutEffect(() => {
+    const top = head.current;
+    const bottom = section.current;
+    if (top === null || bottom === null) return;
+    const border = bottom.offsetHeight - bottom.clientHeight;
+    lastListHeight = Math.round(bottom.getBoundingClientRect().bottom - top.getBoundingClientRect().top - border);
+  });
+
   const liveCount = rows.filter(({ phase }) => phase !== "drawn" && phase !== "void").length;
   const meta =
     state.kind === "ready"
@@ -199,19 +279,23 @@ export function ChainRaffleList() {
       : [`on ${NETWORK}`];
 
   return (
-    <section aria-labelledby="chain-floor" className="border-b border-rule">
-      <div className="px-gutter pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1.5">
-          <h2 id="chain-floor" className="m-0 font-serif text-title">
+    <section ref={section} aria-labelledby="chain-floor" className="border-b border-rule">
+      {/* The meta line is the eyebrow: drawn above the heading by `-order-1`, read after it, so
+          the heading still opens the section for a screen reader. */}
+      <Reveal className="px-gutter pt-[clamp(26px,3.4vw,44px)] pb-[clamp(16px,2vw,24px)]">
+        <div className="flex flex-col gap-y-3">
+          <h2 id="chain-floor" className="m-0 headline-sub text-title">
             On chain
           </h2>
-          <p className="label text-fg-3">
-            {meta.map((part, i) => (
-              <span key={part}>
-                {i > 0 ? <span aria-hidden="true"> {"·"} </span> : null}
-                <span className="whitespace-nowrap">{part}</span>
-              </span>
-            ))}
+          <p className={`${EYEBROW} -order-1`}>
+            <span>
+              {meta.map((part, i) => (
+                <span key={part}>
+                  {i > 0 ? <span aria-hidden="true"> {"·"} </span> : null}
+                  <span className="whitespace-nowrap">{part}</span>
+                </span>
+              ))}
+            </span>
           </p>
         </div>
         <p className="mt-3 max-w-[58ch] text-sm text-fg-2">
@@ -219,10 +303,13 @@ export function ChainRaffleList() {
           signed transaction that moves {NETWORK} RLO, and the draw runs inside the program. Open one
           to buy, reveal, draw or claim.
         </p>
-      </div>
+      </Reveal>
 
       {state.kind === "loading" || (state.kind === "ready" && now === 0) ? (
-        <p className="px-gutter pb-[clamp(20px,3vw,32px)] text-sm text-fg-3">
+        <p
+          className="px-gutter pb-[clamp(20px,3vw,32px)] text-sm text-fg-3"
+          style={state.kind === "ready" && lastListHeight > 0 ? { minHeight: lastListHeight } : undefined}
+        >
           Reading the raffle program&rsquo;s accounts from {NETWORK}.
         </p>
       ) : state.kind === "error" ? (
@@ -240,7 +327,7 @@ export function ChainRaffleList() {
         </div>
       ) : (
         <>
-          <div className="rowhead label" aria-hidden="true">
+          <div ref={head} className="rowhead label" aria-hidden="true">
             <span className="a-serial">Acct</span>
             <span className="a-title">Raffle</span>
             <span className="a-phase">Stage</span>
@@ -248,7 +335,7 @@ export function ChainRaffleList() {
             <span className="a-pool">Pool</span>
             <span className="a-count">Closes</span>
           </div>
-          <div className="rows">
+          <div ref={list} className="rows pb-[clamp(20px,3vw,32px)]">
             {rows.slice(0, MAX_ROWS).map(({ r, phase }) => (
               <ChainRow key={r.address} r={r} phase={phase} now={now} />
             ))}

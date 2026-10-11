@@ -31,17 +31,24 @@ import { BUTTON_PRIMARY_SM } from "@/lib/controls";
  * Three islands subscribe to the store, and it is written for that: `started` is checked, not
  * counted, and teardown waits for `listeners.size === 0`. None of them runs a second poll.
  *
- * THE LINE IS A SURFACE, NOT A TINT. Counterfoil painted this bar as a translucent wash over the
- * page with a soft edge behind it. In this system the ground is the light source and ink is where
- * light is blocked, so there is nothing for a soft edge to be made of and no second light to tint
- * anything with. The masthead is simply the panel, drawn opaque, with one hairline rule along the
- * bottom. Content passing underneath is hidden by it rather than showing through, which is the
- * honest behaviour of an opaque object and also the only way a 15px figure stays readable while a
- * ticket bed scrolls behind it.
+ * THE LINE IS A FLOATING PILL, AND THE PILL IS A SIBLING, NEVER THE HEADER ITSELF. The header is
+ * still the fixed 56px box every route reserves with `pt-mast`, but it paints nothing. The glass,
+ * the blur, the cast shadow and the one-shot drop all live on the first child, an `aria-hidden`
+ * span 48px tall (inset 4px top and bottom) whose ends reach 12px past the gutter, so the content
+ * sits exactly where it sat on the old opaque bar, at every width. That split is load-bearing, not
+ * tidy: `backdrop-filter`, `filter` or a filling transform on the header would make it the
+ * containing block of every `position: fixed` element inside it, which is the menu panel, the
+ * wallet panel and ChainNotice, and all three would be re-parented into the pill and clipped to it.
+ * On a sibling they hang from the viewport as before. The span sits at z-index -1 inside the
+ * header's own stacking context, so it paints behind every child and nothing else changes order.
  *
- * The one consequence worth stating: `--panel` painted across the full width covers the fixed
- * diffusion film that `globals.css` hangs off `body::after`. It costs the film in the top 56px, at
- * 5.5% opacity, and it buys an opaque bar. The preview makes the same trade.
+ * The glass is 94% wine (app/globals.css, block 8), not the preview's 60%: the bar floats over the
+ * drum on the landing, and at 60% the dimmest text fell to 2.94 over an apricot band. Text in the
+ * pill is --fg, --fg-2, apricot-2 (FAUCET) and wine on the paper CTA. The worst body-size pair over
+ * the drum is --fg-2 at 7.87; the account ramp's --fg-2 label text is 4.87 at worst (label floor
+ * 4.5), and turns --fg on hover and while the panel is open (components/wallet-chip.tsx).
+ * The film at the top of the page now shows around the pill, as it should: the glass is a thing
+ * floating in the room, not a wall across it.
  *
  * THE NET CHIP CARRIES THE LIVE BLOCK HEIGHT RATHER THAN A COLOURED SQUARE. The approved preview
  * puts a small filled square beside the word "testnet" to say the chain is there. This product does
@@ -120,7 +127,22 @@ import { BUTTON_PRIMARY_SM } from "@/lib/controls";
  */
 export function Masthead() {
   return (
-    <header className="fixed inset-x-0 top-0 z-[80] flex h-mast flex-nowrap items-center gap-[clamp(10px,2vw,26px)] border-b border-rule bg-panel px-gutter whitespace-nowrap">
+    <header className="fixed inset-x-0 top-0 z-[80] flex h-mast flex-nowrap items-center gap-[clamp(10px,2vw,26px)] px-gutter whitespace-nowrap">
+      {/*
+        THE PILL. Decoration only, so it is aria-hidden and takes no pointer. 12px past the gutter
+        on each side so the content keeps its x-position; 4px in from the top and bottom so it is
+        48px inside the 56px budget. `animate-drop` fills backwards only, so once it lands the span
+        carries no transform at all (and under reduced motion it never had one). The four content
+        children run the same one-shot drop, so the glass and what is written on it land as one
+        object rather than the labels floating over the bare page while the glass catches up. For
+        those 900ms the right-hand group is a containing block for the two panels inside it, which
+        only matters if one is opened before the bar has landed; after that nothing is filled.
+      */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-1 inset-x-[calc(var(--gutter)-12px)] -z-1 rounded-pill glass shadow-pill animate-drop"
+      />
+
       {/*
         The identity and the nav are wrapped rather than handed a class. Every child of this bar is
         owned by another file, and a wrapper asks those files for nothing but their name.
@@ -130,16 +152,16 @@ export function Masthead() {
       <Link
         href="/"
         aria-label="Drawbook, home"
-        className="-ml-[15.5px] flex h-11 w-11 shrink-0 items-center justify-center sm:hidden"
+        className="-ml-[15.5px] flex h-11 w-11 shrink-0 animate-drop items-center justify-center sm:hidden"
       >
         <LogoMark className="h-[13px] w-[13px]" />
       </Link>
 
-      <span className="hidden shrink-0 items-center sm:flex">
+      <span className="hidden shrink-0 animate-drop items-center sm:flex">
         <Wordmark />
       </span>
 
-      <div className="hidden shrink-0 xl:flex xl:items-center">
+      <div className="hidden shrink-0 animate-drop xl:flex xl:items-center">
         <NavLinks />
       </div>
 
@@ -151,7 +173,7 @@ export function Masthead() {
         is touched through a 44px target (`tap`, app/globals.css block 7) that this gap keeps clear
         of its neighbours'.
       */}
-      <div className="ml-auto flex shrink-0 items-center gap-[clamp(8px,1.2vw,16px)]">
+      <div className="ml-auto flex shrink-0 animate-drop items-center gap-[clamp(8px,1.2vw,16px)]">
         <BackLink />
         <NetChip />
         <WalletChip />

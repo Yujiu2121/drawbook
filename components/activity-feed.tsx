@@ -1,3 +1,4 @@
+import { Reveal } from "@/components/fx";
 import { serialOf } from "@/lib/cell";
 import { NOW } from "@/lib/mock-raffles";
 import {
@@ -38,33 +39,34 @@ import {
  *                   that would push a sentence onto a second line, and it is the least useful
  *                   column of the three.
  *
- * THE LIST CARRIES `text-fg`, AND THAT ONE CLASS IS THE WHOLE INVERSION.
+ * THE ENTRIES RISE ONCE. Each line is a `Reveal` (components/fx.tsx): one still below the fold
+ * when the page mounts fades and rises into place the first time it is scrolled to, 50ms after
+ * the line above it; one already on screen is never hidden to be shown again, and with no script
+ * or under a reduced-motion preference every line is simply there. Nothing here is a row, a strip
+ * or a named element, which is why the feed may move at all.
+ *
+ * THE LIST CARRIES `text-fg`, AND THAT ONE CLASS IS THE WHOLE TRICK.
  *
  * `body { color: var(--fg) }` substitutes the var at the body element, so every descendant
- * inherits the resolved rgb of --ink and NOT the custom property. A feed that let its sentences
- * inherit would render ink on ink inside `.inv`: measured in Chromium at 1280, the void raffle's
- * "voided, everyone refunded" came out rgb(22,20,44) on rgb(46,44,74), a ratio of 1.35. The
- * `text-fg` on the <ul> re-resolves --fg at the list, so the sentence and the amount follow the
- * block. This is the same trap app/cell.css documents at `.row` (cell.css:424) and the same fix.
+ * inherits the resolved rgb and NOT the custom property. A section that redefines --fg would
+ * leave a feed that let its sentences inherit in the body's colour. The record tone no longer
+ * redefines --fg, so today nothing on the page does that, but the `text-fg` on the <ul>
+ * re-resolves the role at the list either way, so the sentence and the amount always follow the
+ * block they sit in. app/cell.css makes the same choice for `.row`.
  *
  * CONTRAST, COMPUTED (WCAG 2.x relative luminance, 0.03928 knee,
  * L = 0.2126R + 0.7152G + 0.0722B, formula sanity-checked at #ffffff on #000000 = 21.00), each
  * pair against the surface it actually sits on:
  *
- *   sentence, amount   --fg / --panel      15.01 light, 15.01 inverted
- *   age, serial, actor --fg-3 / --panel     5.73 light,  5.65 inverted
- *   empty-state note   --fg-3 / --panel     5.73 light,  5.65 inverted
- *   hairline           --rule / --panel     1.71 light,  1.35 inverted, decorative only
+ *   sentence, amount   --fg / --panel      16.38 on the ground, 14.98 in the record tone
+ *   age, serial, actor --fg-3 / --panel     5.58 on the ground,  5.10 in the record tone
+ *   empty-state note   --fg-3 / --panel     5.58 on the ground,  5.10 in the record tone
+ *   hairline           --rule / --panel     1.70 on the ground,  1.55 in the record tone,
+ *                                                decorative only
  *
- * The feed carries no surface of its own, so a page owner may set it on a plate or on a raffle in
+ * The feed carries no surface of its own, so a page owner may set it on a panel or on a raffle in
  * its reveal window without recomputing: the tightest pair it can make is --fg-3 on --phase at
- * 4.79, and on --panel-2 it is 5.27. Both clear AA for the 13px it is set at.
- *
- * The feed on a record raffle sits inside `.inv`, which is why both columns are quoted. It is
- * never placed inside a `.recess`, and the reason is the hairline rather than the text: inside an
- * inverted well --rule and the well itself are both --line-inv, so every separator between events
- * disappears and the feed loses the one rule it has. The text would survive that move, because
- * `.inv .recess` lifts --fg-3 to --paper-2 (5.57) and --fg is 11.15 on the well.
+ * 4.76, and on --panel-2 it is 5.13. Both clear AA for the 13px it is set at.
  */
 
 /** Two digits on a ticket serial, matching the cells in components/cell.tsx. */
@@ -98,6 +100,7 @@ export function ActivityFeed({
   limit,
   title = "Activity",
   scope = "raffle",
+  headClass = "label text-fg-3 mb-2.5",
 }: {
   events: readonly Activity[];
   /** Pinned, and never a live clock. Defaults to the same NOW every raffle is built against. */
@@ -111,20 +114,27 @@ export function ActivityFeed({
    */
   title?: string;
   scope?: "raffle" | "all";
+  /**
+   * The heading's classes. A raffle's page keeps the plain label; the board passes its section
+   * eyebrow, so this head and the notes beside it read as one rank.
+   */
+  headClass?: string;
 }) {
   const shown = limit === undefined ? events : events.slice(0, limit);
 
   return (
     <section>
-      <h2 className="label text-fg-3 mb-2.5">{title}</h2>
+      <h2 className={headClass}>{title}</h2>
 
       {shown.length === 0 ? (
         <p className="text-sm text-fg-3 border-t pt-2.5">Nothing has happened here yet.</p>
       ) : (
         <ul aria-label={title} className="text-fg border-t text-sm">
           {shown.map((event, i) => (
-            <li
+            <Reveal
+              as="li"
               key={`${event.raffleId}-${event.kind}-${event.ticketIndex ?? "x"}-${i}`}
+              delay={Math.min(i, 6) * 50}
               /*
                 76px of age, then the sentence, then the amount hard right. The age column is
                 4.5rem rather than the preview's 64px below 760: seven glyphs of Martian Mono at
@@ -158,7 +168,7 @@ export function ActivityFeed({
                   {formatRLO(event.amount)} RLO
                 </span>
               )}
-            </li>
+            </Reveal>
           ))}
         </ul>
       )}

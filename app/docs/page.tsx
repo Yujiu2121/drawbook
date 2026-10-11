@@ -78,14 +78,15 @@ export const metadata = {
  * quotes for 376 bytes). Both are stated in "What runs on chain", the second again under payouts,
  * rather than left for a reader to discover.
  *
- * Layout: quiet by design, like /learn. A reading room, lit flat. The only recess on the page is
- * where it quotes the machine (layouts, preimages, the keystream, inline identifiers); every
- * formula block scrolls inside its own well on a phone rather than widening the page.
+ * Layout: a reading room at dusk, like /learn, on the product's gutter rather than in a centred
+ * box, with motion on decoration only. The only recess on the page is where it quotes the machine
+ * (layouts, preimages, the keystream, inline identifiers); every formula block scrolls inside its
+ * own well on a phone rather than widening the page.
  */
 export default function DocsPage() {
   return (
     <>
-      <main className="mx-auto w-full max-w-[1180px] px-5 pb-20">
+      <main className="w-full px-gutter pb-24">
         <PageHead
           eyebrow="Docs"
           title="The program, in full."

@@ -1,0 +1,90 @@
+/* ==========================================================================================
+   DRUM: THE SHARED EFFECTS
+
+   The CSS half of components/fx.tsx. Two effects, both opt-in per element, both absent with no
+   script and under reduced motion:
+
+     [data-reveal]   content rising into view as it is scrolled to
+     .tilt           a card leaning toward a fine pointer, with an optional glare
+
+   Neither may be put on a board row, a .strip, a .blade, a .sheet, or any element that carries a
+   view-transition name or contains one. A transform on an ancestor of a named element changes
+   the rectangle the route morph flies from, and app/motion.css cannot correct for it.
+   ========================================================================================== */
+
+/* ------------------------------------------------------------------------------ REVEAL
+
+   The server renders no attribute, so the content is visible in the first paint, with no script,
+   in a crawler and in print. After mount, <Reveal> arms only an element whose top is already
+   below the viewport (so nothing the reader can see ever disappears), and only when reduced motion
+   is off. Arming hides it and drops it 36px; intersecting sets data-seen and it rises into place.
+
+   Transform and opacity only: the element keeps its box the whole time, so nothing below it moves
+   and the reveal costs no layout shift. Do not give the revealed element a transform of its own;
+   [data-seen] resolves it to none. Nest a <Tilt> inside a <Reveal> instead. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal="armed"] {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+
+  [data-reveal="armed"][data-seen] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity var(--t-rise) var(--ease-rise) var(--reveal-delay, 0ms),
+      transform var(--t-rise) var(--ease-rise) var(--reveal-delay, 0ms);
+  }
+}
+
+/* ------------------------------------------------------------------------------ TILT
+
+   <Tilt> writes five custom properties from the pointer, on a fine pointer only:
+     --rx, --ry   the lean, in degrees, never more than the component's max (6 by default)
+     --mx, --my   where the pointer is, as percentages of the box, for the glare
+     --glare      0 at rest, 1 while the pointer is over the card
+   Under reduced motion the component writes nothing, and the rules below do not exist either, so
+   a stale value can never lean a card.
+
+   The lean is a transform on the card itself. While the pointer moves it follows in 80ms, so the
+   card tracks the hand rather than trailing it; on leave it eases back on the rise curve. */
+@media (prefers-reduced-motion: no-preference) {
+  .tilt {
+    transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 500ms var(--ease-rise);
+  }
+
+  .tilt[data-tilt="live"] {
+    transition: transform 80ms linear;
+  }
+
+  /* The glare is a light the pointer carries across the card: apricot fading out by 45% of a
+     420px circle. It sits under the content (z-index -1 inside the card's own isolated stacking
+     context, so above the card's background and below its text) and takes no pointer events.
+
+     4% AND NOT THE PREVIEW'S 13%, BECAUSE TEXT SITS UNDER THE POINTER. At its centre, 13% apricot
+     over the card ramp's top stop composited on the haze (#2f141e) puts --fg-3 at 3.61. At 4% the
+     worst case is 4.55 there, 4.65 over the plain ground and 4.68 on the record tone. On a card
+     that paints --phase, --fg-3 would fall to 4.37 under the centre, so .tilt-glare never goes on
+     a card in its reveal window: the glare is for the --ramp-card material only. */
+  .tilt-glare {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .tilt-glare::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 0%),
+      rgba(var(--apricot-rgb), 0.04),
+      transparent 45%
+    );
+    opacity: var(--glare, 0);
+    transition: opacity 300ms var(--ease-settle);
+  }
+}

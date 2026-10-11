@@ -7,6 +7,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import { Blade, PHASE_WORD, Sheet } from "@/components/cell";
 import { Ceremony, CeremonyLedger } from "@/components/ceremony";
 import { Countdown, CountdownRules } from "@/components/countdown";
+import { Reveal, Tilt } from "@/components/fx";
 import { ArrivalScroll } from "@/components/row-link";
 import { activeDeadline, isInverted, isLive, serialOf, utcStamp } from "@/lib/cell";
 import { CLOCK_NOTE, PINNED_STAMP } from "@/lib/clock";
@@ -69,10 +70,17 @@ import { AuditRecompute, PresentHalf, type PresentableStub } from "./counter";
  *
  * EVERYTHING ELSE ON THIS PAGE IS A SERVER COMPONENT. The pool figure, the deadlines, the ticket
  * bed, the facts, the holdings, the winners and the audit are all pure functions of the record,
- * rendered once into static HTML. Three small islands are mounted inside it and no more: the
- * countdown and its two meters (a clock), the counter (the reveal check and the recompute), and,
- * on raffle 0004 alone, the ceremony. Each takes server-rendered nodes as props rather than data
- * to re-render.
+ * rendered once into static HTML. Three small islands carry state: the countdown and its two
+ * meters (a clock), the counter (the reveal check and the recompute), and, on raffle 0004 alone,
+ * the ceremony. Two more carry only motion, from components/fx.tsx: <Reveal> raises the ticket bed
+ * once as it is scrolled to, and <Tilt> leans the winner cards and the buy stub toward a fine
+ * pointer. Both render their children exactly as the server sent them, so with no script and
+ * under reduced motion the page is the same page, standing still. Each island takes
+ * server-rendered nodes as props rather than data to re-render.
+ *
+ * NEITHER MOTION ISLAND TOUCHES THE BLADE. A transform on the blade or on any ancestor of it moves
+ * the rectangle the route morph flies to, so the blade's ancestors carry no transform, filter or
+ * backdrop filter, and the light behind it lives on an unnamed layer beside it. See `BladeLight`.
  *
  * NOTHING IS EMBEDDED. Every figure below comes from `summarize`, `payouts`, `auditWinners`,
  * `activityOf` and `deriveWinnerTrace` over the real `MOCK_RAFFLES`. There is no literal ticket
@@ -160,9 +168,23 @@ function pad2(n: number): string {
 
 /* ------------------------------------------------------------------ small pieces */
 
-/** The uppercase caption over a block. One voice, one colour, one size, defined once. */
-function Cap({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`label text-fg-3 ${className}`}>{children}</div>;
+/**
+ * The uppercase caption over a block. One voice and one size, defined once, and --fg-3 unless the
+ * caller names the one other tone a caption may take: `text-event`, the apricot signal, for the
+ * unit under the pool. The tone is a prop rather than a second class from the caller, because two
+ * colour utilities on one element are settled by stylesheet order, not by the order they are
+ * written in.
+ */
+function Cap({
+  children,
+  className = "",
+  tone = "text-fg-3",
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: "text-fg-3" | "text-event";
+}) {
+  return <div className={`label ${tone} ${className}`}>{children}</div>;
 }
 
 /**
@@ -191,16 +213,16 @@ function Head2({
 
 /**
  * The well: a formula, a preimage, a payload. Cut into the page rather than raised off it, which
- * is what `--recess` means.
+ * is what `--recess` means: the pit on the floor, and dusk inside the record tone, so on 0004 and
+ * 0005 the well is the page colour sunk into a wine route. Rounded at --radius-well, the same
+ * radius as the ticket bed, because both are something cut into the surface.
  *
- * The bare `recess` class next to `bg-recess` is not a duplicate. `bg-recess` is the Tailwind
- * utility that paints the surface; `.recess` is the hook globals.css uses to lift `--fg-3` to
- * `--paper-2` inside an inverted well, where `--paper-3` on `--line-inv` would be 4.20 and fail.
- * Raffles 0004 and 0005 render inverted and both carry a note inside a well, so the hook is the
- * difference between 4.20 and 5.57 on two of the five routes.
+ * --fg on the well is 17.03 on the floor and 16.38 in the record; --fg-3, which a note inside a
+ * well may use, is 5.80 and 5.58. The `.recess` hook that used to lift --fg-3 inside an inverted
+ * well is gone with the light ground it repaired, so the bare class is gone from here too.
  */
 function Well({ children }: { children: ReactNode }) {
-  return <div className="recess bg-recess overflow-x-auto px-4 py-3.5">{children}</div>;
+  return <div className="overflow-x-auto rounded-well bg-recess px-4 py-3.5">{children}</div>;
 }
 
 /**
@@ -230,7 +252,7 @@ function Fact({ term, children }: { term: string; children: ReactNode }) {
       <th className="w-[44%] border-b border-rule py-2.5 text-left align-top font-normal text-fg-3">
         {term}
       </th>
-      <td className="figure border-b border-rule py-2.5 text-right align-top break-normal [overflow-wrap:anywhere]">
+      <td className="figure border-b border-rule py-2.5 text-right align-top break-normal text-fg [overflow-wrap:anywhere]">
         {children}
       </td>
     </tr>
@@ -320,6 +342,12 @@ function leadParagraph(raffle: Raffle): string {
  * block per instant with the term over the stamp; from 560px it is three columns. Term and stamp
  * side by side was tried first and measured: at 360 the label plus a 21-glyph stamp needs about
  * 331px of a 318px line, so the stamp broke before "UTC".
+ *
+ * THE MATERIAL. One `card`, rounded at --radius-row, with the three instants divided by --bound
+ * hairlines (3.62 against the card) rather than by --rule: the dividers are what make three
+ * stamps read as three cells, so they are the boundary the strip is about, and the card's own
+ * --rule edge is only where it stops. The labels are --fg-3 on the card ramp, 5.08 over the
+ * ground and 4.92 at the top of the haze.
  */
 function Deadlines({ raffle }: { raffle: Raffle }) {
   const { config, phase } = raffle;
@@ -341,7 +369,7 @@ function Deadlines({ raffle }: { raffle: Raffle }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 border border-bound min-[560px]:grid-cols-3">
+    <div className="card grid grid-cols-1 overflow-hidden rounded-row min-[560px]:grid-cols-3">
       {cells.map((cell) => (
         <div
           key={cell.term}
@@ -362,9 +390,10 @@ function Deadlines({ raffle }: { raffle: Raffle }) {
  * components/countdown.tsx publishes on the element precisely because a function prop cannot
  * cross the server boundary:
  *
- *   final hour  the figure takes the ceremonial hue. lib/cell.ts names this the one clock
- *               reading in the system allowed to. --event on --panel is 7.05 light, 8.01
- *               inverted, so it is a colour change that is also legible.
+ *   final hour  the figure takes the apricot signal. lib/cell.ts names this the one clock
+ *               reading in the system allowed to. --event on --panel is 13.45, so it is a colour
+ *               change that is also legible. Never coral:
+ *               coral is a winner, and a clock running out is not one.
  *   coarse      the two meters are hidden. They are an hour long and a minute long, so more than
  *               48 hours out they are the second hand of a clock whose hour hand is off the page.
  *
@@ -417,6 +446,24 @@ function Clock({ raffle }: { raffle: Raffle }) {
 
 /* ------------------------------------------------------------------- the winners */
 
+/**
+ * One drawn ticket, as a card that leans toward the pointer and gives off the winner's light.
+ *
+ * Coral is spent here twice and both times on the winner: the index, `text-cell-won`, at 6.17 on
+ * the card ramp in the record tone, and the card's own glow, `shadow-win-lg`, which breathes on
+ * the 2.8s `winbreathe` loop. That loop is one of the few the system allows, and it is gated by
+ * state twice over: this card only exists on a drawn raffle, and the loop is removed outright
+ * under reduced motion (app/globals.css), leaving the glow at rest. The breathe never touches the
+ * index or the payout, so nothing a reader is reading moves.
+ *
+ * The glow reaches about 30px past the card, so the heading above the pair keeps 20px of air and
+ * the pair keeps 20px between them. Measured in the rendered pixels, --fg-3 on "The draw" is 4.79
+ * with the glow at rest and 4.90 at the breathe's peak; inside the card it is 4.9 or more.
+ *
+ * <Tilt> is the card itself rather than a wrapper around it, because its glare is drawn under the
+ * card's content and over the card's own background, which only works on the element that paints
+ * that background. Neither the tilt nor the glow is anywhere near the blade.
+ */
 function WinnerCard({
   raffle,
   index,
@@ -432,9 +479,13 @@ function WinnerCard({
   const paid = payouts(raffle).get(index) ?? 0;
 
   return (
-    <div className="flex items-start gap-4 border border-bound p-4">
+    <Tilt
+      max={6}
+      glare
+      className="card flex items-start gap-4 rounded-card p-5 shadow-win-lg animate-winbreathe"
+    >
       <div
-        className="monument text-event"
+        className="monument text-cell-won"
         style={{ fontSize: "clamp(2.4rem, 5vw, 4rem)" }}
       >
         {pad2(index)}
@@ -448,12 +499,12 @@ function WinnerCard({
           {ticket?.holder ? shortAddress(ticket.holder, 8, 8) : "unknown"}
         </p>
         {ticket?.holder === VIEWER && (
-          <span className="label mt-2 inline-block border border-bound px-1.5 py-0.5 text-fg-2">
+          <span className="label mt-2 inline-block rounded-pill border border-bound px-2 py-0.5 text-fg-2">
             {VIEWER_LABEL}
           </span>
         )}
       </div>
-    </div>
+    </Tilt>
   );
 }
 
@@ -564,11 +615,11 @@ function Audit({ raffle }: { raffle: Raffle }) {
         </Note>
       ) : (
         /*
-          A mismatch refuses in words and in reversed print, never in the ceremonial hue. That
-          hue means a winner in this product, and a fraud dressed as a celebration would be the
-          worst thing this page could do.
+          A mismatch refuses in words and in reversed print (a chalk block with the page's own
+          colour as ink, 16.38), never in coral. Coral means a winner in this product, and a fraud
+          dressed as a celebration would be the worst thing this page could do.
         */
-        <div className="mt-3 border border-bound">
+        <div className="mt-3 overflow-hidden rounded-card border border-bound">
           <p className="label bg-fg px-4 py-3 text-panel">This draw does not check out</p>
           <div className="px-4 py-4">
             <Note>
@@ -622,25 +673,33 @@ function Audit({ raffle }: { raffle: Raffle }) {
  * and its clock is pinned. Then it hands the reader to the two places where something real
  * happens: the live raffles at the top of /raffles, and /create.
  *
- * A bounded block rather than a surface change, because an inverted route has no second surface
- * to change to (--panel and --panel-2 are both ink inside `.inv`), and a boundary reads on both.
- * No hue: the one accent means a winner or a live clock, and a disclosure is neither. It is an
- * `aside` with its own name rather than a heading, so the raffle's title stays the page's first
- * heading and the outline does not open on a caveat.
+ * A card rather than a surface change, because a route in the record tone has no second surface
+ * to change to (--panel and --panel-2 are both wine inside `.inv`), and the card's ramp and edge
+ * read on both. It is the in-page `card`, not the chrome's `glass`: it sits on the page rather than
+ * over the drum, so it has nothing to blur. Its label is the apricot signal, 12.25 on the card,
+ * because this is the one thing on the page a reader must not miss, and NEVER coral: coral means
+ * a winner, and a disclosure is not one. The sentence under it is --fg-2, 8.84 on the card.
+ *
+ * It is an `aside` with its own name rather than a heading, so the raffle's title stays the page's
+ * first heading and the outline does not open on a caveat.
+ *
+ * The two links sit side by side down to 390 wide: under 430 their padding drops to 16px, so the
+ * pair needs 298px of the card's 308. Under 560 they grow to fill the row, so where they do wrap
+ * (360) each is a full-width centred pill rather than two ragged ones.
  */
 function SampleNotice({ raffle }: { raffle: Raffle }) {
   return (
     <aside
       aria-label="Sample raffle, not on chain"
-      className="mb-[clamp(22px,3vw,36px)] flex flex-col gap-4 border border-bound px-4 py-4 min-[860px]:flex-row min-[860px]:items-center min-[860px]:justify-between min-[860px]:gap-8"
+      className="card mb-[clamp(22px,3vw,36px)] flex flex-col gap-4 rounded-panel px-5 py-5 min-[860px]:flex-row min-[860px]:items-center min-[860px]:justify-between min-[860px]:gap-8 min-[860px]:px-6"
     >
       <div className="min-w-0">
-        <p className="label text-fg">Sample raffle &middot; not on chain</p>
+        <p className="label text-event">Sample raffle &middot; not on chain</p>
         <p className="mt-2 max-w-[68ch] text-sm text-fg-2">
           {`Raffle ${serialOf(raffle)} is one of ${MOCK_RAFFLES.length} samples: fixed demonstration data in this site’s code, not an account on Rialo. Nothing here can be bought, revealed or drawn, and nothing is signed or sent. Its clock runs from a pinned ${PINNED_STAMP}. Live raffles on Rialo testnet are at the top of Raffles.`}
         </p>
       </div>
-      <div className="flex shrink-0 flex-wrap gap-2.5">
+      <div className="flex shrink-0 flex-wrap gap-2.5 max-[559px]:[&>a]:grow max-[559px]:[&>a]:justify-center max-[429px]:[&>a]:px-4">
         <Link href="/raffles" className={BUTTON_PRIMARY}>
           Live raffles
         </Link>
@@ -662,7 +721,8 @@ function SampleNotice({ raffle }: { raffle: Raffle }) {
  * program would be the lie the old honesty rule existed to prevent, so the stub keeps what is true
  * about this sample (the price, the bond, the next free number) and its one control goes to where
  * a ticket can genuinely be bought. No wallet is read and nothing is composed, so it needs no
- * client boundary at all.
+ * client boundary of its own; the only island in it is <Tilt>, which gives the stub card a gentle
+ * 4 degree lean toward a fine pointer and carries no data.
  */
 function SampleStub({ raffle, next }: { raffle: Raffle; next: Ticket }) {
   const { config } = raffle;
@@ -689,7 +749,7 @@ function SampleStub({ raffle, next }: { raffle: Raffle; next: Ticket }) {
           </Note>
         </div>
 
-        <div className="flex flex-col gap-3 border border-bound p-4">
+        <Tilt max={4} glare className="card flex flex-col gap-3 rounded-card p-5">
           <span className="label text-fg-3">Stub</span>
 
           <div className="flex flex-wrap items-baseline gap-x-2">
@@ -713,11 +773,101 @@ function SampleStub({ raffle, next }: { raffle: Raffle; next: Ticket }) {
             makes a secret in your browser, files only its hash with the ticket, and sends a real
             signed Buy transaction from a testnet wallet held in this browser.
           </p>
-        </div>
+        </Tilt>
       </div>
     </section>
   );
 }
+
+/* ------------------------------------------------------------------ the blade's light */
+
+/**
+ * THE LIGHT BEHIND THE BLADE, ON A LAYER THAT IS NOT THE BLADE.
+ *
+ * The blade is the named element of the route morph, and anything a named element paints outside
+ * its own border box is clipped by `::view-transition-image-pair { overflow: clip }` for the
+ * whole flight and pops back on the last frame (app/motion.css). So the blade carries no glow, and
+ * neither does any ancestor of it. The light is this unnamed sibling instead: an empty layer that
+ * starts at the blade's lower edge and falls down the page behind everything else, so it belongs
+ * to the root snapshot and simply arrives with the page.
+ *
+ * Two lights, both in the room's own colours. The wine glow (the --glow of the haze, at 14%) is
+ * on every route. On a drawn raffle each winning column also throws a coral bloom straight down,
+ * centred on that ticket's column of the blade, so the two winners light the page under them; coral
+ * means a winner, and these blooms exist only where one is drawn. The column centre is
+ * (index - 0.5) / supply of the width, which is where the blade's equal columns put it to within
+ * its 2px padding.
+ *
+ * It sits under the text, so it was measured under the text: the dimmest text it reaches is the
+ * "The draw" heading beside the winner glow, 4.79 on raffle 0004 at 390 wide, then the "Facts"
+ * heading at 4.91 on raffle 0005; the --fg-3 terms of the facts card keep 4.92 or more, so every
+ * word on every route stays above 4.5. The sample notice's apricot label and --fg-2 sentence keep
+ * 10 and 7. The layer is -z-10 inside
+ * <main>, which is isolated for exactly this, so on a record route it paints over the wine and
+ * under every word; on a floor route it lies over the haze.
+ *
+ * Positions and widths are percentages of the layer, which is the width of the page, so a bloom is
+ * always about three and a half columns wide. Not max(px, %): Chromium rejects a math function
+ * mixing the two in a radial size, and one invalid layer drops the whole background with no
+ * error. Nothing here reads a clock or a random source, so the server and the first client frame
+ * agree.
+ */
+function BladeLight({ raffle }: { raffle: Raffle }) {
+  const { supply } = raffle.config;
+  const layers: string[] = [];
+
+  if (raffle.phase === "drawn") {
+    for (const index of raffle.winningTickets) {
+      const x = (((index - 0.5) / supply) * 100).toFixed(2);
+      layers.push(
+        `radial-gradient(${(360 / supply).toFixed(2)}% 200px at ${x}% 0, rgba(var(--coral-rgb), 0.14), transparent 72%)`,
+      );
+    }
+  }
+
+  layers.push(
+    "radial-gradient(64% 100% at 50% 0, rgba(var(--glow-rgb), 0.14), transparent 72%)",
+  );
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 top-full -z-10 h-[clamp(220px,28vw,380px)]"
+      style={{ backgroundImage: layers.join(", ") }}
+    />
+  );
+}
+
+/**
+ * THE BED'S ENTRANCE, written against the attributes <Reveal> sets on the wrapper.
+ *
+ * While the wrapper is armed and not yet seen, every cell waits at 60% of its size and invisible;
+ * once seen, each one grows back on the rise curve, 18ms after the cell before it, so the bed
+ * fills in reading order. `sibling-index()` gives each cell its place without a style attribute
+ * per cell; a browser without it drops the delay and the cells come in together.
+ *
+ * The transition is marked important, and that is the reason this works at all: app/cell.css is
+ * unlayered and gives every `.c` its own `transition: background-color`, and unlayered CSS beats
+ * every Tailwind utility however specific. An important declaration in a layer beats an unlayered
+ * normal one. background-color stays in the list, so the fill transition cell.css wants is still
+ * there afterwards.
+ *
+ * It never runs unseen: <Reveal> arms only a bed that is below the fold when the page mounts and
+ * only with motion allowed, and every rule here is gated on that attribute, so with no script,
+ * under reduced motion, and for a bed already on screen the cells are exactly as the server drew
+ * them. `scale` and `opacity` only, so the bed keeps its box and nothing below it moves.
+ */
+const SHEET_ENTRY = [
+  "[&[data-reveal=armed]:not([data-seen])_.c]:scale-[0.6]",
+  "[&[data-reveal=armed]:not([data-seen])_.c]:opacity-0",
+  "[&[data-reveal=armed][data-seen]_.c]:transition-[scale,opacity,background-color]!",
+  "[&[data-reveal=armed][data-seen]_.c]:duration-[var(--t-enter)]!",
+  "[&[data-reveal=armed][data-seen]_.c]:ease-rise!",
+  "[&[data-reveal=armed][data-seen]_.c]:delay-[calc(sibling-index()*18ms)]!",
+].join(" ");
+
+/** The facts and holdings panel: the in-page card, with the last table row's rule removed. */
+const FACTS_CARD = "card rounded-card px-5 pt-4 pb-1 [&_tr:last-child>*]:border-b-0";
 
 /* ------------------------------------------------------------------------- route */
 
@@ -769,12 +919,18 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
   return (
     <main
       /*
-        An inverted route is a different material, not a tint: a raffle that has left the floor is
-        drawn on ink and the whole route follows through the role tokens, with no second rule
-        anywhere below. It paints --panel because it genuinely is another surface; a lit route
-        paints nothing at all, so the diffusion film under the body shows through it.
+        A raffle that has left the floor is drawn in the record tone, one step into wine: `.inv`
+        moves --panel, --panel-2 and --phase to wine and --recess to dusk, and every role below
+        follows with no second rule. It paints --panel because it genuinely is another surface; a
+        floor route paints nothing at all, so the haze and the film under the body show through it.
+        A sample page is born settled, so there is no settle transition here: that belongs to a
+        live raffle at /r, which can turn while you watch.
+
+        `relative isolate` makes <main> the stacking context the blade's light hangs in, so the
+        light paints over the wine and under every word. Isolation is not a transform, a filter or
+        a backdrop filter, so the blade, a descendant, still morphs from an untouched rectangle.
       */
-      className={`pt-mast pb-[clamp(48px,8vw,104px)] ${inverted ? "inv bg-panel text-fg" : ""}`}
+      className={`relative isolate pt-mast pb-[clamp(48px,8vw,104px)] ${inverted ? "inv bg-panel text-fg" : ""}`}
     >
       {/*
         The other half of the board's `scroll={false}`. The router places no scroll on a dive, so
@@ -789,9 +945,12 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
         boundary. Its own aria-label is the raffle's state as a sentence, so the largest object on
         the page announces as one image rather than as forty anonymous marks.
       */}
-      <ViewTransition name={`cell-${config.id}`}>
-        <Blade raffle={raffle} />
-      </ViewTransition>
+      <div className="relative">
+        <ViewTransition name={`cell-${config.id}`}>
+          <Blade raffle={raffle} />
+        </ViewTransition>
+        <BladeLight raffle={raffle} />
+      </div>
 
       <div className="px-gutter pt-[clamp(24px,4vw,52px)]">
         <SampleNotice raffle={raffle} />
@@ -808,7 +967,11 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
               {formatRLO(phase === "void" ? voidReturns(raffle).total : s.pool)}
             </div>
 
-            <Cap className="mt-2.5">RLO{subtitle ? ` · ${subtitle}` : ""}</Cap>
+            {/* The unit takes the apricot signal, 13.45; the figure above stays solid --fg,
+                because a ticking clock lives beside it and nothing that ticks is ever ramped. */}
+            <Cap className="mt-2.5" tone="text-event">
+              RLO{subtitle ? ` · ${subtitle}` : ""}
+            </Cap>
 
             {/*
               `tabIndex={-1}` so a keyboard arrival from a board row can land here. Without it the
@@ -819,7 +982,7 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
             <h1
               id="raffle-title"
               tabIndex={-1}
-              className="font-serif mt-[22px] mb-[18px] text-display"
+              className="headline mt-[22px] mb-[18px] text-display"
             >
               {config.title}
             </h1>
@@ -840,7 +1003,9 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
                 claim about whose ticket it is, and this page has read no wallet: it was rendered
                 before any browser opened it. The caption under the bed says which claim it is.
               */}
-              <Sheet raffle={raffle} mine={heldIndices} />
+              <Reveal className={SHEET_ENTRY}>
+                <Sheet raffle={raffle} mine={heldIndices} />
+              </Reveal>
 
               {heldIndices.length > 0 && (
                 <Note className="mt-2.5">
@@ -867,10 +1032,10 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
             {/* -------------------------------------------------------- the winners */}
             {phase === "drawn" && raffle.winningTickets.length > 0 && (
               <section aria-labelledby="winners-heading" className="mt-[clamp(26px,3vw,38px)]">
-                <Head2 id="winners-heading" className="mb-2.5">
+                <Head2 id="winners-heading" className="mb-5">
                   The draw
                 </Head2>
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 min-[760px]:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:grid-cols-2">
                   {raffle.winningTickets.map((index, i) => (
                     <WinnerCard
                       key={index}
@@ -888,61 +1053,71 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ------------------------------------------------------------- the facts */}
+          {/*
+            The facts and the holdings are each a `card` panel: terms --fg-3 at 5.08 on the card
+            over the ground (4.92 under the top of the haze), figures --fg hard right, rows ruled
+            by --rule as before. The density is unchanged. The last row drops its rule, because
+            the card's own edge is there.
+          */}
           <div className="min-w-0">
-            <Head2 id="facts-heading" className="mb-2.5">
-              Facts
-            </Head2>
+            <div className={FACTS_CARD}>
+              <Head2 id="facts-heading" className="mb-1">
+                Facts
+              </Head2>
 
-            <table className="w-full border-collapse text-sm">
-              <tbody>
-                <Fact term="Creator">
-                  <span title={config.creator}>{shortAddress(config.creator, 6, 6)}</span>
-                </Fact>
-                <Fact term="Prize deposited">{formatRLO(config.prize)} RLO</Fact>
-                <Fact term="Ticket price">{formatRLO(config.ticketPrice)} RLO</Fact>
-                <Fact term="Reveal bond">{formatRLO(config.revealBond)} RLO</Fact>
-                <Fact term="Supply">{config.supply}</Fact>
-                <Fact term="Sold">{s.sold}</Fact>
-                <Fact term="Revealed">{s.revealed}</Fact>
-                <Fact term="Outstanding">{s.outstanding}</Fact>
-                <Fact term="Bonds forfeited">{formatRLO(s.forfeited)} RLO</Fact>
-                <Fact term="Winners set">{config.winners}</Fact>
-                {/*
-                  A void raffle has no pool: nothing was drawn and nothing was paid to a winner.
-                  It has three returns instead, each named for who received it, and the last is
-                  the figure the board's row prints for this raffle.
-                */}
-                {phase === "void" ? (
-                  <>
-                    <Fact term="Back to the creator">
-                      {formatRLO(voidReturns(raffle).creator)} RLO
-                    </Fact>
-                    <Fact term="Back to holders">{formatRLO(voidReturns(raffle).holders)} RLO</Fact>
-                    <Fact term="Returned in all">{formatRLO(voidReturns(raffle).total)} RLO</Fact>
-                  </>
-                ) : (
-                  <Fact term="Pool">{formatRLO(s.pool)} RLO</Fact>
-                )}
-                {settled && (
-                  <Fact term="Winners drawn">
-                    {raffle.winningTickets.length
-                      ? raffle.winningTickets.map(pad2).join(", ")
-                      : "none"}
+              <table className="w-full border-collapse text-sm">
+                <tbody>
+                  <Fact term="Creator">
+                    <span title={config.creator}>{shortAddress(config.creator, 6, 6)}</span>
                   </Fact>
-                )}
-                {raffle.chainSeed && <Fact term="Chain seed">{raffle.chainSeed}</Fact>}
-                {audit && <Fact term="Seed">{audit.seed}</Fact>}
-              </tbody>
-            </table>
+                  <Fact term="Prize deposited">{formatRLO(config.prize)} RLO</Fact>
+                  <Fact term="Ticket price">{formatRLO(config.ticketPrice)} RLO</Fact>
+                  <Fact term="Reveal bond">{formatRLO(config.revealBond)} RLO</Fact>
+                  <Fact term="Supply">{config.supply}</Fact>
+                  <Fact term="Sold">{s.sold}</Fact>
+                  <Fact term="Revealed">{s.revealed}</Fact>
+                  <Fact term="Outstanding">{s.outstanding}</Fact>
+                  <Fact term="Bonds forfeited">{formatRLO(s.forfeited)} RLO</Fact>
+                  <Fact term="Winners set">{config.winners}</Fact>
+                  {/*
+                    A void raffle has no pool: nothing was drawn and nothing was paid to a winner.
+                    It has three returns instead, each named for who received it, and the last is
+                    the figure the board's row prints for this raffle.
+                  */}
+                  {phase === "void" ? (
+                    <>
+                      <Fact term="Back to the creator">
+                        {formatRLO(voidReturns(raffle).creator)} RLO
+                      </Fact>
+                      <Fact term="Back to holders">{formatRLO(voidReturns(raffle).holders)} RLO</Fact>
+                      <Fact term="Returned in all">{formatRLO(voidReturns(raffle).total)} RLO</Fact>
+                    </>
+                  ) : (
+                    <Fact term="Pool">{formatRLO(s.pool)} RLO</Fact>
+                  )}
+                  {settled && (
+                    <Fact term="Winners drawn">
+                      {raffle.winningTickets.length
+                        ? raffle.winningTickets.map(pad2).join(", ")
+                        : "none"}
+                    </Fact>
+                  )}
+                  {raffle.chainSeed && <Fact term="Chain seed">{raffle.chainSeed}</Fact>}
+                  {audit && <Fact term="Seed">{audit.seed}</Fact>}
+                </tbody>
+              </table>
+            </div>
 
             {/* ----------------------------------------------------- the holdings */}
-            <section aria-labelledby="held-heading" className="mt-[26px]">
-              <Head2 id="held-heading" className="mb-2.5">
+            <section aria-labelledby="held-heading" className={`mt-5 ${FACTS_CARD}`}>
+              <Head2 id="held-heading" className="mb-1">
                 {VIEWER_LABEL}
               </Head2>
 
               {held.length === 0 ? (
-                <Note>The sample holder has none of this raffle&rsquo;s tickets.</Note>
+                <Note className="mt-2 mb-3">
+                  The sample holder has none of this raffle&rsquo;s tickets.
+                </Note>
               ) : (
                 <table className="w-full border-collapse text-sm">
                   <tbody>
@@ -965,7 +1140,7 @@ export default async function RafflePage({ params }: { params: Promise<{ id: str
                 page whose whole argument is check it yourself.
               */}
               {held.length > 0 && (
-                <Note className="mt-2.5">
+                <Note className="mt-2.5 mb-3">
                   These belong to one address kept in the sample record, not to any wallet and not
                   to you. Nothing was read from a browser to build this page. It is here as a
                   worked example, so the bed can show what a held ticket and a revealed one look

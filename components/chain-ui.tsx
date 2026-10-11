@@ -30,6 +30,7 @@ import { countdownLadder, utcShort, utcStamp } from "@/lib/cell";
 import { ChainError, type Outcome } from "@/lib/chain/actions";
 import { storagePersists } from "@/lib/chain/nonces";
 import { cleanTitle, errorMessage, type ChainPhase } from "@/lib/chain/program";
+import { BUTTON, BUTTON_PRIMARY } from "@/lib/controls";
 import { RIALO_RPC } from "@/lib/rialo-rpc";
 import { WALLET_STORAGE_KEY } from "@/lib/wallet";
 import {
@@ -273,9 +274,11 @@ export const CHAIN_PHASE_WORD: Record<ChainPhase, string> = {
 };
 
 /**
- * The tag for a phase. `data-phase` drives the colour in app/cell.css (drawn takes --event, void
- * --fg-3); "ready" has no rule there and so prints in --fg, which is right: it is the one moment a
- * raffle is waiting on a person rather than on the clock.
+ * The tag for a phase: the same `.phase-tag` pill the board's rows print, so a live raffle and a
+ * sample say their phase in one object. `data-phase` drives the paint in app/cell.css (drawn is
+ * chalk on a rose-sold wash, never coral, because coral is a winner and a phase is not one; void
+ * is --fg-3). "ready" has no rule of its own there and so prints in the pill's resting --fg, which
+ * is right: it is the one moment a raffle is waiting on a person rather than on the clock.
  */
 export function PhaseTag({ phase }: { phase: ChainPhase }) {
   return (
@@ -326,16 +329,33 @@ export function describeError(error: unknown): Refusal {
 /* ---------------------------------------------------------------- controls */
 
 /**
- * The control shells, the same three the counter on a sample raffle uses, so a button on a live
- * raffle is the same object as a button on a sample. No signal hue: --event means a result in this
- * product, and a button is not one.
+ * The control shells. The paint is lib/controls.ts's, the same paper pill and outlined pill the
+ * landing and the ceremony press, so a button on a live raffle is the same object as one anywhere
+ * else in Drawbook. What this kit adds is what only a live page has: a control that is off, and one
+ * that is waiting on the chain.
+ *
+ * OFF (`disabled` and not busy): the page's raised surface with a --bound edge and --fg-3
+ * lettering, 5.13 on --panel-2 (and 5.10 on the record tone's wine). No paper, no glow, no lift,
+ * and the not-allowed cursor, so a button that cannot be pressed never looks more real than it is.
+ *
+ * BUSY (`disabled` and `aria-busy`): the press landed and the chain has not answered. It keeps its
+ * paper, its wine lettering (15.80 and 12.29) and its resting glow, and loses only the lift and the
+ * hover glow, so it no longer answers the pointer. The word swap ("Buying",
+ * "Deploying") is the whole signal. No spinner and no progress estimate: lib/chain reports nothing
+ * until the transaction has executed, so any progress drawn here would be invented. No sheen loop
+ * either: the loops this design allows are listed in the port plan, and a waiting button is not
+ * one of them. <Waiting> under the button counts the seconds in words.
+ *
+ * Neither control is ever coral, and neither hover is an apricot fill: coral is a winner and
+ * apricot is the signal, and a control is neither.
  */
-const CONTROL =
-  "label inline-flex items-center justify-center gap-2 border px-3.5 py-2.5 transition-colors duration-[var(--t-open)] ease-settle";
+const OFF =
+  "disabled:cursor-not-allowed disabled:[transform:none] disabled:not-aria-busy:border-bound disabled:not-aria-busy:bg-panel-2 disabled:not-aria-busy:bg-none disabled:not-aria-busy:text-fg-3 disabled:not-aria-busy:[box-shadow:none] disabled:aria-busy:hover:[box-shadow:var(--shadow-cta)]";
 
-export const PRIMARY = `${CONTROL} border-fg bg-fg text-panel hover:border-fg-2 hover:bg-fg-2 active:translate-y-px disabled:cursor-not-allowed disabled:border-bound disabled:bg-panel-2 disabled:text-fg-3`;
+export const PRIMARY = `${BUTTON_PRIMARY} justify-center ${OFF}`;
 
-export const SECONDARY = `${CONTROL} border-bound text-fg hover:bg-panel-2 active:translate-y-px disabled:cursor-not-allowed disabled:text-fg-3`;
+/** Outlined, and visibly so: the demo tells the presenter which of two buttons is the filled one. */
+export const SECONDARY = `${BUTTON} justify-center disabled:cursor-not-allowed disabled:[translate:none] disabled:bg-transparent disabled:text-fg-3`;
 
 /** The uppercase caption over a block. */
 export function Cap({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -387,16 +407,18 @@ export function Waiting({ since, children }: { since: number; children: ReactNod
 }
 
 /**
- * A refusal, in reversed print and never in a colour. The signal hue means a winner here, and the
- * system has no error colour on purpose; full ink with panel lettering is a louder step than a hue
- * change would be and it spends nothing from the signal budget.
+ * A refusal, in reversed print and never in a colour. Coral means a winner here, apricot is the
+ * signal, and the system has no error colour on purpose: a chalk bar with dusk lettering (16.38;
+ * wine lettering on the record tone, 14.98) is a louder step than a hue change would be, and it
+ * spends nothing from either colour's meaning. The body sits on the raised --panel-2, so the block
+ * reads as one card with a printed header rather than as a coloured alert.
  */
 export function RefusalBlock({ refusal, title }: { refusal: Refusal; title?: string }) {
   const unknown = refusal.outcome === "unknown";
   // A refused transaction is not on chain, so its signature would be a receipt for nothing.
   const showSignature = refusal.signature && refusal.outcome !== "refused" && refusal.outcome !== "not-sent";
   return (
-    <div className="border border-bound" role="alert">
+    <div className="overflow-hidden rounded-card border border-bound bg-panel-2" role="alert">
       <p className="label bg-fg px-4 py-3 text-panel">
         {title ?? (unknown ? "Not confirmed: it may have landed" : "Not done")}
       </p>
@@ -413,7 +435,7 @@ export function RefusalBlock({ refusal, title }: { refusal: Refusal; title?: str
         {refusal.logs.length > 0 && (
           <details className="mt-2.5">
             <summary className="label cursor-pointer text-fg-3">What the node logged</summary>
-            <pre className="mono recess mt-2 overflow-x-auto bg-recess px-3 py-2.5 text-sm leading-[1.6] whitespace-pre text-fg">
+            <pre className="mono mt-2 overflow-x-auto rounded-chip bg-recess px-3 py-2.5 text-sm leading-[1.6] whitespace-pre text-fg">
               {refusal.logs.join("\n")}
             </pre>
           </details>

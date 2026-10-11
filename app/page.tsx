@@ -1,7 +1,14 @@
 import Link from "next/link";
 
-import { MusterBands } from "@/components/cell";
+import { MusterBands, Sheet } from "@/components/cell";
 import { Ceremony, CeremonyLedger, CeremonyWinners } from "@/components/ceremony";
+import { Braid, type BraidData } from "@/components/drum/braid";
+import { CommitField } from "@/components/drum/commit-field";
+import { DrawScene } from "@/components/drum/draw-scene";
+import { DrumStage } from "@/components/drum/drum-stage";
+import type { DrumCell, SceneData } from "@/components/drum/geometry";
+import { ResolveText } from "@/components/drum/resolve-text";
+import { Reveal, Tilt } from "@/components/fx";
 import { Hero } from "@/components/landing/hero";
 import { RaffleCard } from "@/components/landing/raffle-card";
 import {
@@ -14,7 +21,7 @@ import {
   type Step,
 } from "@/components/landing/sections";
 import { VerifyPanel } from "@/components/landing/verify-panel";
-import { activeDeadline, isLive, serialOf } from "@/lib/cell";
+import { activeDeadline, cellState, isLive, serialOf } from "@/lib/cell";
 import { PROGRAM_ID } from "@/lib/chain/program";
 import { PINNED_STAMP } from "@/lib/clock";
 import { BUTTON, BUTTON_PRIMARY } from "@/lib/controls";
@@ -54,10 +61,14 @@ export const metadata = {
  * components at the same four scales. Every route, every deadline and every digest is where it
  * was. This file decided what is said and in what order; it invented nothing.
  *
- * EVERYTHING HERE IS A SERVER COMPONENT EXCEPT THREE ISLANDS: `<Hero>` arms and releases the
- * opening, `<Countdown>` inside each card is the one figure that moves under the reader, and the
- * ceremony is its own. The 112 cells, five cards, the chain, the whole verification panel and the
- * entire ceremony poster ship as HTML.
+ * EVERYTHING HERE IS A SERVER COMPONENT EXCEPT THE ISLANDS, and every island is an enhancement
+ * over HTML that already says everything. `<Hero>` raises the sentence; the drum stage draws the
+ * 112 sample tickets as a turning drum over the muster the server rendered; the draw scene plays
+ * sample 0004's draw on the scroll over the chain and the ticket sheet the server rendered; the
+ * braid and the commitment field picture the working beside the working itself; the program id
+ * resolves once; `<Countdown>` inside each card is the one figure that moves under the reader; and
+ * the ceremony is its own. With no script, or under a reduced-motion preference, the page reads
+ * as plain sections and three.js is never fetched (components/drum/drum-stage.tsx).
  *
  * NOT ONE QUANTITY BELOW IS A LITERAL. Every figure is a reduction over MOCK_RAFFLES through
  * `summarize`, `payouts`, `auditSeed` and `deriveWinnerTrace`, computed at render time, which is
@@ -227,6 +238,61 @@ const CHAIN: ChainLink[] =
       ]
     : [];
 
+/* ------------------------------------------------------------------------------- the drum */
+
+/**
+ * EVERY TICKET IN THE SAMPLE RECORD, AS THE DRUM DRAWS IT: [raffle, ticket, state], raffle 0001's
+ * first ticket first, so each raffle is one band of the sphere. The state is lib/cell.ts's own,
+ * the same value the muster under the drum renders, so the drum and the muster cannot disagree
+ * about which tickets are sold, revealed, refunded or won. No Raffle object crosses into an island.
+ */
+const DRUM_CELLS: DrumCell[] = [...MOCK_RAFFLES]
+  .sort((a, b) => a.config.id - b.config.id)
+  .flatMap((r) => r.tickets.map((t): DrumCell => [r.config.id, t.index, cellState(r, t)]));
+
+/** Each revealed ticket's place in the sorted order `deriveSeed` hashes the nonces in. */
+const SORT_POS = new Map(SORTED_NONCES.map((n, i) => [Number(n.index), i]));
+
+/**
+ * THE DRAW SCENE'S DATA: the settled raffle's tickets, its pool, its trace and the chain's five
+ * links, every one read from the same values the chain and the ceremony print. A ticket is silent
+ * when it was sold and its nonce never published; the trace's picks index the eligible pool in
+ * the order `summarize` returns it, which is the order the scene's cursor walks.
+ */
+const SCENE: SceneData | null =
+  CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY && TRACE.length > 0
+    ? {
+        raffleId: CEREMONY.config.id,
+        serial: serialOf(CEREMONY),
+        tickets: CEREMONY.tickets.map((t) => ({
+          index: t.index,
+          state: cellState(CEREMONY, t),
+          silent: t.holder !== null && t.nonce === null,
+          sortPos: SORT_POS.get(t.index) ?? -1,
+        })),
+        eligible: [...CEREMONY_SUMMARY.eligible],
+        trace: TRACE.map(({ pick, poolBefore, winner }) => ({ pick, poolBefore, winner })),
+        chainValue: CEREMONY.chainSeed ?? "",
+        seed: CEREMONY_SEED,
+        links: CHAIN.map((l) => ({ name: l.name, value: l.value, note: l.note, hex: !!l.hex })),
+      }
+    : null;
+
+/** The braid: the same raffle, its sorted order, its chain value, its seed and its two picks. */
+const BRAID: BraidData | null = SCENE
+  ? {
+      tickets: SCENE.tickets.map((t) => ({ index: t.index, silent: t.silent })),
+      sorted: SORTED_NONCES.map((n) => Number(n.index)),
+      chainValue: SCENE.chainValue,
+      seed: SCENE.seed,
+      trace: SCENE.trace,
+      names: CHAIN.map((l) => l.name),
+    }
+  : null;
+
+/** The commitment field: the same raffle's twenty commitments, in ticket order. */
+const COMMITMENTS = CEREMONY ? CEREMONY.tickets.map((t) => t.commitment ?? "") : [];
+
 /* ------------------------------------------------------------------------------- the copy */
 
 /**
@@ -293,9 +359,18 @@ const BENEFITS: [string, string, string][] = [
 
 export default function LandingPage() {
   const serial = CEREMONY ? serialOf(CEREMONY) : "";
+  const drawHead = (
+    <SectionHead
+      id="draw-heading"
+      title="See how a winner is drawn."
+      lead={`Sample raffle ${serial} is fixed demonstration data, not on chain. This is its draw, recomputed in your browser with the same winner selection a live raffle’s page uses to check its own.`}
+    />
+  );
 
   return (
-    <main className="pt-mast">
+    /* `isolate` makes <main> the stacking context the drum canvas sits at the bottom of: above
+       the body's haze and film, under every word here. See app/drum.css. */
+    <main className="relative isolate pt-mast">
       {/* ==================================================================== 1. THE HERO */}
       <section aria-label="Drawbook">
         {/* The second call to action used to be "How it works" scrolling to #how, while the
@@ -316,14 +391,15 @@ export default function LandingPage() {
             </>
           }
           field={<MusterBands raffles={MOCK_RAFFLES} />}
+          drum={<DrumStage cells={DRUM_CELLS} scene={SCENE} />}
           fieldHead={
-            <figcaption className="label mb-3.5 flex justify-between gap-3 text-fg-3">
+            <div className="label flex justify-between gap-3 text-fg-3">
               <span>Every ticket in the sample raffles</span>
               <span>{TOTALS.tickets} tickets</span>
-            </figcaption>
+            </div>
           }
           fieldNote={
-            <p className="m-0 mt-3.5 max-w-[52ch] text-sm text-fg-3">
+            <p className="m-0 mt-2.5 max-w-[52ch] text-sm text-fg-3">
               One block per ticket across the {TOTALS.raffles} sample raffles, fixed demonstration
               data rather than accounts on chain. Filled is sold, a light foot is a published
               secret, and the two lit blocks are sample {serial}&rsquo;s winners. Open a band and
@@ -339,7 +415,7 @@ export default function LandingPage() {
         aria-labelledby="what-heading"
       >
         <div className="max-w-[58ch]">
-          <h2 id="what-heading" className="m-0 max-w-[18ch] font-serif text-display">
+          <h2 id="what-heading" className="m-0 max-w-[18ch] headline text-display">
             What is Drawbook?
           </h2>
           <p className="m-0 mt-5 text-lg text-fg-2">
@@ -356,32 +432,38 @@ export default function LandingPage() {
           </p>
           <p className="m-0 mt-3 text-sm text-fg-3">
             <span className="label">Program</span>{" "}
-            <span className="mono break-all">{PROGRAM_ID}</span>
+            <ResolveText text={PROGRAM_ID} className="mono break-all" />
           </p>
         </div>
 
-        <ol className="m-0 mt-[clamp(36px,4.6vw,64px)] grid list-none gap-[clamp(24px,3vw,44px)] p-0 min-[760px]:grid-cols-3">
-          {BENEFITS.map(([n, title, body]) => (
-            <li key={n} className="border-t border-bound pt-[18px]">
-              <span className="monument mb-4 block text-[clamp(2.5rem,4.4vw,3.75rem)] text-event">
-                {n}
-              </span>
-              <h3 className="m-0 mb-2.5 font-serif text-title">{title}</h3>
-              <p className="m-0 max-w-[42ch] text-fg-2">{body}</p>
-            </li>
+        {/* Three cards that lean toward a fine pointer and rise as they are reached. The lean and
+            the light it carries are components/fx.tsx; the card ramp is the only surface the
+            glare is allowed on. */}
+        <ol className="m-0 mt-[clamp(36px,4.6vw,64px)] grid list-none gap-[clamp(14px,1.6vw,22px)] p-0 min-[760px]:grid-cols-3">
+          {BENEFITS.map(([n, title, body], i) => (
+            <Reveal as="li" key={n} delay={i * 50} className="flex">
+              <Tilt glare className="card flex w-full flex-col rounded-card p-[26px]">
+                <span className="monument mb-4 block text-[clamp(2.5rem,4.4vw,3.75rem)] text-event">
+                  {n}
+                </span>
+                <h3 className="m-0 mb-2.5 headline-sub text-title">{title}</h3>
+                <p className="m-0 max-w-[42ch] text-fg-2">{body}</p>
+              </Tilt>
+            </Reveal>
           ))}
         </ol>
       </section>
 
-      {/* =============================================================== 3. HOW IT WORKS */}
+      {/* =============================================================== 3. HOW IT WORKS
+          On the ground now, not in a band of its own: the three steps are cards. */}
       <section
         id="how"
-        className="inv scroll-mt-mast bg-panel px-gutter py-[clamp(48px,8vw,112px)] text-fg"
+        className="scroll-mt-mast px-gutter py-[clamp(48px,8vw,112px)]"
         aria-labelledby="how-heading"
       >
         <h2
           id="how-heading"
-          className="m-0 mb-[clamp(36px,4.6vw,64px)] max-w-[18ch] font-serif text-display"
+          className="m-0 mb-[clamp(36px,4.6vw,64px)] max-w-[18ch] headline text-display"
         >
           How a Drawbook raffle works
         </h2>
@@ -406,7 +488,7 @@ export default function LandingPage() {
           title="Try a live raffle."
           lead="Raffles deployed on Rialo testnet are listed at the top of the raffle board, and anyone can deploy one. Buying, revealing, drawing and claiming there are real signed transactions."
           aside={
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-3">
               <Link href="/raffles" className={BUTTON_PRIMARY}>
                 Live raffles <span aria-hidden="true">&rarr;</span>
               </Link>
@@ -438,7 +520,9 @@ export default function LandingPage() {
           been open.
         </p>
 
-        <ul className="rcards m-0 list-none p-0">
+        {/* Six columns on a wide screen: the live cards span two each, three to a row, and the
+            two in the record span three, two to a row (app/drum.css). */}
+        <ul className="lgrid">
           {LIVE.map((r) => (
             <RaffleCard key={r.config.id} raffle={r} />
           ))}
@@ -454,9 +538,13 @@ export default function LandingPage() {
                 {formatRLO(TOTALS.returned)} RLO returned
               </span>
             </h3>
-            <ul className="rcards m-0 list-none p-0">
+            <ul className="lgrid" data-span="3">
               {RECORD.map((r) => (
-                <RaffleCard key={r.config.id} raffle={r} />
+                <RaffleCard
+                  key={r.config.id}
+                  raffle={r}
+                  featured={CEREMONY !== null && r.config.id === CEREMONY.config.id}
+                />
               ))}
             </ul>
           </>
@@ -482,23 +570,37 @@ export default function LandingPage() {
 
       {/* =========================================================== 5. THE DRAW IN ACTION
 
-          The ceremony keeps its section, its five acts and its replay. What is new above it is the
-          chain, which says in five plates what the replay spends twenty seconds saying, for a
-          reader who is not going to press the button. `audit={false}` moves the recomputation to
-          section six, so this page offers one of it rather than two. */}
+          The draw, played by the scroll: the drum slows to rest and sample 0004's twenty tickets
+          form a grid, and the chain's five links walk past one at a time while a cursor makes the
+          two picks. The section head, the chain and the ticket sheet are all server-rendered
+          inside it, so with no script or under reduced motion this is the same section stacked
+          and still (components/drum/draw-scene.tsx). The ceremony keeps its place after it, with
+          its five acts and its replay. `audit={false}` moves the recomputation to section six, so
+          this page offers one of it rather than two. */}
       {CEREMONY && TRACE.length > 0 ? (
         <>
           <section
-            className="inv bg-panel px-gutter py-[clamp(48px,8vw,112px)] text-fg"
+            className={SCENE ? "ds-section" : "px-gutter py-[clamp(48px,8vw,112px)]"}
             aria-labelledby="draw-heading"
           >
-            <SectionHead
-              id="draw-heading"
-              title="See how a winner is drawn."
-              lead={`Sample raffle ${serial} is fixed demonstration data, not on chain. This is its draw, recomputed in your browser with the same winner selection a live raffle’s page uses to check its own.`}
-            />
-            <DrawChain links={CHAIN} />
-            <p className="m-0 mt-[clamp(26px,3vw,40px)] max-w-[62ch] text-sm text-fg-3">
+            {SCENE ? (
+              <DrawScene
+                data={SCENE}
+                skip={{ href: "#verify-heading", label: "Don’t trust the result. Verify it." }}
+                head={drawHead}
+                chain={<DrawChain links={CHAIN} />}
+                sheet={<Sheet raffle={CEREMONY} />}
+              />
+            ) : (
+              /* No scene data: the section as it read before the drum, the head and the chain. */
+              <>
+                {drawHead}
+                <DrawChain links={CHAIN} />
+              </>
+            )}
+            <p
+              className={`${SCENE ? "ds-after" : "mt-[clamp(26px,3vw,40px)]"} m-0 max-w-[62ch] text-sm text-fg-3`}
+            >
               No spin, no near miss, no acceleration into a result. The pool shrank from{" "}
               {TRACE[0].poolBefore} to {TRACE[TRACE.length - 1].poolBefore} between the two picks,
               which is why the second winner could not be the first. Replay it below.
@@ -518,7 +620,7 @@ export default function LandingPage() {
       {CEREMONY && CEREMONY_SEED && CEREMONY_SUMMARY ? (
         <section className="px-gutter py-[clamp(48px,8vw,112px)]" aria-labelledby="verify-heading">
           <div className="mb-[clamp(30px,4vw,52px)] max-w-[58ch]">
-            <h2 id="verify-heading" className="m-0 max-w-[18ch] font-serif text-display">
+            <h2 id="verify-heading" className="m-0 max-w-[18ch] headline text-display">
               Don&rsquo;t trust the result. Verify it.
             </h2>
             <p className="m-0 mt-[18px] text-lg text-fg-2">
@@ -528,16 +630,33 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <VerifyPanel
-            serial={serial}
-            nonces={SORTED_NONCES}
-            chainValue={CEREMONY.chainSeed ?? ""}
-            seed={CEREMONY_SEED}
-            eligible={CEREMONY_SUMMARY.eligible.length}
-            trace={TRACE}
-          />
+          {/* The commitments, unreadable until the pointer reaches them, beside the working that
+              prints every value in full. */}
+          <div className="grid items-start gap-[clamp(20px,2.4vw,28px)] min-[980px]:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+            <CommitField
+              commitments={COMMITMENTS}
+              winners={CEREMONY.winningTickets}
+              caption={`Sample raffle ${serial} · not on chain`}
+            />
+            {/* Closed, the working is a single row beside a tall field, so on a wide screen it
+                sits level with the field's middle rather than hanging off its top edge. Opened,
+                it is the taller of the two and the row grows to it. */}
+            <div className="min-[980px]:self-center">
+              <VerifyPanel
+                serial={serial}
+                nonces={SORTED_NONCES}
+                chainValue={CEREMONY.chainSeed ?? ""}
+                seed={CEREMONY_SEED}
+                eligible={CEREMONY_SUMMARY.eligible.length}
+                trace={TRACE}
+              />
+            </div>
+          </div>
         </section>
       ) : null}
+
+      {/* The braid: the same draw as one picture, between the working and the Rialo section. */}
+      {BRAID ? <Braid data={BRAID} /> : null}
 
       {/* ================================================================ 7. BUILT ON RIALO */}
       <section
@@ -550,7 +669,7 @@ export default function LandingPage() {
             {/* "Built", no longer "Designed": the trigger in the diagram beside this fired on
                 testnet. The paragraph says what Rialo does, then what a person can still do, then
                 which raffles have no schedule, so nobody reads an old raffle's button as a fault. */}
-            <h2 id="rialo-heading" className="m-0 max-w-[18ch] font-serif text-display">
+            <h2 id="rialo-heading" className="m-0 max-w-[18ch] headline text-display">
               Built for automatic execution.
             </h2>
             <p className="m-0 mt-5 max-w-[52ch] text-lg text-fg-2">
@@ -586,14 +705,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ==================================================================== 8. THE CLOSE */}
-      <section className="inv bg-panel px-gutter py-[clamp(64px,10vw,140px)] text-fg">
-        <h2 className="m-0 max-w-[16ch] font-serif text-display">Ready to see it in action?</h2>
+      {/* ==================================================================== 8. THE CLOSE
+          On the ground, under one orb of the room's own light (app/drum.css). */}
+      <section className="relative isolate overflow-hidden px-gutter py-[clamp(64px,10vw,140px)]">
+        <div aria-hidden="true" className="close-orb" />
+        <h2 className="m-0 max-w-[16ch] headline text-display">Ready to see it in action?</h2>
         <p className="m-0 mt-[clamp(18px,2vw,24px)] max-w-[52ch] text-fg-2">
           Live raffles are on Rialo testnet, and a raffle you deploy is a real account there. Your
           wallet is a burner key held in this browser.
         </p>
-        <div className="mt-[clamp(28px,3.4vw,44px)] flex flex-wrap items-center gap-2.5">
+        <div className="mt-[clamp(28px,3.4vw,44px)] flex flex-wrap items-center gap-3">
           <Link href="/raffles" className={BUTTON_PRIMARY}>
             Live raffles
           </Link>

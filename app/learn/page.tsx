@@ -51,14 +51,19 @@ export const metadata = {
  * reveal, a program its deployer can still upgrade during the testnet period, and a rent reserve
  * each raffle account keeps.
  *
- * QUIET BY DESIGN, like /docs. A reading room, lit flat: no ticket, no drum, no signal hue and no
- * motion. The single bright thing is the reversed-print control at the end, because in this room
- * the bright thing is the thing you take.
+ * A READING ROOM AT DUSK, like /docs, built from components/prose.tsx alone. No drum, no
+ * three.js, no cursor glow and no tilt: the motion here is decoration only (the head rising once,
+ * each section's hairline drawing in, the contents rows leaning toward the pointer), and the words
+ * never move. The single bright thing is the paper control at the end, because in this room the
+ * bright thing is the thing you take.
+ *
+ * The column sits on the product's gutter (`px-gutter`), not in a centred box, so the text's left
+ * edge and the contents card's right edge line up with the masthead and the footer at every width.
  */
 export default function LearnPage() {
   return (
     <>
-      <main className="mx-auto w-full max-w-[1180px] px-5 pb-20">
+      <main className="w-full px-gutter pb-24">
         <PageHead
           eyebrow="How it works"
           title="How the draw works."
@@ -224,9 +229,9 @@ export default function LearnPage() {
           </UL>
 
           {/*
-            Reversed print for the primary control, a bounded control for the secondary, both from
-            prose.tsx so every class compiles. The signal hue is not spent: it is ceremonial and means
-            a winner, and a link to a list of raffles is not a ceremony.
+            The paper pill for the primary control and the bounded pill for the secondary, both
+            from prose.tsx, which reads them from lib/controls.ts, so every class compiles. Neither
+            is coral: coral means a winner, and a link to a list of raffles is not a win.
           */}
           <div className="mt-12 flex flex-wrap items-center gap-3">
             <Action href="/raffles" primary>

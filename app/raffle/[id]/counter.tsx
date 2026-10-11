@@ -34,23 +34,36 @@
  * have closed, which was two contradicting statements on one screen. The server and the first
  * hydration render agree, because the clock publishes zero from both until the first frame.
  *
- * CONTRAST, COMPUTED against the surface each token sits on, formula sanity-checked at white on
- * black = 21.00, and read back out of the browser as rendered rather than only off the palette.
+ * CONTRAST, COMPUTED against the surface each token sits on (WCAG 2, sanity-checked at white on
+ * black = 21.00), with the role values of app/globals.css:
  *
- *   light  --fg 15.01 / --fg-2 7.60 / --fg-3 5.73 / --bound 5.18 on --panel
- *          --fg 11.86 / --fg-2 6.01 / --fg-3 4.53 on --recess, the well
- *          --panel on --fg 15.01, the pressed control and the refusal
- *   inv    --fg 15.01 / --fg-2 7.49 / --fg-3 5.65 / --bound 5.65 on --panel
- *          --fg 11.15 / --fg-3 5.57 on --recess, the audit well on a settled raffle
+ *   floor   --fg 16.38 / --fg-2 9.70 / --fg-3 5.58 / --bound 3.97 on --panel, dusk; the reveal
+ *           check renders here, on raffle 0003
+ *           --fg 14.92 / --fg-2 8.84 / --fg-3 5.08 on the card ramp, the check's panel
+ *   record  --fg 14.98 / --fg-2 8.87 / --fg-3 5.10 / --bound 3.63 on --panel, wine; the audit
+ *           renders here, on raffle 0004
+ *           --fg 16.38 / --fg-3 5.58 on --recess, which is dusk inside the record tone
+ *   paper   wine on the paper ramp 15.80 / 12.29, the pressed check (BUTTON_PRIMARY's `cta`)
+ *   chalk   --panel on --fg 16.38 in the record and on the floor, the refusal
  *
- * NO SIGNAL HUE IS SPENT HERE. `--event` is ceremonial in this system: a winner, a payout, a
- * countdown in its final hour. A control or a refusal in that hue would make a button the only
- * iris on the page.
+ * NEITHER SIGNAL IS SPENT ON A CONTROL. Coral means a winner and nothing else; apricot is the
+ * signal (a final hour, a label that must be seen). A pressed check takes the paper fill of the
+ * primary control, and a refusal is reversed print, a chalk block with the page colour as ink.
+ * Neither is ever coral, because a refusal dressed in the winner's colour would read as a result.
+ *
+ * MOTION, ALL OF IT ONE-SHOT AND ALL OF IT ABSENT UNDER REDUCED MOTION. Each is a transition from
+ * `@starting-style`, so it runs once, when its element first appears, and never again while that
+ * element stays: the check's panel slides up into place the first time a ticket is checked; the
+ * recompute's result rises in over 280ms; and the seed it derived wipes in from the left, in
+ * sixteen clip-path steps over 600ms, because it really was computed in this tab at that moment.
+ * It is one clip over the whole block, so when the seed wraps every line opens at once, column by
+ * column; it is a wipe, not typing in reading order. Pressing again with the panel already up changes its text and moves nothing.
  */
 
 import { useState, useSyncExternalStore } from "react";
 
 import { utcStamp } from "@/lib/cell";
+import { BUTTON, BUTTON_PRIMARY } from "@/lib/controls";
 import {
   getServerSnapshot as clockServerSnapshot,
   getSnapshot as clockSnapshot,
@@ -71,29 +84,40 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 /* --------------------------------------------------------------------- the chrome */
 
 /**
- * The shared control shell. Same border, same padding and same transition as the back link and the
- * two wallet chips, so a control in the page reads as the same object as a control in the bar.
+ * The controls are the site's own pills from lib/controls.ts, so a control on this page is the
+ * same object as a control anywhere else. The secondary action is the bounded pill; its pressed
+ * state, which is how a checked stub names itself, is the paper pill of the primary. Both have a
+ * 1px edge and the same padding, so pressing one changes its fill and nothing else: no row reflows.
  */
-const CONTROL =
-  "label inline-flex items-center justify-center gap-2 border px-3.5 py-2.5 transition-colors duration-[var(--t-open)] ease-settle";
-
-/** The secondary action: a bounded control on the page surface, filling with ink under the hand. */
-const SECONDARY = `${CONTROL} border-bound text-fg hover:bg-panel-2 active:translate-y-px`;
-
-/** The pressed state of a secondary control, which is how the checked stub names itself. */
-const SECONDARY_ON = `${CONTROL} border-fg bg-fg text-panel`;
+const SECONDARY = `${BUTTON} justify-center`;
+const SECONDARY_ON = `${BUTTON_PRIMARY} justify-center`;
 
 /**
- * The recess where the content breaks on its own and there is nothing to scroll.
- *
- * It carries the bare `recess` class as well as the `bg-recess` utility, and that is not
- * decoration: `app/globals.css` ends with `.inv .recess { --fg-3: var(--paper-2) }`, which is how
- * the system's one remaining failing pair, --paper-3 on --line-inv at 4.20, is removed by
- * construction. The audit control renders on a settled raffle, which is inverted, so without the
- * class its labels would be that 4.20.
+ * The well where the content breaks on its own and there is nothing to scroll: --recess at the
+ * well radius, the same cut as the ticket bed. Inside the record tone --recess is dusk, so the
+ * audit's labels are --fg-3 at 5.58 there; the `.recess` hook that once lifted them on the light
+ * ground is gone, and so is the bare class.
  */
-const WELL_STATIC = "recess bg-recess px-4 py-3.5";
+const WELL_STATIC = "rounded-well bg-recess px-4 py-3.5";
 const NOTE = "max-w-[62ch] text-sm text-fg-2";
+
+/*
+ * The three entrances, each a transition from @starting-style behind `motion-safe`, so each runs
+ * once when its element mounts and not at all under reduced motion. Transform and opacity only,
+ * or a clip, so nothing around them reflows.
+ */
+/** The check's panel: up 12px and in, on the rise curve, at the entry duration. */
+const SLIDE_IN =
+  "motion-safe:transition-[opacity,translate] motion-safe:duration-[var(--t-enter)] motion-safe:ease-rise motion-safe:starting:translate-y-3 motion-safe:starting:opacity-0";
+/** The recompute's result: up 10px and in, over 280ms. */
+const RISE_IN =
+  "motion-safe:transition-[opacity,translate] motion-safe:duration-[280ms] motion-safe:ease-rise motion-safe:starting:translate-y-2.5 motion-safe:starting:opacity-0";
+/**
+ * The seed, wiped in from the left: a clip that opens in sixteen steps over 600ms, starting as the
+ * result finishes rising. At rest the clip is the whole box, which clips nothing a digest draws.
+ */
+const TYPE_IN =
+  "[clip-path:inset(0_0_0_0)] motion-safe:transition-[clip-path] motion-safe:delay-[200ms] motion-safe:duration-[600ms] motion-safe:ease-[steps(16,end)] motion-safe:starting:[clip-path:inset(0_100%_0_0)]";
 const LEDGER_TERM = "label text-fg-3";
 const LEDGER_VALUE = "digest mt-1 text-sm leading-relaxed text-fg";
 
@@ -210,7 +234,7 @@ export function PresentHalf({
       </p>
 
       {shown && (
-        <div className="mt-6 min-w-0 border border-bound">
+        <div className={`card mt-6 min-w-0 overflow-hidden rounded-card ${SLIDE_IN}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-rule px-4 py-3">
             <span className="label text-fg-3">The check &middot; ticket {pad2(shown.index)}</span>
             <span className="label text-fg-3">Sample, not sent</span>
@@ -235,7 +259,7 @@ export function PresentHalf({
               go into the seed.
             </p>
           ) : (
-            /* A refusal is reversed print, never a colour: the signal hue means a result. */
+            /* A refusal is reversed print, never a colour: coral means a winner. */
             <p className="label bg-fg px-4 py-3 text-panel">
               Refused. This nonce is not the preimage of that commitment.
             </p>
@@ -307,12 +331,14 @@ export function AuditRecompute({ audit }: { audit: AuditInput }) {
       </p>
 
       {out && (
-        <div className="mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
+        <div
+          className={`mt-4 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)] ${RISE_IN}`}
+        >
           <div className={`${WELL_STATIC} min-w-0`}>
             <dl className="grid gap-4">
               <div>
                 <dt className={LEDGER_TERM}>Seed, recomputed here</dt>
-                <dd className={LEDGER_VALUE}>{out.seed}</dd>
+                <dd className={`${LEDGER_VALUE} ${TYPE_IN}`}>{out.seed}</dd>
               </div>
               <div>
                 <dt className={LEDGER_TERM}>Winners, recomputed here</dt>

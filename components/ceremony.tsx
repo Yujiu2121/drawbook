@@ -70,6 +70,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { useReducedMotion } from "motion/react";
 
 import { serialOf, utcStamp } from "@/lib/cell";
+import { BUTTON as CONTROL } from "@/lib/controls";
 import { MOCK_RAFFLES, VIEWER, VIEWER_LABEL } from "@/lib/mock-raffles";
 import {
   deriveSeed,
@@ -202,15 +203,23 @@ export interface CeremonyProps {
   audit?: boolean;
 }
 
-/* =========================================================== shared presentation */
+/* =========================================================== shared presentation
 
-const BUTTON =
-  "label inline-flex items-center border border-bound px-2.5 py-1.5 text-fg transition-colors duration-[var(--t-open)] ease-settle hover:bg-fg hover:text-panel";
+   THE TWO CONTROLS. The bounded one is the product's own, from lib/controls.ts, so Stop, Show the
+   record and Recompute are the same pill as every other secondary control. The replay button is
+   the one control in the product that stays an apricot fill rather than the paper ramp, and that
+   is deliberate: it starts the replay of a draw, so it is the signal itself, not a call to action
+   among others. Wine on apricot is 12.30 (the ink is --on-event, which no record tone moves), and
+   it is never coral, because coral is a winner. Its box is the bounded pill's box, so the two sit
+   on one baseline in the bar. */
+const BUTTON = CONTROL;
 const BUTTON_PRIMARY =
-  "label inline-flex items-center border border-event bg-event px-2.5 py-1.5 text-panel transition-colors duration-[var(--t-open)] ease-settle hover:border-fg hover:bg-fg";
+  "label inline-flex items-center gap-[0.6em] rounded-pill border border-event bg-event px-[22px] py-3.5 text-on-event transition-colors duration-[var(--t-open)] ease-settle hover:border-fg hover:bg-fg";
 
-/** A digest, a preimage or a payload: long, deliberately unreadable, and narrow enough to fit. */
-const WELL = "digest bg-recess p-3.5 leading-[1.9] text-fg text-[clamp(8.5px,0.95vw,12px)]";
+/** A digest, a preimage or a payload: long, deliberately unreadable, and narrow enough to fit. A
+ * well cut into the record, on the well's own radius. */
+const WELL =
+  "digest rounded-well bg-recess p-3.5 leading-[1.9] text-fg text-[clamp(8.5px,0.95vw,12px)]";
 
 /** Running argument, set as prose. Never as a label: three of these are 140 characters long. */
 const NOTE = "max-w-[62ch] text-sm text-fg-2";
@@ -278,6 +287,11 @@ export function CeremonyLedger() {
  * address, in a bounded, unlit tag. This card used to say "Demo viewer" in the accent while
  * /raffle/4 said "Example holder", so one sample address had two names a click apart, and the
  * replay there put both on one screen. The accent is for winners and live state, not for a name.
+ *
+ * A winner card is the one card in the product that glows coral, because it is a winner and coral
+ * means nothing else. The glow is --shadow-win-lg at rest and it arrives once, when the card is
+ * first shown (the record at rest, or act 4 of a replay): `.cwin` in app/story.css. It does not
+ * breathe. Under reduced motion it is simply there.
  */
 export function CeremonyWinners() {
   return (
@@ -286,8 +300,8 @@ export function CeremonyWinners() {
         const ticket = RAFFLE.tickets.find((t) => t.index === index);
         const amount = PAYOUTS.get(index) ?? 0;
         return (
-          <div key={index} className="flex items-start gap-4 border border-bound p-4">
-            <div className="monument shrink-0 text-[clamp(2.4rem,5vw,4rem)] text-event">
+          <div key={index} className="cwin card flex items-start gap-4 rounded-card p-4">
+            <div className="monument shrink-0 text-[clamp(2.4rem,5vw,4rem)] text-cell-won">
               {pad2(index)}
             </div>
             <div className="min-w-0">
@@ -299,7 +313,7 @@ export function CeremonyWinners() {
                 {ticket?.holder ? shortAddress(ticket.holder, 8, 8) : "no holder"}
               </div>
               {ticket?.holder === VIEWER ? (
-                <div className="label mt-2 inline-block border border-bound px-1.5 py-0.5 text-fg-2">
+                <div className="label mt-2 inline-block rounded-pill border border-bound px-2 py-0.5 text-fg-2">
                   {VIEWER_LABEL}
                 </div>
               ) : null}
@@ -408,7 +422,7 @@ function TraceRows({ trace }: { trace: TraceStep[] }) {
  */
 function Record({ poster, trace }: { poster: ReactNode; trace: TraceStep[] }) {
   return (
-    <div className="col-start-1 row-start-1 grid gap-[clamp(18px,2.4vw,28px)]">
+    <div className="crecord col-start-1 row-start-1 grid gap-[clamp(18px,2.4vw,28px)]">
       <p className="max-w-[62ch] text-lg text-fg-2">
         Sample raffle {SERIAL} is settled. It is fixed demonstration data, not an account on chain.{" "}
         {SUMMARY.sold} tickets sold, {SUMMARY.revealed} revealed, {SUMMARY.outstanding} bonds
@@ -602,9 +616,9 @@ export function RecomputePanel() {
         Recompute it
       </button>
       {audit ? (
-        // `recess` as well as `bg-recess`: inside an inverted block the class is what lifts
-        // --fg-3 to a passing ratio on this surface (app/globals.css, `.inv .recess`).
-        <div className="recess mt-3.5 bg-recess p-3.5" aria-live="polite">
+        // A well on --recess: pit on the page, dusk inside the record tone. --fg-3 on it is 5.80
+        // and 5.58, so no class has to lift it any more.
+        <div className="mt-3.5 rounded-well bg-recess p-3.5" aria-live="polite">
           {audit.kind === "rows" ? (
             <dl className="m-0 grid gap-2.5">
               {audit.rows.map(([term, value]) => (
@@ -1043,7 +1057,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
       <div className="flex flex-wrap items-center gap-x-[18px] gap-y-2.5 border-b border-rule px-gutter py-4">
         {/* "Sample" is the first word on the bar because this island is the one place the
             sample record looks most like a live chain event: a draw, replayed. */}
-        <span className="label border border-bound px-2 py-1 text-fg-2">
+        <span className="label rounded-well border border-bound px-3 py-1.5 text-fg-2">
           Sample raffle {SERIAL}, settled {SETTLED_STAMP}
         </span>
         <span className="label text-fg-3" aria-live="polite">
@@ -1128,7 +1142,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
                 </Caption>
                 <Preimage />
                 <PreimageNote className="mt-3.5" />
-                <div className="relative mt-[18px] overflow-hidden bg-recess p-4">
+                <div className="relative mt-[18px] overflow-hidden rounded-well bg-recess p-4">
                   <div className="digest text-[clamp(10px,1.5vw,20px)] leading-[1.6] text-fg">
                     {seedText || "…"}
                   </div>
@@ -1153,8 +1167,10 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
                       <div
                         key={t.index}
                         data-pick={t.index}
-                        className={`label-b relative flex h-[clamp(58px,13vh,116px)] min-w-0 flex-1 items-start justify-start border p-1 text-[clamp(8px,1vw,13px)] font-normal will-change-transform ${
-                          won ? "border-cell-won bg-cell-won text-on-won" : "border-bound bg-panel text-fg-2"
+                        className={`label-b relative flex h-[clamp(58px,13vh,116px)] min-w-0 flex-1 items-start justify-start overflow-hidden rounded-cell border p-1 text-[clamp(8px,1vw,13px)] font-normal will-change-transform ${
+                          won
+                            ? "border-cell-won bg-cell-won text-on-won shadow-win"
+                            : "border-bound bg-panel text-fg-2"
                         }`}
                       >
                         {/* Twenty two-digit serials cannot fit across a 350px measure: below
@@ -1173,7 +1189,7 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
                   <div
                     ref={cursorRef}
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-0 left-0 border-2 border-event opacity-0 will-change-transform"
+                    className="pointer-events-none absolute top-0 left-0 rounded-cell border-2 border-event opacity-0 will-change-transform"
                   />
                 </div>
                 <div className="label mt-[22px] text-fg-2">{pickStatus}</div>
@@ -1223,11 +1239,15 @@ export function Ceremony({ poster, ledger, trace, audit = true }: CeremonyProps)
  * The swap has no opacity in it at all. The preview crossfaded two absolutely positioned
  * paragraphs through each other for 200ms, four times per replay: half a second of double
  * exposure in the one part of the product whose job is to be legible as an argument.
+ *
+ * `data-on` marks the act on stage for app/story.css, so the winner cards' one-shot glow plays
+ * when act 4 is shown rather than when the hidden act mounted at the start of the replay.
  */
 function Act({ on, children }: { on: boolean; children: ReactNode }) {
   return (
     <div
-      className="col-start-1 row-start-1"
+      className="act col-start-1 row-start-1"
+      data-on={on ? "" : undefined}
       style={{ visibility: on ? "visible" : "hidden", pointerEvents: on ? "auto" : "none" }}
       aria-hidden={on ? undefined : true}
       inert={on ? undefined : true}

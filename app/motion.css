@@ -44,9 +44,14 @@
    No @view-transition { navigation: auto }. That is the cross document form; Drawbook
    navigates in document through the App Router, and declaring it would start a second,
    unrelated transition on every full page load.
-   Nothing here paints a surface treatment: no shadow, no soft edge, no glass, no ramp of
-   colour. A group animation is transform and opacity on a pair of snapshots, which is
-   exactly what the material model allows and all that it allows.
+   Nothing here paints a surface treatment. A group animation is transform and opacity on a
+   pair of snapshots, and the rule that follows from block 2 binds every page that names an
+   element: anything a named element paints outside its own border box, a glow included, is
+   clipped by `::view-transition-image-pair(*) { overflow: clip }` for the length of the
+   flight and pops back on the last frame. So a glow lives on a cell inside the box (the sheet
+   and the muster, never the strip or the blade) or on an unnamed wrapper behind it, and no
+   named element or ancestor of one carries a filter, a backdrop filter, a 3D transform or
+   preserve-3d.
    No feature detection anywhere in the app. Where the API is missing the navigation is an
    instant cut with zero exceptions, which is the honest fallback and needs no code.
    ========================================================================================== */
@@ -87,9 +92,9 @@
    is painted at its full 1100x320 outside a box only 650px wide, a ghost of the finished
    page hanging off the end of the cell. With both, the box is 650px wide and everything
    inside it is at 1:1. Clipping the image pair, which is inset to the group's rect, is what
-   turns the box into an aperture. The cost is that anything a snapshot paints outside its own border box is
-   clipped too; in a system with no shadow and no soft edge that is an outline and nothing
-   else.
+   turns the box into an aperture. The cost is that anything a snapshot paints outside its own
+   border box is clipped too: an outline, a shadow, a glow. That is why the strip and the blade
+   carry none, and why the winner in them is found by a hairline inside its cell instead.
 
    The root snapshot is the whole page and must keep the user agent's behaviour, so it is
    handed back its defaults by name. Its pair is already exactly viewport sized, so the clip
