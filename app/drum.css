@@ -1033,8 +1033,10 @@
     padding: 0 0 clamp(48px, 8vw, 112px);
   }
 
+  /* The gutter is margin, never padding: the note's box is capped at 62ch, and past a 1600px
+     viewport the gutter grows, so as padding it ate the whole measure and stood the note one
+     word to a line on a 1920px screen. */
   .ds-after {
-    margin-top: 0;
-    padding: 0 var(--gutter);
+    margin: 0 var(--gutter);
   }
 }
